@@ -145,7 +145,7 @@ export function Header({ overMedia = false }: { overMedia?: boolean }) {
       {/* 4.5px gutters around a 59px pill give the 68px bar height from Figma. */}
       <div className="px-[12px] py-[4.5px] desk:hidden">
         <div
-          className={`pointer-events-auto flex flex-col gap-[24px] px-[20px] py-[16px] ${pillClass} ${
+          className={`pointer-events-auto flex flex-col gap-[24px] px-[20px] py-[16px] max-[379px]:pr-[12px] ${pillClass} ${
             open ? "rounded-[30px]" : "rounded-full"
           }`}
         >
@@ -163,7 +163,10 @@ export function Header({ overMedia = false }: { overMedia?: boolean }) {
               {open ? <CloseIcon /> : <EqualsIcon />}
             </button>
 
-            <LanguageDropdown variant="compact" />
+            {/* Full Figma pill (40px) on mobile; negative margin keeps the 27px row height. */}
+            <div className="-my-[6.5px]">
+              <LanguageDropdown variant="nav" />
+            </div>
 
             <div className="absolute left-1/2 top-[1.5px] z-20 -translate-x-1/2">
               <Logo tone={showPill || lightChrome ? "light" : "dark"} />
