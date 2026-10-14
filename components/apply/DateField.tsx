@@ -21,11 +21,14 @@ export function DateField({
   onChange,
   className = "",
   size = "md",
+  invalid = false,
 }: {
   value: string; // YYYY-MM-DD
   onChange: (v: string) => void;
   className?: string;
   size?: "md" | "lg";
+  /** Highlight the field (e.g. the age check failed). */
+  invalid?: boolean;
 }) {
   const lg = size === "lg";
   const tr = useText();
@@ -129,7 +132,7 @@ export function DateField({
         aria-expanded={open}
         className={`${FIELD} w-full gap-2.5 px-4 transition-colors ${lg ? `${FIELD_LG} ${display ? "justify-start" : "justify-center"}` : "justify-center"} ${
           lg && open ? "bg-cream!" : ""
-        }`}
+        } ${invalid ? "border-magenta!" : ""}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/calendar-blank.svg" alt="" width={20} height={20} className={`size-5 ${lg ? "opacity-[0.48] brightness-0" : "opacity-60"}`} />

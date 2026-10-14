@@ -25,6 +25,8 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [existing, setExisting] = useState(false);
   const [consent, setConsent] = useState(false);
+  // Display-only copy of who applied, for the check-email screen.
+  const [applicant, setApplicant] = useState<{ name: string; email: string } | null>(null);
 
   const handleSubmit = async (data: AboutData) => {
     if (submitting || !consent) return;
@@ -56,6 +58,7 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
         setSubmitting(false);
         return;
       }
+      setApplicant({ name: data.fullName, email: data.email });
       setStep("check-email");
     } catch (err) {
       console.error("[apply] submit failed", err);
@@ -90,10 +93,25 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
     );
   }
   if (step === "check-email") {
-    return <RedirectingStep message={tr("Check your email to confirm your address and begin.")} onClose={onClose} />;
+    return (
+      <RedirectingStep
+        onBack={onClose}
+        message={applicant ? tr("Hi {name},").replace("{name}", applicant.name) : tr("Check your email to confirm your address and begin.")}
+        detail={
+          applicant ? (
+            <>
+              <span className="text-black/64">{tr("Complete your application through the link we've sent you on your registered email")}</span>
+              <br />
+              <span className="break-all">{applicant.email}</span>
+            </>
+          ) : undefined
+        }
+        pending={false}
+      />
+    );
   }
   if (step === "redirecting-home") {
-    return <RedirectingStep message={tr("Redirecting you to the homepage")} />;
+    return <RedirectingStep message={tr("Redirecting you to the homepage")} onBack={onClose} />;
   }
-  return <RedirectingStep message={tr("Redirecting you to VideoAsk")} />;
+  return <RedirectingStep message={tr("Redirecting you to VideoAsk")} onBack={onClose} />;
 }
