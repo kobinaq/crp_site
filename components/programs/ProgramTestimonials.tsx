@@ -135,7 +135,10 @@ export function ProgramTestimonials() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 mx-auto h-[420px] w-full max-w-[632px] desk:h-[576px]">
+      {/* Arrow rail: on mobile it matches the 280px card so the half-overhanging
+          arrows straddle the card edge instead of spilling past the viewport
+          (which widened the page to 430px at 390). Desktop keeps 632px. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 mx-auto h-[420px] w-full max-w-[280px] desk:h-[576px] desk:max-w-[632px]">
         <ArrowButton
           dir="left"
           onClick={() => go(-1)}

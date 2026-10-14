@@ -329,7 +329,7 @@ export function AboutStep({
             {tr("This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.")}</Toast>
         ) : shown === "success" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
-            {tr("Check your email and confirm your interest to receive updates about future programs.")}</Toast>
+            {tr("Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!")}</Toast>
         ) : shown === "already-recorded" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
             {tr("You're already on our interest list. We've emailed you a link in case you want to update your details.")}</Toast>
