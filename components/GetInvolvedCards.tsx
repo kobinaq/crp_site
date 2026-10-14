@@ -127,9 +127,14 @@ function YouthActions({ onNavigate }: { onNavigate?: () => void }) {
 type InvolvedCardProps = {
   surface?: "section" | "popup";
   onNavigate?: () => void;
+  /** About page mobile: Figma 297px cards with 20px one-line titles (desktop unchanged). */
+  compact?: boolean;
 };
 
-function YouthContent({ onNavigate }: { onNavigate?: () => void }) {
+const TITLE_SIZE = "text-[clamp(24px,3.4vw,40px)]";
+const COMPACT_TITLE_SIZE = "whitespace-nowrap text-[20px] tracking-[-0.8px] desk:whitespace-normal desk:text-[clamp(24px,3.4vw,40px)] desk:tracking-[-0.04em]";
+
+function YouthContent({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
   const copy = useCopy();
 
   return (
@@ -153,7 +158,7 @@ function YouthContent({ onNavigate }: { onNavigate?: () => void }) {
       />
 
       <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
-        <p className="max-w-[12ch] text-[clamp(24px,3.4vw,40px)] leading-[0.9] tracking-[-0.04em] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.35)]">
+        <p className={`${compact ? `max-w-none desk:max-w-[12ch] ${COMPACT_TITLE_SIZE}` : `max-w-[12ch] ${TITLE_SIZE}`} leading-[0.9] tracking-[-0.04em] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.35)]`}>
           {copy.involved.youth}
         </p>
       </div>
@@ -166,6 +171,7 @@ function YouthContent({ onNavigate }: { onNavigate?: () => void }) {
 export function YouthAmbassadorCard({
   surface = "section",
   onNavigate,
+  compact = false,
 }: InvolvedCardProps) {
   if (surface === "popup") {
     return (
@@ -177,12 +183,12 @@ export function YouthAmbassadorCard({
 
   return (
     <div className={`${CARD_SHELL} overflow-visible ${SECTION_SIZE}`}>
-      <YouthContent onNavigate={onNavigate} />
+      <YouthContent onNavigate={onNavigate} compact={compact} />
     </div>
   );
 }
 
-function PartnerContent({ onNavigate }: { onNavigate?: () => void }) {
+function PartnerContent({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
   const copy = useCopy();
   const { x, y, active, onPointerMove, onPointerLeave } = usePointerOrigin();
   const shiftX = useTransform(x, [0, 1], ["-12%", "12%"]);
@@ -228,7 +234,7 @@ function PartnerContent({ onNavigate }: { onNavigate?: () => void }) {
       />
 
       <div className="absolute inset-0 flex items-center justify-center px-8 text-center">
-        <p className="text-[clamp(24px,3.4vw,40px)] leading-[0.9] tracking-[-0.04em] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.25)]">
+        <p className={`${compact ? COMPACT_TITLE_SIZE : TITLE_SIZE} leading-[0.9] tracking-[-0.04em] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.25)]`}>
           {copy.involved.partner}
         </p>
       </div>
@@ -243,6 +249,7 @@ function PartnerContent({ onNavigate }: { onNavigate?: () => void }) {
 export function PartnerCard({
   surface = "section",
   onNavigate,
+  compact = false,
 }: InvolvedCardProps) {
   if (surface === "popup") {
     return (
@@ -254,7 +261,7 @@ export function PartnerCard({
 
   return (
     <div className={`${CARD} rounded-[88px] desk:rounded-blob-lg ${SECTION_SIZE}`}>
-      <PartnerContent onNavigate={onNavigate} />
+      <PartnerContent onNavigate={onNavigate} compact={compact} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -265,13 +266,8 @@ function MobileTeamCard({
   member: AboutTeamMember;
   onOpen: () => void;
 }) {
-  const ticket = useTicketLabel(member.role);
-
   return (
     <button
-      ref={(el) => {
-        ticket.cardRef.current = el;
-      }}
       type="button"
       onClick={onOpen}
       aria-label={`${member.name}. ${member.role}`}
@@ -291,7 +287,7 @@ function MobileTeamCard({
           {member.name}
         </p>
       </div>
-      <TicketTab placement="top" ink label={ticket.text} labelPx={ticket.px} maxWidth={120} />
+      <TicketTab placement="top" ink wrap label={member.role} />
     </button>
   );
 }
@@ -389,6 +385,158 @@ function TeamMemberSheet({
   );
 }
 
+type WorkCardCopy = { label: string; title: string };
+
+/** Native mobile 2x2 "What we do" grid (Figma 390 frame: 195x254 cards, 64px radius). */
+function MobileWorkCards({ cards }: { cards: readonly WorkCardCopy[] }) {
+  const card =
+    "relative flex h-[254px] min-w-0 flex-1 flex-col items-center justify-center gap-6 overflow-hidden rounded-[64px] p-6";
+  const label = "relative z-10 w-full text-[14px] font-semibold uppercase leading-[0.9] tracking-[1.12px] text-black";
+  const title = "relative z-10 w-full text-[24px] leading-none tracking-[-0.96px]";
+  return (
+    <div className="flex w-full flex-col desk:hidden">
+      <div className="flex w-full">
+        <article className={`${card} bg-white`}>
+          <Glow
+            src={aboutImages.workGlow}
+            className="absolute left-[57px] top-[-75px] h-[149.5px] w-[169.814px] rotate-180"
+            inset="-35.72% -31.45%"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt=""
+            src={aboutImages.workRings}
+            className="pointer-events-none absolute right-[7.15px] top-[calc(50%-0.56px)] size-[213.848px] max-w-none -translate-y-1/2"
+          />
+          <GlassOrb icon={aboutImages.iconPin} pad={15} opacity={0.72} className="left-[37.71px] top-[2.67px]" />
+          <GlassOrb
+            icon={aboutImages.iconUser}
+            pad={22.5}
+            opacity={0.8}
+            className="left-[152.69px] top-[calc(50%-0.56px)] -translate-y-1/2"
+          />
+          <GlassOrb icon={aboutImages.iconCrosshair} pad={28.12} className="left-[17.21px] top-[190.15px]" />
+          <p className={label}>{cards[0].label}</p>
+          <p className={`${title} text-black`}>{cards[0].title}</p>
+        </article>
+        <article className={`${card} bg-lime`}>
+          <Glow
+            src={aboutImages.workGlowStories}
+            className="absolute left-[79px] top-[136px] h-[138.5px] w-[183.814px]"
+            inset="-38.56% -29.05%"
+          />
+          <p
+            aria-hidden
+            className={`${trail.className} pointer-events-none absolute left-[168px] top-[6px] w-[88px] -translate-x-1/2 text-center text-[88.8px] uppercase leading-[0.7] tracking-[-1.776px] text-magenta mix-blend-plus-lighter`}
+          >
+            HOME
+          </p>
+          <p className={label}>{cards[1].label}</p>
+          <p className={`${title} text-black`}>{cards[1].title}</p>
+        </article>
+      </div>
+      <div className="flex w-full">
+        <article className={`${card} bg-magenta`}>
+          <Glow
+            src={aboutImages.workGlowAmbassadors}
+            className="absolute left-[-16px] top-[-59px] h-[149.5px] w-[169.814px]"
+            inset="-35.72% -31.45%"
+          />
+          <p className={label}>{cards[2].label}</p>
+          <p className={`${title} text-white`}>{cards[2].title}</p>
+          <div className="absolute left-6 top-[194px] isolate flex items-center">
+            {[aboutImages.avatar1, aboutImages.avatar2, aboutImages.avatar3].map((src, i) => (
+              <span
+                key={src}
+                className={`relative size-6 overflow-hidden rounded-full border border-white ${i < 2 ? "-mr-[17px]" : ""}`}
+                style={{ zIndex: 3 - i }}
+              >
+                <Image src={src} alt="" fill className="object-cover" sizes="24px" />
+              </span>
+            ))}
+          </div>
+        </article>
+        <article className={`${card} bg-orange`}>
+          <Glow
+            src={aboutImages.workGlow}
+            className="absolute left-[58px] top-[159px] h-[138.5px] w-[183.814px] rotate-180"
+            inset="-38.56% -29.05%"
+          />
+          <p className={label}>{cards[3].label}</p>
+          <p className={`${title} text-black`}>{cards[3].title}</p>
+          <div className="pointer-events-none absolute left-[98px] top-[-15px] flex size-[106.215px] items-center justify-center">
+            <div className="rotate-45">
+              <div className="relative bg-white p-[2.59px] [border-radius:647px_647px_0_647px]">
+                <div className="relative size-[69.926px]">
+                  <div className="absolute left-1/2 top-1/2 flex size-[98.89px] -translate-x-1/2 -translate-y-1/2 -rotate-45 items-center justify-center">
+                    <Image
+                      src={aboutImages.pavilionPin}
+                      alt=""
+                      width={70}
+                      height={70}
+                      className="size-[69.926px] rounded-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  );
+}
+
+/** Native mobile H.O.M.E banner (Figma 390x170). */
+function MobileHomeBanner({ topics, caption }: { topics: readonly string[]; caption: string }) {
+  const spots = [
+    { left: 36, top: 14.5 },
+    { left: 132, top: 37.5 },
+    { left: 214, top: 13.5 },
+    { left: 311, top: 60.5 },
+  ];
+  return (
+    <div className="flex h-[170px] w-full flex-col bg-black desk:hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[16.9px] bg-white/12 p-1">
+        <div className="relative h-full min-w-0 flex-1 overflow-hidden rounded-[14.3px] bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={aboutImages.homeSlide} alt="" className="absolute inset-0 size-full object-cover" />
+          <div className="pointer-events-none absolute bottom-[-0.5px] left-1/2 h-[130px] w-[385px] -translate-x-1/2 bg-gradient-to-t from-black to-transparent backdrop-blur-[3.9px] [mask-image:linear-gradient(to_top,#000_40%,transparent)]" />
+          <p
+            aria-hidden
+            className={`${trail.className} pointer-events-none absolute left-1/2 top-[-1.95px] z-10 -translate-x-1/2 whitespace-nowrap text-center text-[146.475px] uppercase leading-[0.7] tracking-[-2.93px] text-magenta`}
+          >
+            HOME
+          </p>
+          {topics.slice(0, 4).map((topic, i) => (
+            <p
+              key={topic}
+              className="absolute z-10 whitespace-nowrap text-[10px] font-semibold uppercase leading-[0.9] tracking-[0.4px] text-white mix-blend-hard-light"
+              style={spots[i]}
+            >
+              {topic}
+            </p>
+          ))}
+          <p className="absolute left-1/2 top-[106px] z-10 w-[362px] max-w-[calc(100%-8px)] -translate-x-1/2 text-center text-[20px] leading-[0.9] tracking-[-0.8px] text-white">
+            {caption}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const MOBILE_GLOBE_YAW = Math.PI - 0.9;
+const MOBILE_QUERY = "(max-width: 899.98px)";
+function subscribeMobile(onChange: () => void) {
+  const mq = window.matchMedia(MOBILE_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+function getMobile() {
+  return window.matchMedia(MOBILE_QUERY).matches;
+}
+
 const TEAM_SEATS = ["left", "lead", "right"] as const;
 
 function TeamRow({ members }: { members: readonly AboutTeamMember[] }) {
@@ -439,6 +587,9 @@ export function AboutPage() {
   const a = copy.aboutUs;
   const [selectedMember, setSelectedMember] = useState<AboutTeamMember | null>(null);
   const statementLines = a.statement.split("\n");
+  // Mobile Figma frames the globe on Asia; desktop keeps its original start (yaw 0).
+  const isMobile = useSyncExternalStore(subscribeMobile, getMobile, () => false);
+  const globeYaw = isMobile ? MOBILE_GLOBE_YAW : 0;
   const teamPins: Pin[] = aboutTeam.map((member, index) => {
     const band = (index + 0.5) / aboutTeam.length;
     const place = "place" in member ? member.place : undefined;
@@ -460,7 +611,7 @@ export function AboutPage() {
 
   return (
     <div className="overflow-x-hidden bg-cream">
-      <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden px-5 pb-16 pt-28 desk:min-h-[805px] desk:px-16 desk:pb-[96px] desk:pt-[120px]">
+      <section className="relative flex h-[855px] items-start justify-center overflow-hidden px-3 pb-3 pt-[123px] desk:h-auto desk:min-h-[805px] desk:items-center desk:px-16 desk:pb-[96px] desk:pt-[120px]">
         <Image
           src={aboutImages.heroBg}
           alt=""
@@ -469,29 +620,32 @@ export function AboutPage() {
           className="object-cover"
           sizes="100vw"
         />
-        <div className="relative z-10 flex min-h-[520px] w-full flex-col items-center justify-between text-white desk:min-h-[589px]">
+        <div className="relative z-auto flex w-full flex-col items-center gap-8 text-white desk:z-10 desk:min-h-[589px] desk:justify-between desk:gap-0">
           <h1
-            className={`${trail.className} text-center text-[clamp(64px,14vw,130px)] uppercase leading-[0.9] tracking-[0.04em] desk:tracking-[5.2px]`}
+            className={`${trail.className} relative z-10 h-[81px] w-[421px] shrink-0 text-center text-[90px] uppercase leading-[0.9] tracking-[3.6px] desk:h-auto desk:w-auto desk:text-[clamp(64px,14vw,130px)] desk:tracking-[5.2px]`}
           >
             {a.heroTitle}
           </h1>
-          <p className="max-w-[632px] text-center text-[18px] leading-[0.9] tracking-[-0.72px] desk:text-[32px] desk:tracking-[-1.28px]">
+          {/* Mobile: reserve the 407x430 Figma globe slot; the globe itself is absolutely positioned over it. */}
+          <div aria-hidden className="h-[430px] w-full shrink-0 desk:hidden" />
+          <p className="relative z-30 max-w-[632px] text-center text-[20px] desk:z-auto leading-[0.9] tracking-[-0.8px] text-white desk:text-[32px] desk:tracking-[-1.28px]">
             {a.heroBody}
           </p>
         </div>
         {/* Figma mobile: 407px globe in a 390px frame so L/R clip to the screen edge. */}
-        <div className="absolute left-1/2 top-[calc(50%-38.5px)] z-20 aspect-square w-[407px] max-w-none -translate-x-1/2 -translate-y-1/2 desk:w-[min(407px,42vw)]">
+        <div className="absolute left-1/2 top-[259px] z-20 aspect-square w-[407px] max-w-none -translate-x-1/2 desk:top-[calc(50%-38.5px)] desk:w-[min(407px,42vw)] desk:-translate-y-1/2">
           <PlatformGlobe
             visibleGroups={["ambassadors"]}
             emphasis={null}
             pins={teamPins}
             waitForImages={ABOUT_GLOBE_WAIT_IMAGES}
+            initialYaw={globeYaw}
           />
         </div>
       </section>
 
-      <section className="flex items-center justify-center px-5 py-20 desk:h-[805px] desk:px-16 desk:py-24">
-        <div className="flex w-full max-w-[632px] flex-col gap-12">
+      <section className="flex h-[855px] items-center justify-center px-6 pb-3 pt-[68px] desk:h-[805px] desk:px-16 desk:py-24">
+        <div className="flex w-full max-w-[632px] flex-col gap-8 desk:gap-12">
           <div className="text-[28px] leading-[0.9] tracking-[-0.04em] text-black desk:text-[48px] desk:tracking-[-1.92px]">
             {statementLines.map((line, i) => (
               <p
@@ -502,13 +656,13 @@ export function AboutPage() {
               </p>
             ))}
           </div>
-          <p className="text-[18px] leading-[0.9] tracking-[-0.04em] text-black desk:text-[32px] desk:tracking-[-1.28px]">
+          <p className="text-[20px] leading-[0.9] tracking-[-0.8px] text-black desk:text-[32px] desk:tracking-[-1.28px]">
             {a.statementTag}
           </p>
         </div>
       </section>
 
-      <section data-nav-tone="dark" className="bg-black py-16 text-white desk:px-16 desk:py-24">
+      <section data-nav-tone="dark" className="bg-black py-24 text-white desk:px-16">
         <div className="mx-auto flex w-full flex-col gap-8 desk:max-w-[632px] desk:gap-16">
           <div className="flex flex-col gap-8 px-6 desk:px-0">
             <h2 className="text-[28px] leading-[0.9] tracking-[-1.12px] desk:text-[48px] desk:tracking-[-1.92px]">
@@ -519,7 +673,9 @@ export function AboutPage() {
             </p>
           </div>
 
-          <div className="w-full">
+          <MobileWorkCards cards={a.cards} />
+
+          <div className="hidden w-full desk:block">
             <FitWidth designWidth={632} designHeight={632} cap>
               <div className="grid size-[632px] grid-cols-2">
                 <article className="relative flex flex-col items-center justify-center gap-6 overflow-hidden rounded-[64px] bg-white p-8">
@@ -633,6 +789,8 @@ export function AboutPage() {
       </section>
 
       <section data-nav-tone="dark" className="bg-black">
+        <MobileHomeBanner topics={a.homeTopics} caption={copy.content.homeCaption} />
+        <div className="hidden desk:block">
         <FitWidth designWidth={1200} designHeight={526}>
           <div className="flex h-[526px] w-[1200px] flex-col bg-black">
             <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[52px] bg-white/12 p-2">
@@ -684,6 +842,7 @@ export function AboutPage() {
             </div>
           </div>
         </FitWidth>
+        </div>
       </section>
 
       <section data-nav-tone="dark" className="bg-black py-16 text-white desk:px-16 desk:py-24">
