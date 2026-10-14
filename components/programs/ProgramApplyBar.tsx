@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ExpressInterestPopup } from "../ExpressInterestPopup";
+import { ApplyFlow } from "../apply/ApplyFlow";
+import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useLanguage } from "../LanguageProvider";
 
 /** Floating CTA pinned to the bottom of the viewport. */
@@ -9,6 +11,7 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
   const { copy } = useLanguage();
   const [open, setOpen] = useState(false);
   const nominate = mode === "nominate";
+  const applyFlow = useApplyFlowEnabled();
 
   return (
     <>
@@ -26,12 +29,16 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
         </button>
       </div>
 
-      <ExpressInterestPopup
-        open={open}
-        ageGroup="19_26"
-        source={nominate ? "nominate_express_19_26" : "apply_express_19_26"}
-        onClose={() => setOpen(false)}
-      />
+      {applyFlow ? (
+        open ? <ApplyFlow onClose={() => setOpen(false)} /> : null
+      ) : (
+        <ExpressInterestPopup
+          open={open}
+          ageGroup="19_26"
+          source={nominate ? "nominate_express_19_26" : "apply_express_19_26"}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }

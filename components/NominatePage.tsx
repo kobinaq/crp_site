@@ -7,6 +7,8 @@ import {
   APPLY_GRADIENT,
 } from "./age-selection/AgeSelectionLayout";
 import { ExpressInterestPopup } from "./ExpressInterestPopup";
+import { ApplyFlow } from "./apply/ApplyFlow";
+import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useCopy } from "./LanguageProvider";
 
 const CTA_REVEAL =
@@ -71,6 +73,7 @@ function NominateCta({ onExpress }: { onExpress: () => void }) {
 export function NominatePage() {
   const copy = useCopy();
   const [interestOpen, setInterestOpen] = useState(false);
+  const applyFlow = useApplyFlowEnabled();
 
   return (
     <>
@@ -81,12 +84,16 @@ export function NominatePage() {
         body={copy.nominateLanding.body}
         cta={<NominateCta onExpress={() => setInterestOpen(true)} />}
       />
-      <ExpressInterestPopup
-        open={interestOpen}
-        ageGroup="19_26"
-        source="nominate_express_19_26"
-        onClose={() => setInterestOpen(false)}
-      />
+      {applyFlow ? (
+        interestOpen ? <ApplyFlow onClose={() => setInterestOpen(false)} /> : null
+      ) : (
+        <ExpressInterestPopup
+          open={interestOpen}
+          ageGroup="19_26"
+          source="nominate_express_19_26"
+          onClose={() => setInterestOpen(false)}
+        />
+      )}
     </>
   );
 }
