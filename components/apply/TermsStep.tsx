@@ -54,7 +54,7 @@ export function TermsStep({
         <div className="relative flex shrink-0 items-center justify-end p-6 desk:p-8">
           <h2
             id={titleId}
-            className="pointer-events-none absolute inset-x-[72px] text-center text-[26px] leading-[0.9] tracking-[-1.28px] text-black desk:inset-x-2 desk:text-[32px]"
+            className="pointer-events-none absolute inset-x-16 text-center text-[24px] leading-[0.9] tracking-[-1.28px] text-black desk:inset-x-2 desk:text-[32px]"
           >
             {tr("Terms of application")}</h2>
           <button
