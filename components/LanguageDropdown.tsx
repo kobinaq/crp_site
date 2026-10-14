@@ -156,8 +156,10 @@ export function LanguageDropdown({
         onClick={toggle}
         className="flex h-[27px] shrink-0 items-center rounded-full bg-white py-[2px] pl-[2px] pr-[8px] text-black transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.03] active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
-        <span className="flex items-center justify-center rounded-full px-[8px] py-[6px] text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px]">
-          {locale.toUpperCase()}
+        {/* Mobile header pill, Figma Contact frame 2282:11269: 71×27. */}
+        <span className="flex items-center justify-center gap-[4px] rounded-full px-[8px] py-[6px] text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px]">
+          <TranslateIcon />
+          <span className="mix-blend-hard-light">{locale.toUpperCase()}</span>
         </span>
         <CaretDownIcon open={open} />
       </button>

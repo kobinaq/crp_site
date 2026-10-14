@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type FormEvent,
   type ReactNode,
   useEffect,
   useRef,
@@ -12,6 +13,10 @@ import Link from "@/components/LocaleLink";
 import { usePointerOrigin } from "@/lib/usePointerOrigin";
 import { useCopy } from "./LanguageProvider";
 import { TicketTab } from "./TicketTab";
+import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
+import { submitWaitlist } from "@/lib/actions";
+import { useCaptureSubmission } from "./useCaptureSubmission";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 /** Figma card edge length — internals are authored at this size. */
 const DESIGN = 536;
@@ -73,9 +78,9 @@ function ScaledDesignCard({
   );
 }
 
-function ArrowCircle() {
+function ArrowCircle({ large = false }: { large?: boolean }) {
   return (
-    <span className="grid h-14 w-14 place-items-center rounded-full bg-white shadow-lg desk:h-20 desk:w-20">
+    <span className={`grid place-items-center rounded-full bg-white shadow-lg desk:h-20 desk:w-20 ${large ? "h-20 w-20" : "h-14 w-14"}`}>
       <span className="flex h-5 w-[19px] items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -188,7 +193,15 @@ export function YouthAmbassadorCard({
   );
 }
 
-function PartnerContent({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
+function PartnerContent({
+  onNavigate,
+  compact = false,
+  contact = false,
+}: {
+  onNavigate?: () => void;
+  compact?: boolean;
+  contact?: boolean;
+}) {
   const copy = useCopy();
   const { x, y, active, onPointerMove, onPointerLeave } = usePointerOrigin();
   const shiftX = useTransform(x, [0, 1], ["-12%", "12%"]);
@@ -198,7 +211,7 @@ function PartnerContent({ onNavigate, compact = false }: { onNavigate?: () => vo
   const washOpacity = useTransform(active, [0, 1], [0, 0.5]);
 
   return (
-    <a
+    <Link
       href="/partner"
       aria-label={copy.a11y.partnerUp}
       onClick={onNavigate}
@@ -239,10 +252,10 @@ function PartnerContent({ onNavigate, compact = false }: { onNavigate?: () => vo
         </p>
       </div>
 
-      <div className="absolute inset-x-0 bottom-8 flex justify-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 desk:bottom-10">
-        <ArrowCircle />
+      <div className={`absolute inset-x-0 flex justify-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 desk:bottom-10 ${contact ? "bottom-3" : "bottom-8"}`}>
+        <ArrowCircle large={contact} />
       </div>
-    </a>
+    </Link>
   );
 }
 
@@ -250,7 +263,11 @@ export function PartnerCard({
   surface = "section",
   onNavigate,
   compact = false,
-}: InvolvedCardProps) {
+  contact = false,
+}: InvolvedCardProps & {
+  /** Contact page mobile: Figma 297×294 card with an 80px arrow (desktop unchanged). */
+  contact?: boolean;
+}) {
   if (surface === "popup") {
     return (
       <ScaledDesignCard className={`group ${CARD} ${POPUP_SHELL}`}>
@@ -260,8 +277,90 @@ export function PartnerCard({
   }
 
   return (
-    <div className={`${CARD} rounded-[88px] desk:rounded-blob-lg ${SECTION_SIZE}`}>
-      <PartnerContent onNavigate={onNavigate} compact={compact} />
+    <div
+      className={`${CARD} rounded-[88px] desk:rounded-blob-lg ${SECTION_SIZE} ${
+        contact ? "max-desk:aspect-auto max-desk:h-[294px]" : ""
+      }`}
+    >
+      <PartnerContent onNavigate={onNavigate} compact={compact} contact={contact} />
+    </div>
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Contact page mobile (Figma 2282:11398): 297×294 "Join the waitlist" card with an email field. */
+export function WaitlistCard() {
+  const copy = useCopy();
+  const { pending, error, challengeKey, submit } = useCaptureSubmission();
+  const [email, setEmail] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const [done, setDone] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  // Card is CSS-hidden on desktop; only mount the challenge where it's visible.
+  const isMobile = useIsMobile();
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (done || pending || (TURNSTILE_SITE_KEY && !token)) return;
+    if (!EMAIL_RE.test(email.trim())) {
+      setInvalid(true);
+      return;
+    }
+    const saved = await submit(() =>
+      submitWaitlist({ email: email.trim(), source: "contact_waitlist", turnstileToken: token }),
+    );
+    if (saved) setDone(true);
+    else setToken(null);
+  };
+
+  return (
+    <div className="relative h-[294px] w-full overflow-hidden rounded-[88px]">
+      <Image
+        src="/images/waitlist.jpg"
+        alt={copy.waitlist.photoAlt}
+        fill
+        sizes="297px"
+        className="object-cover"
+      />
+      <div className="absolute inset-x-6 top-3 bottom-[84px] flex items-center justify-center">
+        <p className="text-center text-[20px] leading-[0.9] tracking-[-0.8px] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.35)]">
+          {done ? copy.waitlist.checkEmail : copy.waitlist.title}
+        </p>
+      </div>
+      <form
+        noValidate
+        onSubmit={onSubmit}
+        className="absolute left-1/2 top-[221.5px] w-[207px] -translate-x-1/2"
+      >
+        <label className="sr-only" htmlFor="contact-waitlist-email">
+          {copy.waitlist.emailPlaceholder}
+        </label>
+        <input
+          id="contact-waitlist-email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          required
+          value={email}
+          disabled={done}
+          aria-invalid={invalid || undefined}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (invalid) setInvalid(!EMAIL_RE.test(event.target.value.trim()));
+          }}
+          placeholder={`*${copy.waitlist.emailPlaceholder}`}
+          className={`h-[61px] w-full rounded-[48px] border bg-white pl-6 pr-8 text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px] text-black outline-none placeholder:text-black/48 focus-visible:ring-2 focus-visible:ring-white ${
+            invalid ? "border-magenta" : "border-black/12"
+          }`}
+        />
+      </form>
+      {isMobile ? <Turnstile key={challengeKey} onToken={setToken} /> : null}
+      {error ? (
+        <p role="alert" className="sr-only">
+          {copy.waitlist.saveError}
+        </p>
+      ) : null}
     </div>
   );
 }
