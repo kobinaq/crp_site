@@ -40,7 +40,7 @@ export function TermsStep({
       <button
         type="button"
         aria-label={tr("Close")}
-        className="absolute inset-0 bg-black/30 backdrop-blur-md"
+        className="absolute inset-0 bg-black/12 backdrop-blur-[58.5px]"
         onClick={onClose}
       />
 
@@ -48,13 +48,13 @@ export function TermsStep({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[90dvh] w-full max-w-[590px] flex-col overflow-hidden rounded-[48px] bg-white shadow-[0_4px_27.6px_rgba(0,0,0,0.25)] desk:rounded-[88px]"
+        className="relative z-10 flex max-h-[90dvh] w-full max-w-[590px] flex-col overflow-hidden rounded-[48px] bg-white shadow-[0_4px_27.6px_rgba(0,0,0,0.25)] desk:h-[805px] desk:rounded-[88px]"
       >
         {/* Header */}
         <div className="relative flex shrink-0 items-center justify-end p-6 desk:p-8">
           <h2
             id={titleId}
-            className="pointer-events-none absolute inset-x-0 text-center text-[26px] leading-[0.9] tracking-[-1.28px] text-black desk:text-[32px]"
+            className="pointer-events-none absolute inset-x-[72px] text-center text-[26px] leading-[0.9] tracking-[-1.28px] text-black desk:inset-x-2 desk:text-[32px]"
           >
             {tr("Terms of application")}</h2>
           <button
@@ -62,7 +62,7 @@ export function TermsStep({
             type="button"
             onClick={onClose}
             aria-label={tr("Close")}
-            className="relative grid size-12 shrink-0 place-items-center rounded-full text-black desk:size-[72px]"
+            className="relative grid size-12 shrink-0 place-items-center rounded-full text-black outline-none focus-visible:ring-2 focus-visible:ring-black desk:size-[72px]"
           >
             <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
               <path
@@ -76,7 +76,7 @@ export function TermsStep({
         </div>
 
         {/* Scrollable consent copy */}
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pb-4 desk:px-8">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pb-[64px] desk:px-8 desk:pb-[104px]">
           <div className="space-y-3 text-[16px] leading-[1.2] tracking-[-0.8px] text-black/72 desk:text-[20px]">
             <p>
               {tr("By accepting, I consent to my personal data being processed to assess my application and contact me about the program.")}</p>
@@ -87,8 +87,8 @@ export function TermsStep({
           </div>
         </div>
 
-        {/* Frosted bottom bar */}
-        <div className="flex shrink-0 flex-col items-center justify-center gap-6 rounded-t-[48px] bg-cream p-6 desk:gap-8 desk:rounded-t-[88px] desk:p-8">
+        {/* Cream bottom bar overlaps the scroll area so copy shows behind its rounded corners (Figma 2308:6794). */}
+        <div className="relative z-10 -mt-[48px] flex shrink-0 flex-col items-center justify-center gap-6 rounded-t-[48px] bg-cream p-6 desk:-mt-[88px] desk:gap-8 desk:rounded-t-[88px] desk:p-8">
           <button
             type="button"
             onClick={() => setAccepted((v) => !v)}
