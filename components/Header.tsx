@@ -23,7 +23,7 @@ function EqualsIcon() {
       <path
         d="M4 9h16M4 15h16"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
@@ -36,14 +36,21 @@ function CloseIcon() {
       <path
         d="M5.5 5.5l13 13M18.5 5.5l-13 13"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
   );
 }
 
-export function Header({ overMedia = false }: { overMedia?: boolean }) {
+export function Header({
+  overMedia = false,
+  mobileLogoTone,
+}: {
+  overMedia?: boolean;
+  /** Mobile bar logo tone while the bar is transparent (e.g. Contact uses the colour lockup). */
+  mobileLogoTone?: "color";
+}) {
   const copy = useCopy();
   const { locale } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -145,7 +152,7 @@ export function Header({ overMedia = false }: { overMedia?: boolean }) {
       {/* 4.5px gutters around a 59px pill give the 68px bar height from Figma. */}
       <div className="px-[12px] py-[4.5px] desk:hidden">
         <div
-          className={`pointer-events-auto flex flex-col gap-[24px] px-[20px] py-[16px] ${pillClass} ${
+          className={`pointer-events-auto flex flex-col gap-[24px] px-[20px] py-[16px] max-[379px]:pr-[12px] ${pillClass} ${
             open ? "rounded-[30px]" : "rounded-full"
           }`}
         >
@@ -166,7 +173,10 @@ export function Header({ overMedia = false }: { overMedia?: boolean }) {
             <LanguageDropdown variant="compact" />
 
             <div className="absolute left-1/2 top-[1.5px] z-20 -translate-x-1/2">
-              <Logo tone={showPill || lightChrome ? "light" : "dark"} />
+              <Logo
+                tone={showPill || lightChrome ? "light" : (mobileLogoTone ?? "dark")}
+                imgClassName="h-[24px] w-[67px] object-fill"
+              />
             </div>
           </div>
 
@@ -177,7 +187,7 @@ export function Header({ overMedia = false }: { overMedia?: boolean }) {
                   <a
                     href={localePath(link.href, locale)}
                     onClick={() => setOpen(false)}
-                    className="flex w-full items-center justify-center py-[24px] text-center text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] text-white transition-colors duration-300 hover:text-white/70 [text-shadow:0_0_4px_rgba(0,0,0,0.25)]"
+                    className="flex h-[61px] w-full items-center justify-center text-center text-[14px] font-semibold uppercase leading-[13px] tracking-[0.56px] text-white mix-blend-hard-light transition-colors duration-300 hover:text-white/70 [text-shadow:0_0_4px_rgba(0,0,0,0.25)]"
                   >
                     {copy.nav[link.key]}
                   </a>

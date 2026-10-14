@@ -16,7 +16,7 @@ export default function ContactRoute() {
   return (<>
       <StructuredData page="contact" />
     <div className={`${outfit.className} relative flex flex-1 flex-col`}>
-      <Header />
+      <Header mobileLogoTone="color" />
       <main className="flex-1">
         <ContactPage />
         <GetInvolved embedded contactMobile />
