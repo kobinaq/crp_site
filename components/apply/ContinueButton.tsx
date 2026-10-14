@@ -30,7 +30,7 @@ export function ContinueButton({
       disabled={disabled}
       className={`relative flex h-14 w-full max-w-[632px] items-center overflow-hidden rounded-full transition-[filter,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100 desk:h-20 ${
         fill !== null ? "bg-black" : "gradient-brand"
-      } ${!ready && fill !== null ? "opacity-[0.32]" : ""} ${className}`}
+      } ${!ready ? (fill !== null ? "opacity-[0.32]" : "cursor-not-allowed opacity-40") : ""} ${className}`}
     >
       {fill !== null && fill > 0 ? (
         <span aria-hidden className="absolute inset-y-0 left-0 overflow-hidden rounded-full" style={{ width: `${fill * 100}%` }}>
