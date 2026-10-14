@@ -201,6 +201,7 @@ function CtaCard({
   titleClass,
   fade,
   href,
+  imageClass = "left-1/2 top-[92.5px] h-[474px]",
 }: {
   title: string;
   image: string;
@@ -210,6 +211,8 @@ function CtaCard({
   titleClass: string;
   fade: string;
   href: string;
+  /** Mobile photo box (Figma 2282:12411); desktop keeps 612px tall at 163px. */
+  imageClass?: string;
 }) {
   return (
     <div
@@ -218,7 +221,7 @@ function CtaCard({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[92.5px] h-[612px] w-[415px] -translate-x-1/2 desk:top-[163px]"
+        className={`pointer-events-none absolute w-[415px] -translate-x-1/2 ${imageClass} desk:left-1/2 desk:top-[163px] desk:h-[612px]`}
       >
         <Image src={image} alt="" fill className="object-cover" sizes="415px" />
         <div className="absolute inset-0" style={{ backgroundImage: fade }} />
@@ -336,6 +339,7 @@ export function PartnerPage() {
             titleClass="text-white"
             fade="radial-gradient(ellipse at 50% 34%, transparent 0%, #000 70%)"
             href="/partner/reach-out?support=ambassador"
+            imageClass="left-[calc(50%+0.5px)] top-[92.5px] h-[474px]"
           />
           <CtaCard
             title={p.storyline}
@@ -346,6 +350,7 @@ export function PartnerPage() {
             titleClass="text-white"
             fade="radial-gradient(ellipse at 50% 34%, transparent 0%, #ec268f 70%)"
             href="/partner/reach-out?support=storyline"
+            imageClass="left-[calc(50%+0.5px)] top-[92.5px] h-[301px]"
           />
           <CtaCard
             title={p.speaker}
@@ -356,6 +361,7 @@ export function PartnerPage() {
             titleClass="text-black"
             fade="radial-gradient(ellipse at 50% 34%, transparent 0%, #fa8d2e 72%)"
             href="/partner/reach-out?support=speaker"
+            imageClass="left-[calc(50%+7.5px)] top-[67.5px] h-[342px]"
           />
           </div>
         </div>
