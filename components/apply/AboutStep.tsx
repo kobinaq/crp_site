@@ -246,7 +246,7 @@ export function AboutStep({
                   onChange={(e) => setFullName(e.target.value)}
                   aria-label={tr("Full name")}
                 />
-                <DateField value={dob} onChange={setDob} size="lg" className="desk:w-[206px]" />
+                <DateField value={dob} onChange={setDob} size="lg" invalid={shown === "interest" || shown === "success"} className="desk:w-[206px]" />
               </div>
 
               {/* Email + phone */}
@@ -314,7 +314,12 @@ export function AboutStep({
       </main>
 
       {/* Continue / toasts */}
-      <footer className="flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1 desk:p-[10px]">
+      <footer className="relative flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1 desk:p-[10px]">
+        {shown ? (
+          // White fade over the panel bottom behind the toast (Figma 2308:3296).
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[260px] bg-gradient-to-t from-white/80 via-white/50 to-transparent max-desk:hidden" />
+        ) : null}
+        <div className="relative z-10 flex w-full justify-center desk:absolute desk:inset-x-0 desk:bottom-[40px] desk:px-[163px]">
         {shown === "interest" ? (
           <Toast
             variant="error"
@@ -339,6 +344,7 @@ export function AboutStep({
           <Toast variant="error" onClose={() => setFollowup("closed")}>
             {tr("We couldn't send the link just now. Please wait a moment and try again.")}</Toast>
         ) : null}
+        </div>
 
         <Turnstile key={challengeKey} onToken={setTurnstileToken} size="compact" />
         <ContinueButton
