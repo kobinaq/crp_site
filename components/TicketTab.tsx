@@ -11,6 +11,8 @@ type TicketTabProps = {
   labelPx?: number;
   /** Caps the whole tab, ears included. Height stays the Figma team-tab size. */
   maxWidth?: number;
+  /** Team-tab size that wraps onto extra lines instead of shrinking or truncating (mobile team grid). */
+  wrap?: boolean;
 };
 
 // Concave corner that blends the chip into the surface it sits on, so it has
@@ -39,6 +41,7 @@ export function TicketTab({
   ink = false,
   labelPx,
   maxWidth,
+  wrap = false,
 }: TicketTabProps) {
   const isTop = placement === "top";
   const isLarge = size === "lg";
@@ -60,7 +63,11 @@ export function TicketTab({
       ? "h-[19.125px] w-[19.125px]"
       : "h-[19px] w-[19px]";
 
-  const chip = isLarge
+  const chip = wrap
+    ? `min-h-[32.625px] min-w-0 px-[8px] py-[6px] text-[12px] tracking-[0.04em] bg-current ${
+        isTop ? "rounded-b-[13.5px]" : "rounded-t-[13.5px]"
+      }`
+    : isLarge
     ? isTop
       ? "h-[33px] px-[18px] text-[13.5px] rounded-b-[13.5px] tracking-[0.96px] bg-current desk:h-[65.25px] desk:px-[36px] desk:text-[24px] desk:rounded-b-[27px]"
       : "h-[33px] px-[18px] text-[13.5px] rounded-t-[13.5px] tracking-[0.96px] bg-current desk:h-[65.25px] desk:px-[36px] desk:text-[24px] desk:rounded-t-[27px]"
@@ -106,7 +113,7 @@ export function TicketTab({
         className={`relative flex min-w-0 ${capped ? "w-max shrink-0" : ""} ${tone} ${
           isTop ? "items-start" : "items-end"
         }`}
-        style={capped ? { maxWidth } : undefined}
+        style={capped ? { maxWidth } : wrap ? { maxWidth: "100%" } : undefined}
       >
         {/* Bleed strip under the docked edge of this ticket only. */}
         <span
@@ -119,7 +126,7 @@ export function TicketTab({
         <span
           className={`relative z-[1] items-center justify-center text-center font-semibold uppercase leading-[0.9] ${
             capped ? "flex min-w-0" : "inline-flex"
-          } ${chip} ${typeof label === "string" || capped ? "whitespace-nowrap" : ""}`}
+          } ${chip} ${!wrap && (typeof label === "string" || capped) ? "whitespace-nowrap" : ""}`}
           style={labelPx === undefined ? undefined : { fontSize: labelPx }}
         >
           <span className={`mix-blend-hard-light ${capped ? "min-w-0 truncate" : ""} ${labelTone}`}>

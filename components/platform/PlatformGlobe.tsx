@@ -18,6 +18,8 @@ export type PlatformGlobeProps = {
   pins?: readonly Pin[];
   /** Image path fragments that must finish (or time out) before the live globe mounts. */
   waitForImages?: readonly string[];
+  /** Starting spin angle in radians (0 = default framing). */
+  initialYaw?: number;
 };
 
 function useGlobeReady(imageKeys: readonly string[]): boolean {
@@ -77,6 +79,7 @@ export function PlatformGlobe({
   emphasis,
   pins,
   waitForImages: imageKeys = HOME_GLOBE_WAIT_IMAGES,
+  initialYaw,
 }: PlatformGlobeProps) {
   const deferReady = useGlobeReady(imageKeys);
   const [live, setLive] = useState(false);
@@ -97,6 +100,7 @@ export function PlatformGlobe({
             visibleGroups={visibleGroups}
             emphasis={emphasis}
             pins={pins}
+            initialYaw={initialYaw}
             onReady={() => setLive(true)}
           />
         </div>

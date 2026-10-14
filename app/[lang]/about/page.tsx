@@ -3,6 +3,7 @@ import { requestLocale } from "@/lib/request-locale";
 import { StructuredData } from "@/components/StructuredData";
 import type { Metadata } from "next";
 import { AboutPage } from "@/components/about/AboutPage";
+import { AboutTicker } from "@/components/about/AboutTicker";
 import { Footer } from "@/components/Footer";
 import { GetInvolved } from "@/components/GetInvolved";
 import { GetInvolvedPill } from "@/components/GetInvolvedPill";
@@ -18,11 +19,16 @@ export default function AboutRoute() {
       <Header overMedia />
       <main className="flex-1">
         <AboutPage />
-        <GetInvolved embedded />
-        <div aria-hidden className="h-16 bg-cream desk:h-24" />
+        <GetInvolved embedded compactMobile />
+        {/* Mobile: Figma slogan ticker sits between Get involved and the footer arc. */}
+        <AboutTicker />
+        <div aria-hidden className="hidden h-16 bg-cream desk:block desk:h-24" />
       </main>
       <Footer />
-      <GetInvolvedPill />
+      {/* Figma mobile has no floating Get involved pill. */}
+      <div className="hidden desk:block">
+        <GetInvolvedPill />
+      </div>
     </div>
   </>);
 }
