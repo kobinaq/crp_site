@@ -228,7 +228,7 @@ function PinLayer({
 }) {
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-10 overflow-hidden transition-opacity duration-300 ease-out"
+      className="pointer-events-none absolute inset-0 z-10 overflow-visible transition-opacity duration-300 ease-out"
       style={{ opacity: revealed ? 1 : 0 }}
       aria-hidden={!revealed}
     >
