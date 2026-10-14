@@ -902,11 +902,19 @@ test("registration grants no access until email confirmation and resuming revoke
 test("VideoAsk rejects forged references, wrong forms, abandoned and unrelated events", async () => {
   const a = await h.apply();
   const valid = h.load("lib/videoask.ts").videoaskReference(a.id);
+  // Authentic events that are not ours to act on are acknowledged, not stored.
   for (const change of [
     { event_type: "form_contact_message" },
-    { contact: { status: "completed", variables: [null, "invalid"] } },
     { form: { form_id: "wrong-form" } },
     { contact: { status: "abandoned", variables: { application_ref: valid } } },
+  ]) {
+    const result = await h.videoask(a.id, change);
+    assert.equal(result.status, 200);
+    assert.ok(result.body.ignored);
+  }
+  assert.equal((await row("applicants", a.id)).status, "submitted");
+  for (const change of [
+    { contact: { status: "completed", variables: [null, "invalid"] } },
     { contact: { status: "completed", variables: { application_ref: valid.slice(0, -2) + "XX" } } },
     { applicant_id: a.id, contact: { status: "completed", answers: [{ input_text: valid }] } },
   ]) {
@@ -995,7 +1003,7 @@ test("Spanish applicants confirm ownership before the form advances", async () =
   const send = (formId, reference = videoaskReference(a.id)) => h.load("app/api/webhooks/videoask/route.ts").POST(h.req("/api/webhooks/videoask", {
     headers: { "x-webhook-secret": "videoask" }, body: JSON.stringify({ event_id: randomUUID(), event_type: "form_response", form: { form_id: formId }, contact: { status: "completed", variables: { application_ref: reference } } }),
   }));
-  assert.equal((await send("wrong-form")).status, 400);
+  assert.equal((await send("wrong-form")).body.ignored, "other form");
   assert.equal((await send(process.env.VIDEOASK_FORM_ID)).body.advanced, true);
   assert.equal((await row("applicants", a.id)).status, "round1_complete");
 });
