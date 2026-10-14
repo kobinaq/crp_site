@@ -123,7 +123,9 @@ export function ProgramAbout() {
           <span className="mb-3 block">{about.online}</span>
           {about.onlineDates}
         </p>
-        <p className="pointer-events-none absolute left-[calc(50%+146px)] top-1/2 z-10 w-[98px] -translate-x-1/2 -translate-y-1/2 text-center text-[14px] font-semibold uppercase leading-[0.9] tracking-[1.12px] text-black desk:left-auto desk:right-[79px] desk:w-[126px] desk:translate-x-1/2 desk:text-[16px] desk:tracking-[1.28px] desk:text-white">
+        {/* Capped so the 98px label never passes the bar's right edge on narrow
+            phones (it pushed /programs to 376px wide at 360). Unchanged at 390+. */}
+        <p className="pointer-events-none absolute left-[min(calc(50%+146px),calc(100%-49px))] top-1/2 z-10 w-[98px] -translate-x-1/2 -translate-y-1/2 text-center text-[14px] font-semibold uppercase leading-[0.9] tracking-[1.12px] text-black desk:left-auto desk:right-[79px] desk:w-[126px] desk:translate-x-1/2 desk:text-[16px] desk:tracking-[1.28px] desk:text-white">
           <span className="mb-3 block">{about.antalya}</span>
           {about.antalyaDates}
         </p>
