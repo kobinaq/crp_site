@@ -175,7 +175,7 @@ export function AboutProgramPopup({ open, onClose }: AboutProgramPopupProps) {
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, panelRef]);
 
   if (!open) return null;
 
