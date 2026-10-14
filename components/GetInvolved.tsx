@@ -1,17 +1,21 @@
 "use client";
 
 import { GetInvolvedTab } from "./GetInvolvedPill";
-import { PartnerCard, YouthAmbassadorCard } from "./GetInvolvedCards";
+import { PartnerCard, WaitlistCard, YouthAmbassadorCard } from "./GetInvolvedCards";
 import { useCopy } from "./LanguageProvider";
 
 export function GetInvolved({
   embedded = false,
   compactMobile = false,
+  contactMobile = false,
 }: {
   embedded?: boolean;
   /** About page: Figma 297px mobile cards with 20px titles. */
   compactMobile?: boolean;
+  /** Contact page: Figma mobile shows Join the waitlist + Partner up (297×294). Desktop unchanged. */
+  contactMobile?: boolean;
 }) {
+  const narrow = compactMobile || contactMobile;
   const copy = useCopy();
   return (
     <section
@@ -19,7 +23,9 @@ export function GetInvolved({
       data-nav-tone="dark"
       className={
         embedded
-          ? "relative z-10 bg-ink px-5 py-16 text-white desk:px-16 desk:py-24"
+          ? `relative z-10 bg-ink px-5 text-white desk:px-16 desk:py-24 ${
+              contactMobile ? "pb-[161px] pt-[97px]" : "py-16"
+            }`
           : "relative z-10 bg-ink px-5 py-16 text-white snap-section desk:box-border desk:flex desk:h-svh desk:flex-col desk:justify-center desk:px-8 desk:py-24"
       }
     >
@@ -32,12 +38,23 @@ export function GetInvolved({
         </h2>
 
         <div
-          className={`mt-10 grid gap-0 desk:mt-12 desk:grid-cols-2 desk:items-stretch ${
-            compactMobile ? "mx-auto w-[297px] max-w-full desk:mx-0 desk:w-auto desk:max-w-none" : ""
+          className={`${contactMobile ? "mt-8" : "mt-10"} grid gap-0 desk:mt-12 desk:grid-cols-2 desk:items-stretch ${
+            narrow ? "mx-auto w-[297px] max-w-full desk:mx-0 desk:w-auto desk:max-w-none" : ""
           }`}
         >
-          <YouthAmbassadorCard compact={compactMobile} />
-          <PartnerCard compact={compactMobile} />
+          {contactMobile ? (
+            <>
+              <div className="desk:hidden">
+                <WaitlistCard />
+              </div>
+              <div className="hidden desk:contents">
+                <YouthAmbassadorCard compact />
+              </div>
+            </>
+          ) : (
+            <YouthAmbassadorCard compact={compactMobile} />
+          )}
+          <PartnerCard compact={narrow} contact={contactMobile} />
         </div>
       </div>
     </section>
