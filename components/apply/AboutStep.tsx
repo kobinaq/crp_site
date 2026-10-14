@@ -39,7 +39,7 @@ function FloatInput({
   );
 }
 
-type ToastKind = "interest" | "success" | "existing" | "link-sent" | "link-failed";
+type ToastKind = "interest" | "success" | "already-recorded" | "existing" | "link-sent" | "link-failed";
 
 export type AboutData = {
   language: ApplicationLocale;
@@ -173,7 +173,7 @@ export function AboutStep({
         setInterestBusy(false);
         return;
       }
-      setToast("success");
+      setToast(res.status === "already_recorded" ? "already-recorded" : "success");
       window.setTimeout(() => router.push(localePath("/", locale)), 3000);
     } catch (err) {
       console.error("[apply] interest failed", err);
@@ -330,6 +330,9 @@ export function AboutStep({
         ) : shown === "success" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
             {tr("Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!")}</Toast>
+        ) : shown === "already-recorded" ? (
+          <Toast variant="success" onClose={() => setToast(null)}>
+            {tr("You're already on our interest list. We've emailed you a link in case you want to update your details.")}</Toast>
         ) : shown === "existing" ? (
           <Toast
             variant="error"

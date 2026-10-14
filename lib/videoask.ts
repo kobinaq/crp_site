@@ -29,20 +29,28 @@ export function videoaskLink(applicantId: string): string | null {
   return url.toString();
 }
 // Inspect only provider metadata, never answer text or arbitrary nested values.
-export function readVideoaskCompletion(body: unknown) {
+// Events that are authentic but not ours to act on (other event types,
+// abandoned responses, or another environment's form sharing this webhook)
+// come back as { ignored } so the route can acknowledge them with 200 and
+// VideoAsk does not keep retrying. Malformed or forged references stay null.
+export type VideoaskCompletion = { applicantId: string; eventId: string; formId: string };
+export function readVideoaskCompletion(body: unknown): VideoaskCompletion | { ignored: string } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
-  if (!["form_response", "form_response_transcribed"].includes(String(b.event_type)) || typeof b.event_id !== "string") return null;
+  if (typeof b.event_id !== "string") return null;
+  if (!["form_response", "form_response_transcribed"].includes(String(b.event_type))) return { ignored: "event type" };
   const contact = b.contact as Record<string, unknown> | undefined;
   const form = b.form as Record<string, unknown> | undefined;
-  if (!contact || contact.status !== "completed" || !form) return null;
+  if (!contact || !form) return null;
+  const expectedForm = process.env.VIDEOASK_FORM_ID;
+  if (!expectedForm) return null;
+  if (form.form_id !== expectedForm) return { ignored: "other form" };
+  if (contact.status !== "completed") return { ignored: "not completed" };
   const variables = contact.variables as Record<string, unknown> | { key?: string; name?: string; value?: unknown }[] | undefined;
   const raw = Array.isArray(variables)
     ? variables.find((v) => v && typeof v === "object" && (v.key ?? v.name) === "application_ref")?.value
     : variables?.application_ref;
   const reference = parseVideoaskReference(raw);
   if (!reference) return null;
-  const expectedForm = process.env.VIDEOASK_FORM_ID;
-  if (!expectedForm || form.form_id !== expectedForm) return null;
   return { ...reference, eventId: b.event_id, formId: expectedForm };
 }
