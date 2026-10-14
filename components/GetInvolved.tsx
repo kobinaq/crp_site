@@ -24,7 +24,7 @@ export function GetInvolved({
       }
     >
       {embedded ? null : (
-        <GetInvolvedTab className="absolute bottom-full left-1/2 z-40 -translate-x-1/2 translate-y-px" />
+        <GetInvolvedTab className="absolute bottom-full left-1/2 z-40 -translate-x-1/2 translate-y-px max-desk:!hidden" />
       )}
       <div className="mx-auto w-full max-w-[1072px]">
         <h2 className="text-center text-[32px] leading-[0.9] tracking-[-0.04em] desk:text-[clamp(28px,6vw,48px)]">

@@ -164,12 +164,12 @@ export function Waitlist() {
       data-nav-tone="dark"
       className="bg-ink px-5 py-16 text-white desk:px-8 desk:py-24"
     >
-      <div className="mx-auto flex w-full max-w-[1072px] flex-col items-center gap-10 desk:gap-12">
+      <div className="mx-auto flex w-full max-w-[1072px] flex-col items-center gap-8 desk:gap-12">
         <h2 className="text-center text-[32px] leading-[0.95] tracking-[-0.04em] desk:text-[clamp(28px,6vw,48px)]">
           {copy.waitlist.title}
         </h2>
 
-        <div className="relative mx-auto aspect-[298/484] w-full max-w-[536px] overflow-hidden rounded-[56px] desk:aspect-square desk:rounded-[154px]">
+        <div className="relative mx-auto h-[484px] w-[298px] max-w-full overflow-hidden rounded-[88px] desk:aspect-square desk:h-auto desk:w-full desk:max-w-[536px] desk:rounded-[154px]">
           <Image
             src="/images/waitlist.jpg"
             alt={copy.waitlist.photoAlt}
@@ -187,8 +187,8 @@ export function Waitlist() {
               transition={morph}
             />
 
-            <div className="relative z-10 flex h-full items-center justify-center px-6 desk:px-10">
-              <div ref={colRef} className="relative w-full max-w-[442px]">
+            <div className="relative z-10 flex h-full items-center justify-center px-[13px] desk:px-10">
+              <div ref={colRef} className="relative w-full max-w-[272px] desk:max-w-[442px]">
                 <motion.p
                   role="status"
                   aria-hidden={!submitted}
@@ -211,7 +211,7 @@ export function Waitlist() {
                     initial={false}
                     animate={{ width: pillWidth }}
                     transition={submitted ? morph : { duration: 0 }}
-                    className="flex h-[88px] items-center overflow-hidden rounded-full bg-white p-2 desk:h-[98px]"
+                    className="flex h-[76px] items-center overflow-hidden rounded-[48px] bg-white p-2 desk:h-[98px] desk:rounded-full"
                   >
                     <motion.div
                       initial={false}
@@ -259,7 +259,7 @@ export function Waitlist() {
                             ? { scale: 0.95 }
                             : undefined
                         }
-                        className="relative grid h-[72px] w-[72px] shrink-0 place-items-center overflow-hidden rounded-full desk:h-20 desk:w-20"
+                        className="relative grid h-[60px] w-[60px] shrink-0 place-items-center overflow-hidden rounded-full desk:h-20 desk:w-20"
                       >
                         <motion.span
                           aria-hidden

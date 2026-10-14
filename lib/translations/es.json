@@ -145,6 +145,9 @@
   },
   "pavilion": {
     "location": "COP31, Antalya y en línea",
+    "locationPlace": "COP31, Antalya",
+    "locationOnline": "y en línea",
+    "headlineMobile": "Donde las personas se reúnen para comprender la movilidad climática y construir soluciones",
     "headline": "Únete a quienes se reúnen para comprender la movilidad climática y construir soluciones",
     "bringing": "Reuniendo a",
     "together": "para actuar juntos",

@@ -14,7 +14,7 @@ import { useCopy } from "./LanguageProvider";
 
 const HOVER_PLAYBACK_RATE = 0.28;
 
-type Orientation = "vertical" | "horizontal";
+type Orientation = "vertical" | "horizontal" | "window";
 
 function wrapLoop(value: number, period: number) {
   if (period <= 0) return value;
@@ -146,7 +146,7 @@ export function PosterMarquee({
   const [inView, setInView] = useState(true);
   const [dragging, setDragging] = useState(false);
 
-  const horizontal = orientation === "horizontal";
+  const horizontal = orientation !== "vertical";
   const hoveringRef = useRef(false);
   const draggingRef = useRef(false);
   const inViewRef = useRef(true);

@@ -18,10 +18,10 @@ function TickerRun({ text }: { text: string }) {
 }
 
 /** About page mobile only (Figma 390 frame): slogan ticker tucked above the footer arc. */
-export function AboutTicker() {
+export function AboutTicker({ className = "h-[124px]" }: { className?: string }) {
   const a = useCopy().aboutUs;
   return (
-    <section data-nav-tone="dark" className="relative h-[124px] overflow-hidden bg-black text-white desk:hidden">
+    <section data-nav-tone="dark" className={`relative overflow-hidden bg-black text-white desk:hidden ${className}`}>
       <p className="sr-only">{a.ticker}</p>
       <div aria-hidden className="flex w-max animate-partners-marquee motion-reduce:animate-none">
         <TickerRun text={a.ticker} />

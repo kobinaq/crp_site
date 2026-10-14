@@ -7,7 +7,7 @@ type ContentPosterProps = {
   topic: ReactNode;
   comingSoon: ReactNode;
   children: ReactNode;
-  orientation?: "vertical" | "horizontal";
+  orientation?: "vertical" | "horizontal" | "window";
 };
 
 // Titles use absolute pixel positions inside this 16:9 box, so cards scale as a whole.
@@ -33,6 +33,15 @@ export function ContentPoster({
       <TicketTab placement="bottom" label={comingSoon} />
     </article>
   );
+
+  if (orientation === "window") {
+    // Mobile Figma: two 228px-tall posters side by side, each a centred crop of the 380px card.
+    return (
+      <div className="relative mr-2 h-[228px] w-[183px] shrink-0 overflow-hidden rounded-[44px]">
+        <div className="absolute left-1/2 top-0 -translate-x-1/2">{card}</div>
+      </div>
+    );
+  }
 
   if (orientation === "horizontal") {
     const scale = STRIP_H / BASE_H;
