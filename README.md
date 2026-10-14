@@ -26,7 +26,12 @@ the webhook destination. Only authenticated webhook events record approval.
 Applicants who submit an email already on file can request a fresh, single-use resume link sent to that mailbox. The public form does not disclose
 existing application IDs or grant access to existing verification sessions.
 
-Accepted applicants receive the locale-specific Calendly URL. Register
+Calendly is optional. Booking is on only when `CALENDLY_URL_EN/_FR/_ES` are all
+set and `CALENDLY_ENABLED` is not `false` (`calendlyEnabled()` in `lib/calendly.ts`).
+When it is off, the accepted email has no button and says the team will be in
+touch, and `/api/webhooks/calendly` answers 503 `{ ignored }` (it also needs
+`CALENDLY_WEBHOOK_SIGNING_KEY`). When on, accepted applicants receive the
+locale-specific Calendly URL. Register
 `/api/webhooks/calendly` with `node scripts/register-calendly-webhook.mjs`; the
 script needs `CALENDLY_PERSONAL_ACCESS_TOKEN` and `APP_URL`. Calendly booking
 events update `interviewAt` without changing pipeline status.

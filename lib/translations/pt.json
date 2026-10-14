@@ -221,6 +221,12 @@
     "logosAlt": "ESG News e MEF"
   },
   "footer": {
+    "sections": [
+      { "title": "A nossa oferta", "links": ["Início", "Sobre nós", "Programas"] },
+      { "title": "Informação legal", "links": ["Política de privacidade", "Termos e condições"] },
+      { "title": "Fale connosco", "links": ["Contacte-nos", "Seja nosso parceiro", "Envolva-se"] }
+    ],
+    "getInTouch": "Mantenha-se em contacto",
     "copyright": "© {year} Climate Refugee Pavilion. Todos os direitos reservados.",
     "columns": [
       {

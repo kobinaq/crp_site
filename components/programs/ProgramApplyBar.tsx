@@ -2,13 +2,21 @@
 
 import { useState } from "react";
 import { ExpressInterestPopup } from "../ExpressInterestPopup";
+import { ApplyFlow } from "../apply/ApplyFlow";
+import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useLanguage } from "../LanguageProvider";
+import { useText } from "@/lib/ui-text";
 
 /** Floating CTA pinned to the bottom of the viewport. */
 export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate" }) {
   const { copy } = useLanguage();
   const [open, setOpen] = useState(false);
   const nominate = mode === "nominate";
+  const applyFlow = useApplyFlowEnabled();
+  const tr = useText();
+  // Figma labels the bar "Apply" when it opens ApplyFlow; the production
+  // ExpressInterestPopup path (and nominate mode) keep "Express interest".
+  const applyLabel = applyFlow && !nominate;
 
   return (
     <>
@@ -17,21 +25,25 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
           id="apply"
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={copy.a11y.expressInterest}
+          aria-label={applyLabel ? tr("Apply") : copy.a11y.expressInterest}
           className="gradient-brand pointer-events-auto flex w-full max-w-[632px] items-center justify-center rounded-full px-6 py-6 shadow-[0_0_5.45px_rgba(0,0,0,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] desk:h-[80px] desk:px-8 desk:py-0 desk:shadow-[0_8px_28px_rgba(236,38,143,0.35)]"
         >
           <span className="text-[20px] font-medium leading-[0.9] tracking-[-0.8px] text-white desk:font-semibold desk:uppercase desk:tracking-[0.8px]">
-            {copy.apply.interest}
+            {applyLabel ? tr("Apply") : copy.apply.interest}
           </span>
         </button>
       </div>
 
-      <ExpressInterestPopup
-        open={open}
-        ageGroup="19_26"
-        source={nominate ? "nominate_express_19_26" : "apply_express_19_26"}
-        onClose={() => setOpen(false)}
-      />
+      {applyFlow ? (
+        open ? <ApplyFlow onClose={() => setOpen(false)} /> : null
+      ) : (
+        <ExpressInterestPopup
+          open={open}
+          ageGroup="19_26"
+          source={nominate ? "nominate_express_19_26" : "apply_express_19_26"}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }

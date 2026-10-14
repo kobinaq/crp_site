@@ -8,6 +8,8 @@
   "MOBILE": "MOBILE",
   "Mobile number": "Mobile number",
   "Nationality": "Nationality",
+  "Search": "Search",
+  "Clear search": "Clear search",
   "Currently based in": "Currently based in",
   "Only program": "Online program",
   "Travel to Antalya": "Travel to Antalya",
@@ -15,6 +17,7 @@
   "Do you have a passport valid for six months after the dates of travel?": "Do you have a passport valid for six months after the dates of travel?",
   "This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.": "This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.",
   "Check your email and confirm your interest to receive updates about future programs.": "Check your email and confirm your interest to receive updates about future programs.",
+  "Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!": "Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!",
   "An application already exists for this email. We can send a single-use link to that address so you can continue where you left off.": "An application already exists for this email. We can send a single-use link to that address so you can continue where you left off.",
   "If that address has an application, a link to continue is on its way. It works once and expires in 30 minutes.": "If that address has an application, a link to continue is on its way. It works once and expires in 30 minutes.",
   "We couldn't send the link just now. Please wait a moment and try again.": "We couldn't send the link just now. Please wait a moment and try again.",
@@ -63,7 +66,10 @@
   "Check your email to confirm your address and begin.": "Check your email to confirm your address and begin.",
   "Redirecting you to the homepage": "Redirecting you to the homepage",
   "Redirecting you to VideoAsk": "Redirecting you to VideoAsk",
+  "Hi {name},": "Hi {name},",
+  "Complete your application through the link we've sent you on your registered email": "Complete your application through the link we've sent you on your registered email",
   "I'm interested": "I'm interested",
   "Sending…": "Sending…",
-  "Email me my link": "Email me my link"
+  "Email me my link": "Email me my link",
+  "You're already on our interest list. We've emailed you a link in case you want to update your details.": "You're already on our interest list. We've emailed you a link in case you want to update your details."
 }

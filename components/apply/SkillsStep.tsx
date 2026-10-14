@@ -34,7 +34,7 @@ function SkillTab({ label, selected }: { label: string; selected: boolean }) {
       <div className="relative flex items-end">
         <span aria-hidden className="absolute inset-x-0 -bottom-px h-[3px] bg-current" />
         <Ear className="h-[19px] w-[19px] shrink-0 -mr-[2px] -scale-y-100 rotate-180" />
-        <span className="relative z-[1] inline-flex min-h-[38px] max-w-[130px] items-center justify-center rounded-t-[19px] bg-current px-4 py-2.5 text-center text-[11px] font-semibold uppercase leading-[1.2] tracking-[0.48px] desk:px-5 desk:text-[12px]">
+        <span className="relative z-[1] inline-flex min-h-[38px] max-w-[130px] items-center justify-center rounded-t-[19px] bg-current px-4 py-2.5 text-center text-[11px] font-semibold uppercase leading-[1.2] tracking-[0.48px] desk:max-w-none desk:whitespace-nowrap desk:px-5 desk:py-3 desk:text-[12px]">
           <span className={text}>{label}</span>
         </span>
         <Ear className="h-[19px] w-[19px] shrink-0 -ml-[2px]" />
@@ -69,6 +69,7 @@ export function SkillsStep({
   return (
     <FormShell
       fill
+      wide
       onBack={onBack}
       footer={
         <ContinueButton
@@ -88,7 +89,7 @@ export function SkillsStep({
             {tr("Select the ones that apply")}</p>
         </div>
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-10">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-t-[32px] pb-10 desk:rounded-t-[44px] desk:pb-16">
           <div className="grid min-w-0 grid-cols-3">
             {APPLY_SKILLS.map((skill) => {
               const on = selected.includes(skill.en);

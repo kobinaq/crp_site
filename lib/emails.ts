@@ -2,7 +2,7 @@ import emailCopy from "@/lib/translations/application-emails.json";
 import type { ApplicationLocale } from "@/lib/locale";
 
 // Branded transactional email shell, matching the Figma email frames
-// (2237:16463 desktop, 2237:16490 mobile): scalloped photo header, cream body,
+// (2308:7356 desktop, 2308:7383 mobile): scalloped photo header, cream body,
 // a pink→orange gradient CTA pill, and a black footer with the swirl.
 //
 // Applicant-journey emails are localized; the top-of-funnel ones (waitlist,
@@ -19,21 +19,29 @@ function escapeHtml(value: string): string {
 }
 
 // Absolute so it resolves in an email client, not against a relative path.
-const SITE = process.env.APP_URL ?? "https://www.climaterefugeepavilion.org";
-const LOGO = `${SITE}/CRP_iDentity_Monochromatic-HWhite.png`;
+const SITE = (process.env.APP_URL ?? "https://www.climaterefugeepavilion.org").replace(/\/+$/, "");
+const LOGO = `${SITE}/emails/email-logo.png`;
 const BANNER = process.env.EMAIL_HEADER_URL ?? `${SITE}/emails/email-banner-desktop.png`;
 const SWIRL = `${SITE}/emails/email-footer-swirl.png`;
+const SWIRL_MOBILE = `${SITE}/emails/email-footer-swirl-mobile.png`;
 
 const CREAM = "#f4f1ea";
-const INK = "#111111";
+const INK = "#000000";
 const MAGENTA = "#EC268F";
 const ORANGE = "#FA8D2E";
-const FONT = "Outfit, Arial, Helvetica, sans-serif";
+const FONT = "Outfit, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const SMALL_FONT = "Geist, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+// Figma's button fill is a radial gradient anchored near the bottom-right
+// (orange) fading out to magenta. Clients that drop radial-gradient keep the
+// linear declaration before it; Outlook desktop gets the VML gradient fill.
+const LINEAR = `linear-gradient(90deg,${MAGENTA} 0%,${ORANGE} 100%)`;
+const RADIAL = `radial-gradient(194px 181px at 93.8% 83.4%,${ORANGE} 0%,#F77346 25%,#F35A5E 50%,#F04077 75%,${MAGENTA} 100%)`;
 
 const pick = <T>(language: ApplicationLocale, en: T, fr: T, es: T): T => language === "fr" ? fr : language === "es" ? es : en;
 
-// Email-client-safe: table layout, inline styles, gradient button with a solid
-// magenta fallback for clients that ignore CSS gradients (e.g. Outlook).
+// Email-client-safe: table layout, inline styles, progressive gradient
+// fallbacks (solid bgcolor → linear → radial; VML for Outlook desktop).
+// Geometry follows Figma 2308:7356 (600px desktop) and 2308:7383 (320px mobile).
 function render(language: ApplicationLocale, bodyParas: string[], cta: Cta | null): string {
   const year = new Date().getUTCFullYear();
   const signoff = pick(
@@ -45,59 +53,71 @@ function render(language: ApplicationLocale, bodyParas: string[], cta: Cta | nul
   const tagline = pick(language, "Making climate mobility impossible to ignore", "Rendre la mobilité climatique impossible à ignorer", "Hacer que la movilidad climática sea imposible de ignorar");
   const rights = pick(language, "All rights reserved.", "Tous droits réservés.", "Todos los derechos reservados.");
 
+  // Figma separates paragraphs with an empty 14px/1.2 line (16.8px).
   const paras = [...bodyParas, signoff]
     .map(
-      (p) =>
-        `<p style="margin:0 0 16px;font-family:${FONT};font-size:14px;line-height:1.2;letter-spacing:-0.56px;color:${INK}">${p}</p>`,
+      (p, i, all) =>
+        `<p style="margin:0 0 ${i === all.length - 1 ? 0 : 17}px;font-family:${FONT};font-size:14px;font-weight:400;line-height:1.2;letter-spacing:-0.56px;color:${INK}">${p}</p>`,
     )
     .join("");
 
   const button = cta
-    ? `<table role="presentation" class="btn" align="center" width="240" cellpadding="0" cellspacing="0" style="width:240px;margin-top:32px;border-collapse:collapse">
-         <tr><td align="center" bgcolor="${MAGENTA}" style="border-radius:500px;background:${MAGENTA};background-image:linear-gradient(90deg,${MAGENTA} 0%,${ORANGE} 100%)">
+    ? `<table role="presentation" class="btn" align="center" width="240" cellpadding="0" cellspacing="0" border="0" style="width:240px;margin:48px auto 0;border-collapse:separate">
+         <tr><td class="btn-cell" align="center" height="45" bgcolor="${MAGENTA}" style="height:45px;border-radius:500px;background-color:${MAGENTA};background-image:${LINEAR};background-image:${RADIAL};mso-padding-alt:0">
            <!--[if mso]>
-           <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${cta.url}" style="height:45px;v-text-anchor:middle;width:240px;" arcsize="50%" fillcolor="${MAGENTA}" strokecolor="${MAGENTA}">
+           <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${cta.url}" style="height:45px;v-text-anchor:middle;width:240px;" arcsize="50%" stroked="f" fillcolor="${MAGENTA}">
+             <v:fill type="gradient" color="${MAGENTA}" color2="${ORANGE}" angle="90" />
              <w:anchorlock/>
-             <center style="color:#ffffff;font-family:${FONT};font-size:14px;font-weight:bold;letter-spacing:0.56px;text-transform:uppercase;">${cta.label}</center>
+             <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:0.56px;text-transform:uppercase;">${cta.label}</center>
            </v:roundrect>
            <![endif]-->
            <!--[if !mso]><!-- -->
-           <a class="btn-link" href="${cta.url}" style="display:block;padding:16px 28px;color:#ffffff;text-decoration:none;font-family:${FONT};font-size:14px;font-weight:600;line-height:0.9;letter-spacing:0.56px;text-transform:uppercase">${cta.label}</a>
+           <a class="btn-link" href="${cta.url}" style="display:block;box-sizing:border-box;width:240px;padding:16px 28px;border-radius:500px;color:#ffffff;text-decoration:none;text-align:center;font-family:${FONT};font-size:14px;font-weight:600;line-height:13px;mso-line-height-rule:exactly;letter-spacing:0.56px;text-transform:uppercase">${cta.label}</a>
            <!--<![endif]-->
          </td></tr>
        </table>`
     : "";
 
   return `<!doctype html>
-<html lang="${language}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="color-scheme" content="light only" />
+<html lang="${language}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="color-scheme" content="light only" /><meta name="supported-color-schemes" content="light" />
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&amp;family=Geist:wght@400&amp;display=swap" rel="stylesheet" />
 <style>
+  body{margin:0!important;padding:0!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
   @media only screen and (max-width:480px){
-    .shell{width:100%!important}
-    .header-pad{padding:44px 16px!important;text-align:center!important}
+    .shell{width:100%!important;max-width:320px!important}
+    .header-pad{padding:44px 16px!important;text-align:center!important;background-position:-200px 0!important}
     .logo{margin:0 auto!important}
     .body-pad{padding:32px!important}
-    .btn,.btn-link{width:100%!important}
-    .btn{margin-top:16px!important}
+    .btn{width:100%!important;margin-top:32px!important}
+    .btn-link{width:100%!important}
+    .footer{background-image:url('${SWIRL_MOBILE}')!important;padding-top:46px!important}
+    .tagline{line-height:1.2!important;max-width:207px!important}
+    .copy{margin-top:20px!important}
   }
 </style></head>
 <body style="margin:0;padding:0;background:${CREAM}">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${CREAM}">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${CREAM}" style="border-collapse:collapse;background:${CREAM}">
     <tr><td align="center" style="padding:0">
-      <table role="presentation" class="shell" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;border-collapse:collapse">
-        <tr><td class="header-pad" height="120" valign="middle" background="${BANNER}" bgcolor="${CREAM}" style="height:120px;padding:44px 76px;background-color:${CREAM};background-image:url('${BANNER}');background-repeat:no-repeat;background-position:center center;background-size:cover">
-          <a href="${SITE}" style="text-decoration:none">
-            <img class="logo" src="${LOGO}" alt="Climate Refugee Pavilion" width="87" height="31" style="display:block;width:87px;height:31px;border:0;outline:none" />
+      <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" class="shell" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;border-collapse:collapse">
+        <tr><td class="header-pad" height="120" valign="middle" background="${BANNER}" bgcolor="${CREAM}" style="height:120px;box-sizing:border-box;padding:44px 80px 45px 76px;background-color:${CREAM};background-image:url('${BANNER}');background-repeat:no-repeat;background-position:-60px 0;background-size:720px 120px">
+          <!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:120px;"><v:fill type="frame" src="${BANNER}" color="${CREAM}" /><v:textbox inset="76px,44px,0,0"><![endif]-->
+          <a href="${SITE}" style="text-decoration:none;display:inline-block">
+            <img class="logo" src="${LOGO}" alt="Climate Refugee Pavilion" width="88" height="31" style="display:block;width:88px;height:31px;border:0;outline:none" />
           </a>
+          <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
         </td></tr>
-        <tr><td class="body-pad" style="background:${CREAM};padding:64px">
+        <tr><td class="body-pad" bgcolor="${CREAM}" style="background:${CREAM};padding:64px">
           ${paras}
           ${button}
         </td></tr>
-        <tr><td background="${SWIRL}" bgcolor="#000000" height="120" valign="middle" align="center" style="height:120px;background-color:#000000;background-image:url('${SWIRL}');background-repeat:no-repeat;background-position:right center;background-size:auto 120px;border-radius:32px 32px 0 0;padding:24px 24px 16px;text-align:center">
-          <p style="margin:0;font-family:${FONT};font-size:12px;font-weight:600;line-height:1.2;letter-spacing:0.48px;text-transform:uppercase;color:rgba(255,255,255,0.48)">${tagline}</p>
-          <p style="margin:18px 0 0;font-family:${FONT};font-size:8px;line-height:1.2;color:#ffffff">© ${year} Climate Refugee Pavilion. ${rights}</p>
+        <tr><td class="footer" background="${SWIRL}" bgcolor="#000000" height="120" valign="top" align="center" style="height:120px;box-sizing:border-box;background-color:#000000;background-image:url('${SWIRL}');background-repeat:no-repeat;background-position:right top;background-size:auto 120px;border-radius:32px 32px 0 0;padding:55px 16px 0;text-align:center">
+          <p class="tagline" style="margin:0 auto;font-family:${FONT};font-size:12px;font-weight:600;line-height:0.9;letter-spacing:0.48px;text-transform:uppercase;color:#ffffff;color:rgba(255,255,255,0.48)">${tagline}</p>
+          <p class="copy" style="margin:29px 0 0;font-family:${SMALL_FONT};font-size:8px;line-height:10px;color:#ffffff">© ${year} Climate Refugee Pavilion. ${rights}</p>
         </td></tr>
       </table>
+      <!--[if mso]></td></tr></table><![endif]-->
     </td></tr>
   </table>
 </body></html>`;
@@ -164,7 +184,11 @@ export function decisionEmail(
   const copy = emailCopy[language];
   if (status === "rejected") return { subject: copy.rejectedSubject, html: render(language, [copy.applicant, copy.rejected], null) };
   if (status === "online_offered") return { subject: copy.onlineSubject, html: render(language, [copy.applicant, copy.online], link ? { label: copy.onlineButton, url: link } : null) };
-  if (status === "accepted") return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], link ? { label: copy.interviewButton, url: link } : null) };
+  if (status === "accepted") {
+    // No booking link (Calendly off): no button, and copy that doesn't point at one.
+    if (!link) return { subject: copy.acceptedSubject, html: render(language, [copy.congratulations, copy.interviewManual], null) };
+    return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], { label: copy.interviewButton, url: link }) };
+  }
   return { subject: copy.selectedSubject, html: render(language, [copy.congratulations, copy.selected], null) };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useHydrated } from "@/lib/useHydrated";
 import { createPortal } from "react-dom";
 
 type TurnstileApi = {
@@ -47,14 +48,10 @@ export function Turnstile({
   const boxRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const cbRef = useRef(onToken);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   useEffect(() => {
     cbRef.current = onToken;
   }, [onToken]);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   useEffect(() => {
     if (!SITE_KEY || !mounted || !boxRef.current) return;
     let cancelled = false;

@@ -84,9 +84,8 @@ export function PlatformGlobe({
   const deferReady = useGlobeReady(imageKeys);
   const [live, setLive] = useState(false);
 
-  useEffect(() => {
-    if (!deferReady) setLive(false);
-  }, [deferReady]);
+  // Reset when the globe un-defers (adjusting state during render, not in an effect).
+  if (!deferReady && live) setLive(false);
 
   return (
     <GlobeShell>

@@ -21,7 +21,9 @@ let checked = false;
 // production deploy fails loudly before it can accept an application.
 export function assertBackendConfig(): void {
   if (checked || process.env.NODE_ENV !== "production") return;
-  const required = ["DATABASE_URL", "APP_URL", "RESEND_API_KEY", "RESEND_FROM", "APP_SECRET", "OPERATIONS_TOKENS", "CRON_SECRET", "SYNC_API_SECRET", "TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY", "VIDEOASK_WEBHOOK_SECRET", "VIDEOASK_FORM_URL", "VIDEOASK_FORM_ID", "DIDIT_API_KEY", "DIDIT_WORKFLOW_ID", "DIDIT_WEBHOOK_SECRET", "RESEND_WEBHOOK_SECRET", "CALENDLY_URL_EN", "CALENDLY_URL_FR", "CALENDLY_URL_ES", "CALENDLY_WEBHOOK_SIGNING_KEY", "BLOB_READ_WRITE_TOKEN"];
+  const required = ["DATABASE_URL", "APP_URL", "RESEND_API_KEY", "RESEND_FROM", "APP_SECRET", "OPERATIONS_TOKENS", "CRON_SECRET", "SYNC_API_SECRET", "TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY", "VIDEOASK_WEBHOOK_SECRET", "VIDEOASK_FORM_URL", "VIDEOASK_FORM_ID", "DIDIT_API_KEY", "DIDIT_WORKFLOW_ID", "DIDIT_WEBHOOK_SECRET", "RESEND_WEBHOOK_SECRET", "BLOB_READ_WRITE_TOKEN"];
+  // Calendly is optional (CALENDLY_URL_*, CALENDLY_WEBHOOK_SIGNING_KEY): see
+  // calendlyEnabled() in lib/calendly.ts.
   const missing = required.filter((key) => !process.env[key]);
   try { if (new URL(process.env.VIDEOASK_FORM_URL ?? "").protocol !== "https:") missing.push("VIDEOASK_FORM_URL"); }
   catch { missing.push("VIDEOASK_FORM_URL"); }

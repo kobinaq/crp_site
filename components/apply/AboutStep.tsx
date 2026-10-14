@@ -17,9 +17,29 @@ import { Toast } from "./Toast";
 import { ContinueButton } from "./ContinueButton";
 import { FormRadioCard } from "./FormRadioCard";
 import { FormCheckRow } from "./FormCheckRow";
-import { FIELD, PLACEHOLDER } from "./fieldStyles";
+import { FIELD, FIELD_LG, MINI_LABEL, PLACEHOLDER, VALUE_LG } from "./fieldStyles";
 
-type ToastKind = "interest" | "success" | "existing" | "link-sent" | "link-failed";
+// Text pill with a floating label once filled (Figma 2308:2967): placeholder
+// label when empty, small label above the value when filled. Presentation only.
+function FloatInput({
+  label,
+  className = "",
+  ...input
+}: { label: string; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  const filled = String(input.value ?? "").length > 0;
+  return (
+    <label className={`${FIELD} ${FIELD_LG} min-w-0 flex-col items-start justify-center pl-5 pr-6 desk:pl-6 desk:pr-8 ${className}`}>
+      {filled ? <span className={MINI_LABEL}>{label}</span> : null}
+      <input
+        {...input}
+        placeholder={label}
+        className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER} ${filled ? "mt-0.5" : ""}`}
+      />
+    </label>
+  );
+}
+
+type ToastKind = "interest" | "success" | "already-recorded" | "existing" | "link-sent" | "link-failed";
 
 export type AboutData = {
   language: ApplicationLocale;
@@ -153,7 +173,7 @@ export function AboutStep({
         setInterestBusy(false);
         return;
       }
-      setToast("success");
+      setToast(res.status === "already_recorded" ? "already-recorded" : "success");
       window.setTimeout(() => router.push(localePath("/", locale)), 3000);
     } catch (err) {
       console.error("[apply] interest failed", err);
@@ -180,15 +200,15 @@ export function AboutStep({
   return createPortal(
     <div className="fixed inset-0 z-[70] flex h-dvh flex-col overflow-hidden bg-cream">
       {/* Header */}
-      <header className="flex shrink-0 items-center justify-between px-4 py-2.5 desk:px-12 desk:py-3">
+      <header className="flex shrink-0 items-center justify-between px-4 py-2.5 desk:h-[88px] desk:px-16 desk:py-6">
         <button
           type="button"
           onClick={onBack}
           aria-label={tr("Back")}
-          className="grid size-9 place-items-center rounded-full bg-white shadow-sm"
+          className="grid size-9 place-items-center rounded-full bg-white shadow-sm desk:size-10"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/apply/arrow-left.svg" alt="" width={20} height={20} className="size-5" />
+          <img src="/icons/apply/arrow-left.svg" alt="" width={20} height={20} className="size-5 desk:size-6" />
         </button>
 
         <div className="flex items-center rounded-full bg-white p-1">
@@ -198,7 +218,7 @@ export function AboutStep({
               type="button"
               onClick={() => setLocale(code)}
               aria-pressed={locale === code}
-              className={`h-7 rounded-full px-3.5 text-[12px] font-semibold uppercase tracking-[0.04em] transition-colors ${
+              className={`h-7 rounded-full px-3.5 text-[12px] font-semibold uppercase tracking-[0.04em] transition-colors desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:tracking-[0.56px] ${
                 locale === code ? "bg-black text-white" : "bg-transparent text-black/50"
               }`}
             >
@@ -209,58 +229,57 @@ export function AboutStep({
       </header>
 
       {/* Card */}
-      <main className="flex min-h-0 flex-1 items-center justify-center px-3 pb-2">
-        <div className="flex max-h-full w-full min-w-0 max-w-[960px] flex-col rounded-[36px] bg-white px-5 py-5 desk:rounded-[64px] desk:px-0 desk:py-8">
-          <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[632px] flex-col overflow-x-hidden overflow-y-auto">
+      <main className="flex min-h-0 flex-1 items-center justify-center px-3 pb-2 desk:items-stretch desk:px-16 desk:pb-0">
+        <div className="flex max-h-full w-full min-w-0 max-w-[1072px] flex-col rounded-[36px] bg-white px-5 py-5 desk:h-full desk:rounded-[154px] desk:px-10 desk:py-16">
+          <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[632px] flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <h1 className="text-center text-[26px] leading-[0.9] tracking-[-1.04px] text-black desk:text-[48px] desk:tracking-[-1.92px]">
               {tr("More about you")}</h1>
 
-            <div className="mt-5 flex flex-col gap-1.5 desk:mt-7 desk:gap-2">
+            <div className="mt-5 flex flex-col gap-1.5 desk:my-auto desk:gap-2 desk:pt-14">
               {/* Name + DOB */}
               <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-                <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={tr("*NAME")}
-                    aria-label={tr("Full name")}
-                    className={`min-w-0 w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
-                  />
-                </div>
-                <DateField value={dob} onChange={setDob} className="desk:w-[206px]" />
+                <FloatInput
+                  label={tr("*NAME")}
+                  className="shrink-0 desk:shrink desk:flex-1"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  aria-label={tr("Full name")}
+                />
+                <DateField value={dob} onChange={setDob} size="lg" invalid={shown === "interest" || shown === "success"} className="desk:w-[206px]" />
               </div>
 
               {/* Email + phone */}
               <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-                <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={tr("*EMAIL")}
-                    aria-label={tr("Email")}
-                    spellCheck={false}
-                    className={`min-w-0 w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
-                  />
-                </div>
-                <div className={`${FIELD} min-w-0 gap-3 pl-3 pr-5 desk:w-[312px]`}>
-                  <CountryDropdown variant="inline" value={dialCountry} onChange={setDialCountry} />
-                  <input
-                    type="tel"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder={tr("MOBILE")}
-                    aria-label={tr("Mobile number")}
-                    className={`min-w-0 w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
-                  />
+                <FloatInput
+                  label={tr("*EMAIL")}
+                  className="shrink-0 desk:shrink desk:flex-1"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  aria-label={tr("Email")}
+                  spellCheck={false}
+                />
+                <div className={`${FIELD} ${FIELD_LG} min-w-0 gap-3 pl-3 pr-5 desk:w-[312px] desk:shrink-0 desk:gap-4 desk:pl-4 desk:pr-10`}>
+                  <CountryDropdown variant="inline" size="lg" value={dialCountry} onChange={setDialCountry} />
+                  <label className="flex min-w-0 flex-1 flex-col items-start justify-center">
+                    {mobile ? <span className={MINI_LABEL}>{tr("MOBILE")}</span> : null}
+                    <input
+                      type="tel"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      placeholder={tr("MOBILE")}
+                      aria-label={tr("Mobile number")}
+                      className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER} ${mobile ? "mt-0.5" : ""}`}
+                    />
+                  </label>
                 </div>
               </div>
 
               {/* Nationality + based in */}
               <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-                <CountryDropdown variant="field" label={tr("Nationality")} value={nationality} onChange={setNationality} />
-                <CountryDropdown variant="field" label={tr("Currently based in")} value={basedIn} onChange={setBasedIn} />
+                <CountryDropdown variant="field" size="lg" label={tr("Nationality")} value={nationality} onChange={setNationality} />
+                <CountryDropdown variant="field" size="lg" label={tr("Currently based in")} value={basedIn} onChange={setBasedIn} />
               </div>
 
               {/* Program radios */}
@@ -270,7 +289,7 @@ export function AboutStep({
               </div>
 
               {track === "in_person" ? (
-                <div className="mt-6 flex flex-col gap-1.5 desk:mt-8 desk:gap-2">
+                <div className="mt-6 flex flex-col gap-1.5 desk:mt-[60px] desk:gap-0.5">
                   <FormCheckRow
                     label={tr("Can you travel out of the country you're located in")}
                     checked={canTravel}
@@ -295,7 +314,12 @@ export function AboutStep({
       </main>
 
       {/* Continue / toasts */}
-      <footer className="flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1">
+      <footer className="relative flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1 desk:p-[10px]">
+        {shown ? (
+          // White fade over the panel bottom behind the toast (Figma 2308:3296).
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[260px] bg-gradient-to-t from-white/80 via-white/50 to-transparent max-desk:hidden" />
+        ) : null}
+        <div className="relative z-10 flex w-full justify-center desk:absolute desk:inset-x-0 desk:bottom-[40px] desk:px-[163px]">
         {shown === "interest" ? (
           <Toast
             variant="error"
@@ -305,7 +329,10 @@ export function AboutStep({
             {tr("This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.")}</Toast>
         ) : shown === "success" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
-            {tr("Check your email and confirm your interest to receive updates about future programs.")}</Toast>
+            {tr("Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!")}</Toast>
+        ) : shown === "already-recorded" ? (
+          <Toast variant="success" onClose={() => setToast(null)}>
+            {tr("You're already on our interest list. We've emailed you a link in case you want to update your details.")}</Toast>
         ) : shown === "existing" ? (
           <Toast
             variant="error"
@@ -320,6 +347,7 @@ export function AboutStep({
           <Toast variant="error" onClose={() => setFollowup("closed")}>
             {tr("We couldn't send the link just now. Please wait a moment and try again.")}</Toast>
         ) : null}
+        </div>
 
         <Turnstile key={challengeKey} onToken={setTurnstileToken} size="compact" />
         <ContinueButton

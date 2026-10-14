@@ -8,6 +8,8 @@
   "MOBILE": "TELÉFONO MÓVIL",
   "Mobile number": "Número de móvil",
   "Nationality": "Nacionalidad",
+  "Search": "Buscar",
+  "Clear search": "Borrar búsqueda",
   "Currently based in": "País de residencia actual",
   "Only program": "Programa en línea",
   "Travel to Antalya": "Viajar a Antalya",
@@ -15,6 +17,7 @@
   "Do you have a passport valid for six months after the dates of travel?": "¿Tu pasaporte tiene una validez de al menos seis meses después de las fechas del viaje?",
   "This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.": "Este programa está dirigido a personas de 19 a 26 años. Para recibir información sobre futuros programas para tu edad, pulsa «Mostrar interés».",
   "Check your email and confirm your interest to receive updates about future programs.": "Revisa tu correo y confirma tu interés para recibir novedades sobre futuros programas.",
+  "Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!": "Hemos registrado tu interés. Mantente atento a nuestros próximos programas. ¡Esperamos verte muy pronto!",
   "An application already exists for this email. We can send a single-use link to that address so you can continue where you left off.": "Ya existe una solicitud con este correo. Podemos enviar un enlace de un solo uso a esa dirección para que puedas continuar.",
   "If that address has an application, a link to continue is on its way. It works once and expires in 30 minutes.": "Si ese correo tiene una solicitud, recibirás un enlace para continuar. Es de un solo uso y caduca en 30 minutos.",
   "We couldn't send the link just now. Please wait a moment and try again.": "No hemos podido enviar el enlace. Espera un momento y vuelve a intentarlo.",
@@ -63,7 +66,10 @@
   "Check your email to confirm your address and begin.": "Revisa tu correo para confirmar tu dirección y empezar.",
   "Redirecting you to the homepage": "Redirigiendo al inicio",
   "Redirecting you to VideoAsk": "Redirigiendo a VideoAsk",
+  "Hi {name},": "Hola, {name}:",
+  "Complete your application through the link we've sent you on your registered email": "Completa tu solicitud con el enlace que enviamos a tu correo electrónico registrado",
   "I'm interested": "Mostrar interés",
   "Sending…": "Enviando…",
-  "Email me my link": "Enviarme el enlace"
+  "Email me my link": "Enviarme el enlace",
+  "You're already on our interest list. We've emailed you a link in case you want to update your details.": "Ya estás en nuestra lista de interés. Te hemos enviado un enlace por correo por si quieres actualizar tus datos."
 }
