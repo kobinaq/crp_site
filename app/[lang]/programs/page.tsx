@@ -29,19 +29,19 @@ export default async function ProgramsPage({
       <main className="flex-1">
         <ProgramHero />
 
-        {/* Centered 632px content column (632 + 2×24 gutter) */}
-        <div className="mx-auto flex max-w-[680px] flex-col gap-8 px-0 pt-8 desk:gap-24 desk:px-6 desk:pt-24">
+        {/* Centered 632px content column (632 + 2×24 gutter); Figma 2308:6448 uses 64px desktop rhythm. */}
+        <div className="mx-auto flex max-w-[680px] flex-col gap-8 px-0 pt-8 desk:gap-16 desk:px-6 desk:pt-16">
           <ProgramAbout />
           <ProgramResonate />
           <ProgramWhatYouGet />
         </div>
 
         {/* Team cards bleed past the content column, matching Figma. */}
-        <div className="pt-16 desk:pt-24">
+        <div className="pt-16 desk:pt-16">
           <ProgramTestimonials />
         </div>
 
-        <div className="pt-20 desk:pt-32">
+        <div className="pt-20 desk:pt-16">
           <ProgramApplicationBand />
         </div>
 
