@@ -11,7 +11,7 @@ import { useCopy } from "./LanguageProvider";
 function FeaturedVideo() {
   const copy = useCopy();
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[36px] bg-white desk:rounded-[44px]">
+    <div className="relative h-[225px] overflow-hidden rounded-[44px] bg-white desk:aspect-video desk:h-auto">
       <Image
         src="/images/home/hero.png"
         alt={copy.content.featuredAlt}
@@ -44,7 +44,7 @@ function FeaturedVideo() {
           className="h-[38px] w-[38px] desk:h-[48px] desk:w-[48px]"
         />
       </button>
-      <p className="absolute bottom-6 left-6 z-10 w-[min(604px,86%)] text-[clamp(14px,3.4vw,20px)] font-normal leading-[0.9] tracking-[-0.04em] text-white desk:bottom-8 desk:left-8 desk:text-[32px] desk:tracking-[-1.28px]">
+      <p className="absolute bottom-6 left-6 z-10 w-[min(604px,86%)] text-[20px] font-normal leading-[0.9] tracking-[-0.8px] text-white desk:bottom-8 desk:tracking-[-0.04em] desk:left-8 desk:text-[32px] desk:tracking-[-1.28px]">
         {copy.content.homeCaption}
       </p>
     </div>
@@ -73,12 +73,12 @@ export function ContentGrid() {
       <div className="relative z-10 mx-auto flex w-full max-w-[1072px] flex-col items-center">
         <DisplayWordmark kicker={copy.content.kicker} word="Content" size="xl" className="shrink-0" />
 
-        <p className="mt-4 max-w-[840px] text-center text-[22px] font-normal leading-[0.9] tracking-[-0.04em] text-white desk:mt-6 desk:text-[40px]">
+        <p className="mt-[11px] w-[360px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:mt-6 desk:w-auto desk:max-w-[840px] desk:text-[40px] desk:tracking-[-0.04em]">
           {copy.content.subtitle}
         </p>
 
-        <SectionReveal className="mt-10 w-full desk:mt-14">
-          <div className="rounded-[40px] bg-white/[0.12] p-2 desk:rounded-[52px]">
+        <SectionReveal className="mt-8 w-full desk:mt-14">
+          <div className="rounded-[52px] bg-white/[0.12] p-2">
             <div className="relative flex flex-col gap-2 desk:block">
               {/* Video drives the height; on desktop it leaves room for the column. */}
               <div className="desk:mr-[388px]">
@@ -91,8 +91,8 @@ export function ContentGrid() {
               </div>
 
               {/* Mobile: the same cards scrolling sideways. */}
-              <div className="h-[214px] overflow-hidden rounded-[32px] desk:hidden">
-                <PosterMarquee orientation="horizontal" />
+              <div className="h-[228px] overflow-hidden rounded-[44px] desk:hidden">
+                <PosterMarquee orientation="window" />
               </div>
             </div>
           </div>

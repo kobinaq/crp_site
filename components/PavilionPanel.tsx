@@ -18,7 +18,7 @@ const SLIDE_MS = 520;
 const ACTIVE_TEXT =
   "whitespace-nowrap text-[20px] tracking-[-0.8px] desk:text-[32px] desk:tracking-[-1.28px]";
 const IDLE_TEXT =
-  "whitespace-nowrap text-[15px] tracking-[-0.6px] text-black/25 desk:text-[24px] desk:tracking-[-0.96px]";
+  "whitespace-nowrap text-[16px] tracking-[-0.64px] text-black/25 desk:text-[24px] desk:tracking-[-0.96px]";
 
 function BringingTogether() {
   const copy = useCopy();
@@ -97,7 +97,7 @@ function BringingTogether() {
                 type="button"
                 tabIndex={-1}
                 onClick={() => setIndex(row)}
-                className={`flex h-[var(--row)] w-full items-center text-left transition-colors ${
+                className={`flex h-[var(--row)] w-full items-center justify-center text-center transition-colors desk:justify-start desk:text-left ${
                   active ? `${ACTIVE_TEXT} text-black` : IDLE_TEXT
                 }`}
               >
@@ -149,13 +149,13 @@ export function PavilionPanel() {
     <section
       ref={ref}
       id="stories"
-      className="relative w-full overflow-hidden rounded-t-[64px] bg-cream desk:rounded-t-[154px]"
+      className="relative w-full overflow-hidden rounded-t-[88px] bg-cream desk:rounded-t-[154px]"
     >
-      <div className="relative mx-auto h-[600px] w-full max-w-[1200px] desk:h-[805px]">
-        <div className="absolute inset-x-0 top-0 h-[430px] desk:h-[613px]">
+      <div className="relative mx-auto h-[844px] w-full max-w-[1200px] desk:h-[805px]">
+        <div className="absolute inset-x-0 top-0 h-[670px] desk:h-[613px]">
           <motion.div
-            className={`absolute inset-0 overflow-hidden [--pavilion-end-r:64px] desk:[--pavilion-end-r:154px] ${
-              reduceMotion ? "rounded-[64px] desk:rounded-[154px]" : ""
+            className={`absolute inset-0 overflow-hidden [--pavilion-end-r:88px] desk:[--pavilion-end-r:154px] ${
+              reduceMotion ? "rounded-[88px] desk:rounded-[154px]" : ""
             }`}
             style={style}
           >
@@ -171,7 +171,7 @@ export function PavilionPanel() {
               className="absolute inset-0 bg-black/45 mix-blend-multiply"
             />
 
-            <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[48px] pt-[76px] desk:pb-[88px] desk:pt-[48px]">
+            <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[63px] pt-[96px] desk:pb-[88px] desk:pt-[48px]">
               <div className="flex flex-col items-center">
                 <DisplayWordmark
                   word="Pavilion"
@@ -186,13 +186,18 @@ export function PavilionPanel() {
                   height={48}
                   className="relative z-10 -mt-[36px] h-8 w-12 overflow-clip desk:-mt-[52px] desk:h-[48px] desk:w-[72px]"
                 />
-                <p className="relative z-10 mt-[10px] whitespace-nowrap font-semibold uppercase leading-[0.9] tracking-[0.72px] text-white mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] text-[18px] desk:mt-[12px] desk:text-[24px] desk:tracking-[0.96px]">
+                <div className="relative z-10 mt-2 flex flex-col items-center gap-1 whitespace-nowrap font-semibold uppercase leading-[0.9] mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:hidden">
+                  <p className="text-[18px] tracking-[0.72px] text-white">{copy.pavilion.locationPlace}</p>
+                  <p className="text-[14px] tracking-[0.56px] text-white/72">{copy.pavilion.locationOnline}</p>
+                </div>
+                <p className="relative z-10 mt-[10px] hidden whitespace-nowrap font-semibold uppercase leading-[0.9] tracking-[0.72px] text-white mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] text-[18px] desk:mt-[12px] desk:block desk:text-[24px] desk:tracking-[0.96px]">
                   {copy.pavilion.location}
                 </p>
               </div>
 
-              <h2 className="mt-auto w-[92%] max-w-[859px] text-center text-[24px] font-normal leading-[0.9] tracking-[-0.96px] text-white desk:text-[48px] desk:tracking-[-1.92px]">
-                {copy.pavilion.headline}
+              <h2 className="mt-auto w-[342px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:w-[92%] desk:max-w-[859px] desk:text-[48px] desk:tracking-[-1.92px]">
+                <span className="desk:hidden">{copy.pavilion.headlineMobile}</span>
+                <span className="hidden desk:inline">{copy.pavilion.headline}</span>
               </h2>
             </div>
           </motion.div>
@@ -205,7 +210,7 @@ export function PavilionPanel() {
         </div>
 
         <div className="flex h-full flex-col items-center justify-end">
-          <div className="flex h-[140px] w-full items-center justify-center desk:h-[192px]">
+          <div className="flex h-[174px] w-full items-center justify-center desk:h-[192px]">
             <BringingTogether />
           </div>
         </div>

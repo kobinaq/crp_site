@@ -34,7 +34,7 @@ function stackMask(squares: number) {
 }
 
 const COPY_CLASS =
-  "text-[clamp(26px,7.2vw,48px)] font-normal leading-[0.9] tracking-[-0.04em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]";
+  "text-[28px] font-normal leading-[0.9] tracking-[-1.12px] desk:text-[clamp(26px,7.2vw,48px)] desk:tracking-[-0.04em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]";
 
 function HeroCopy({
   square,
@@ -48,7 +48,7 @@ function HeroCopy({
   const Heading = heading;
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-8 text-center"
+      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-3 text-center desk:px-8"
       style={{
         top: `calc(var(--hero-peek-t) + ${square} * var(--hero-h))`,
         height: "var(--hero-h)",

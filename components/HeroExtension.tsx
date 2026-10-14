@@ -56,11 +56,11 @@ export function HeroExtension() {
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[42%] bg-gradient-to-b from-black from-0% via-black/55 via-35% to-transparent to-100%"
           />
-          <SectionReveal className="relative z-10 flex flex-col items-center gap-[12px] px-8 text-center text-white">
-            <h2 className="text-[clamp(26px,7.2vw,48px)] font-normal leading-[0.9] tracking-[-0.04em] drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]">
+          <SectionReveal className="relative z-10 flex flex-col items-center gap-[12px] px-[21px] text-center text-white desk:px-8">
+            <h2 className="text-[28px] font-normal leading-[0.9] tracking-[-1.12px] desk:text-[clamp(26px,7.2vw,48px)] desk:tracking-[-0.04em] drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]">
               {copy.heroExtension.title}
             </h2>
-            <p className="text-[clamp(14px,3.6vw,24px)] font-normal leading-[0.9] tracking-[-0.04em] text-white/90">
+            <p className="text-[14px] font-normal leading-[0.9] tracking-[-0.56px] text-white/90 desk:text-[clamp(14px,3.6vw,24px)] desk:tracking-[-0.04em]">
               {copy.heroExtension.subtitle}
             </p>
             <CaretDown />

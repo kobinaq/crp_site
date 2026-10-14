@@ -6,7 +6,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -19,6 +18,7 @@ import { aboutTeam, type AboutTeamMember } from "@/lib/about-team";
 import type { Pin } from "@/lib/pins";
 import { ABOUT_GLOBE_WAIT_IMAGES } from "../platform/globe-defer";
 import { PlatformGlobe } from "../platform/PlatformGlobe";
+import { MOBILE_GLOBE_YAW, useIsMobile } from "@/lib/useIsMobile";
 
 function FitWidth({
   designWidth,
@@ -526,16 +526,6 @@ function MobileHomeBanner({ topics, caption }: { topics: readonly string[]; capt
   );
 }
 
-const MOBILE_GLOBE_YAW = Math.PI - 0.9;
-const MOBILE_QUERY = "(max-width: 899.98px)";
-function subscribeMobile(onChange: () => void) {
-  const mq = window.matchMedia(MOBILE_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-function getMobile() {
-  return window.matchMedia(MOBILE_QUERY).matches;
-}
 
 const TEAM_SEATS = ["left", "lead", "right"] as const;
 
@@ -588,7 +578,7 @@ export function AboutPage() {
   const [selectedMember, setSelectedMember] = useState<AboutTeamMember | null>(null);
   const statementLines = a.statement.split("\n");
   // Mobile Figma frames the globe on Asia; desktop keeps its original start (yaw 0).
-  const isMobile = useSyncExternalStore(subscribeMobile, getMobile, () => false);
+  const isMobile = useIsMobile();
   const globeYaw = isMobile ? MOBILE_GLOBE_YAW : 0;
   const teamPins: Pin[] = aboutTeam.map((member, index) => {
     const band = (index + 0.5) / aboutTeam.length;

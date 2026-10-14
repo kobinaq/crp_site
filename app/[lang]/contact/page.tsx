@@ -19,11 +19,17 @@ export default function ContactRoute() {
       <Header />
       <main className="flex-1">
         <ContactPage />
-        <GetInvolved embedded />
-        <Sponsors />
+        <GetInvolved embedded contactMobile />
+        {/* Mobile Figma has no sponsors band here (it renders empty); desktop unchanged. */}
+        <div className="max-desk:hidden">
+          <Sponsors />
+        </div>
       </main>
-      <Footer />
-      <GetInvolvedPill />
+      <Footer pillSpace={false} />
+      {/* Mobile Figma has no floating pill on Contact; it covered the EMAIL/PHONE tiles. */}
+      <div className="max-desk:hidden">
+        <GetInvolvedPill />
+      </div>
     </div>
   </>);
 }

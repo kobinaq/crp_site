@@ -13,6 +13,7 @@ import { PavilionPanel } from "@/components/PavilionPanel";
 import { PrefetchGlobe } from "@/components/PrefetchGlobe";
 import { PlatformSection } from "@/components/PlatformSection";
 import { Sponsors } from "@/components/Sponsors";
+import { AboutTicker } from "@/components/about/AboutTicker";
 import { Waitlist } from "@/components/Waitlist";
 
 export async function generateMetadata(): Promise<Metadata> { return pageMetadata(await requestLocale(), "home"); }
@@ -28,12 +29,17 @@ export default function Home() {
         <PavilionPanel />
         <PlatformSection />
         <ContentGrid />
-        <GetInvolved />
+        <GetInvolved compactMobile />
         <Waitlist />
+        {/* Mobile: Figma slogan ticker (shared with About); partners band stays hidden. */}
+        <AboutTicker className="pt-16" />
         <Sponsors />
       </main>
       <Footer />
-      <GetInvolvedPill />
+      {/* Figma mobile has no floating Get involved pill. */}
+      <div className="hidden desk:block">
+        <GetInvolvedPill />
+      </div>
       <PrefetchGlobe />
     </div>
   </>);
