@@ -240,7 +240,7 @@ export function AboutStep({
               <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
                 <FloatInput
                   label={tr("*NAME")}
-                  className="flex-1"
+                  className="shrink-0 desk:shrink desk:flex-1"
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -253,7 +253,7 @@ export function AboutStep({
               <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
                 <FloatInput
                   label={tr("*EMAIL")}
-                  className="flex-1"
+                  className="shrink-0 desk:shrink desk:flex-1"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

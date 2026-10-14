@@ -3,7 +3,7 @@
 import { useText } from "@/lib/ui-text";
 
 import { type KeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useLanguage } from "../LanguageProvider";
 import { COUNTRIES, countryLabel, rankCountries, type Country } from "@/lib/countries";
 import { FIELD, FIELD_LG, LABEL, MINI_LABEL, VALUE_LG } from "./fieldStyles";
@@ -81,6 +81,7 @@ export function CountryDropdown({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const lastTyped = useRef(0);
   const listId = useId();
 
@@ -162,6 +163,9 @@ export function CountryDropdown({
         return;
       }
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // In the dial search input, text editing keys belong to the input itself.
+      const inSearch = event.target === searchRef.current;
+      if (inSearch && (event.key === "Backspace" || event.key.length === 1 || event.key === "Home" || event.key === "End")) return;
       if (event.key === "ArrowDown") {
         event.preventDefault();
         setActive((index) => Math.min(index + 1, Math.max(ranked.length - 1, 0)));
@@ -200,6 +204,17 @@ export function CountryDropdown({
     };
   }, [open, ranked, safeActive, choose]);
 
+  // Dial menu: move focus into the search input so typing (and the mobile
+  // keyboard) goes there. Click-open focuses synchronously (see onClick) so iOS
+  // shows the keyboard; this covers keyboard-open paths.
+  useEffect(() => {
+    if (open && menuStyle && variant === "inline" && document.activeElement !== searchRef.current) {
+      const input = searchRef.current;
+      input?.focus({ preventScroll: true });
+      input?.setSelectionRange(input.value.length, input.value.length);
+    }
+  }, [open, menuStyle, variant]);
+
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (open) return;
@@ -229,6 +244,13 @@ export function CountryDropdown({
         onClick={() => {
           setQuery("");
           setActive(0);
+          if (variant === "inline" && !open) {
+            // Render the menu synchronously so focus lands in the search input
+            // inside the tap gesture (required for the iOS keyboard).
+            flushSync(() => setOpen(true));
+            searchRef.current?.focus({ preventScroll: true });
+            return;
+          }
           setOpen((current) => !current);
         }}
         onKeyDown={onTriggerKeyDown}
@@ -312,10 +334,25 @@ export function CountryDropdown({
                     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M10.75 10.75L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
-                  <span className={`min-w-0 flex-1 truncate text-[20px] leading-[1.2] tracking-[-0.8px] ${query ? "text-black" : "text-black/32"}`}>
-                    {query || tr("Search")}
-                    {query ? <span aria-hidden className="ml-px inline-block h-[0.9em] w-px translate-y-[0.1em] bg-black" /> : null}
-                  </span>
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    inputMode="search"
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setActive(0);
+                    }}
+                    placeholder={tr("Search")}
+                    aria-label={tr("Search")}
+                    aria-controls={listId}
+                    aria-activedescendant={ranked[safeActive] ? `${listId}-${ranked[safeActive].country.code}` : undefined}
+                    className="min-w-0 flex-1 bg-transparent text-[20px] leading-[1.2] tracking-[-0.8px] text-black outline-none placeholder:text-black/32"
+                  />
                   {query ? (
                     <button
                       type="button"
@@ -323,6 +360,7 @@ export function CountryDropdown({
                       onClick={() => {
                         setQuery("");
                         setActive(0);
+                        searchRef.current?.focus();
                       }}
                       className="grid size-6 shrink-0 place-items-center rounded-full text-black/48 hover:bg-cream"
                     >
