@@ -9,7 +9,7 @@ export function PrivacyPage() {
   const { privacyPage: page } = useCopy();
 
   return (
-    <section className="bg-cream px-[12px] pb-[12px] pt-[68px] desk:px-16 desk:pb-24 desk:pt-[120px]">
+    <section className="bg-cream px-[12px] pb-[76px] pt-[68px] desk:px-16 desk:pb-24 desk:pt-[120px]">
       <div className="mx-auto flex w-full max-w-[1072px] flex-col gap-[32px] desk:flex-row desk:items-stretch desk:gap-12">
         <div className="flex flex-col justify-between gap-[24px] px-[10px] text-black desk:gap-10 desk:px-0 desk:h-[589px] desk:min-w-0 desk:flex-1">
           <h1 className="text-[48px] leading-[0.8] tracking-[-1.92px] desk:text-[96px] desk:tracking-[-3.84px]">
