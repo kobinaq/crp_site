@@ -18,6 +18,7 @@ import { PinIcon } from "./platform/PinIcon";
 import { ComingSoonBadge } from "./platform/ComingSoonBadge";
 import { pinGroupIds, type PinGroup } from "@/lib/pins";
 import { useCopy } from "./LanguageProvider";
+import { MOBILE_GLOBE_YAW, useIsMobile } from "@/lib/useIsMobile";
 
 const SWEEP_DURATION = 13; // seconds for one left-to-right pass (half previous speed)
 const BTN_RADIUS = 24;
@@ -282,6 +283,7 @@ function PlatformBackdrop() {
 }
 
 export function PlatformSection() {
+  const globeYaw = useIsMobile() ? MOBILE_GLOBE_YAW : 0;
   const copy = useCopy();
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { amount: 0.15 });
@@ -322,6 +324,7 @@ export function PlatformSection() {
               <PlatformGlobe
                 visibleGroups={visibleGroups}
                 emphasis={mode === "manual" ? activeGroup : null}
+                initialYaw={globeYaw}
               />
             </div>
             <ComingSoonBadge className="platform-soon-badge !hidden desk:!block" />
@@ -351,7 +354,7 @@ export function PlatformSection() {
                     />
                   </div>
                 </div>
-                <p className="w-full text-center text-[20px] font-normal leading-[0.9] tracking-[-0.8px] text-white desk:w-[422px] desk:text-[24px] desk:tracking-[-0.96px]">
+                <p className="w-full px-[38px] text-center text-[20px] font-normal leading-[0.9] tracking-[-0.8px] text-white desk:w-[422px] desk:px-0 desk:text-[24px] desk:tracking-[-0.96px]">
                   {copy.platform.groups[activeGroup].blurb}
                 </p>
               </div>

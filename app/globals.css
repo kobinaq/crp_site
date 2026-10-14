@@ -45,7 +45,7 @@ html {
 
 /* Shared width of the hero squares; the pavilion morph starts from this. */
 :root {
-  --column-w: min(92vw, 440px);
+  --column-w: min(75.4vw, 440px);
 }
 
 @media (min-width: 900px) {
