@@ -5,7 +5,7 @@ import { useText } from "@/lib/ui-text";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "../LanguageProvider";
-import { FIELD, LABEL } from "./fieldStyles";
+import { FIELD, FIELD_LG, LABEL, MINI_LABEL, VALUE_LG } from "./fieldStyles";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -13,15 +13,21 @@ const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 // Calendar date picker matching Figma 2184:3924: month/year header with
 // prev/next, S-M-T-W-T-F-S row, a 6-week grid with greyed adjacent months and a
 // cream circle on the selected day. The month/year caret opens a year list.
+// Popover restyled to Figma 2308:5762 (black rounded day with lime text).
+// size="lg" is the More about you trigger (Figma 2308:2967): 64px desktop pill,
+// floating "*D.O.B" label over a "Nov 9, 2003" value, cream while open.
 export function DateField({
   value,
   onChange,
   className = "",
+  size = "md",
 }: {
   value: string; // YYYY-MM-DD
   onChange: (v: string) => void;
   className?: string;
+  size?: "md" | "lg";
 }) {
+  const lg = size === "lg";
   const tr = useText();
   const { locale } = useLanguage();
   const MONTHS = Array.from({ length: 12 }, (_, month) => new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(2024, month, 1)));
@@ -110,7 +116,9 @@ export function DateField({
   }, [today]);
 
   const display = selected
-    ? `${pad(selected.getDate())} ${MONTHS[selected.getMonth()].slice(0, 3)} ${selected.getFullYear()}`
+    ? lg
+      ? new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric" }).format(selected)
+      : `${pad(selected.getDate())} ${MONTHS[selected.getMonth()].slice(0, 3)} ${selected.getFullYear()}`
     : null;
 
   return (
@@ -119,11 +127,18 @@ export function DateField({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`${FIELD} w-full justify-center gap-2.5 px-4`}
+        className={`${FIELD} w-full gap-2.5 px-4 transition-colors ${lg ? `${FIELD_LG} ${display ? "justify-start" : "justify-center"}` : "justify-center"} ${
+          lg && open ? "bg-cream!" : ""
+        }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/calendar-blank.svg" alt="" width={20} height={20} className="size-5 opacity-60" />
-        {display ? (
+        <img src="/icons/calendar-blank.svg" alt="" width={20} height={20} className={`size-5 ${lg ? "opacity-[0.48] brightness-0" : "opacity-60"}`} />
+        {lg && display ? (
+          <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
+            <span className={MINI_LABEL}>{tr("*D.O.B")}</span>
+            <span className={`truncate ${VALUE_LG}`}>{display}</span>
+          </span>
+        ) : display ? (
           <span className="text-[16px] text-black">{display}</span>
         ) : (
           <span className={LABEL}>{tr("*D.O.B")}</span>
@@ -135,27 +150,27 @@ export function DateField({
         <div
           ref={menuRef}
           style={{ top: menuBox.top, left: menuBox.left, width: menuBox.width }}
-          className="fixed z-[90] rounded-[24px] border border-black/12 bg-white p-4 shadow-[0_8px_28px_rgba(0,0,0,0.12)]"
+          className="fixed z-[90] rounded-[32px] bg-white px-4 pb-3 pt-5 shadow-[0_12px_40px_rgba(0,0,0,0.14)]"
         >
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between pl-2">
             <button
               type="button"
               onClick={() => setYearPicker((v) => !v)}
-              className="flex items-center gap-1.5 text-[20px] tracking-[-0.8px] text-black"
+              className="flex items-center gap-2 text-[20px] leading-[1.2] tracking-[-0.8px] text-black"
             >
               {MONTHS[view.m]} {view.y}
-              <svg viewBox="0 0 12 12" className="size-3 text-black/60" fill="none" aria-hidden>
+              <svg viewBox="0 0 12 12" className="size-3 text-black" fill="none" aria-hidden>
                 <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             {!yearPicker ? (
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={() => shift(-1)} aria-label={tr("Previous month")} className="grid size-7 place-items-center text-black/70">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => shift(-1)} aria-label={tr("Previous month")} className="grid size-8 place-items-center rounded-full text-black hover:bg-cream">
                   <svg viewBox="0 0 12 12" className="size-3.5" fill="none" aria-hidden>
                     <path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-                <button type="button" onClick={() => shift(1)} aria-label={tr("Next month")} className="grid size-7 place-items-center text-black/70">
+                <button type="button" onClick={() => shift(1)} aria-label={tr("Next month")} className="grid size-8 place-items-center rounded-full text-black hover:bg-cream">
                   <svg viewBox="0 0 12 12" className="size-3.5" fill="none" aria-hidden>
                     <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -174,7 +189,7 @@ export function DateField({
                     setView((v) => ({ ...v, y }));
                     setYearPicker(false);
                   }}
-                  className={`h-9 rounded-full text-[15px] ${y === view.y ? "bg-[rgba(244,241,234,0.9)] text-black" : "text-black/70"}`}
+                  className={`h-10 rounded-[16px] text-[16px] ${y === view.y ? "bg-black text-lime" : "text-black hover:bg-cream"}`}
                 >
                   {y}
                 </button>
@@ -182,9 +197,9 @@ export function DateField({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-7 text-center text-[12px] text-black/40">
+              <div className="grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-[0.4px] text-black/48">
                 {WEEKDAYS.map((w, i) => (
-                  <span key={i} className="py-1">{w}</span>
+                  <span key={i} className="py-2">{w}</span>
                 ))}
               </div>
               <div className="grid grid-cols-7">
@@ -203,12 +218,12 @@ export function DateField({
                         onChange(iso(c.y, c.m, c.d));
                         setOpen(false);
                       }}
-                      className={`grid aspect-square place-items-center text-[15px] ${
-                        c.cur ? "text-black" : "text-black/25"
+                      className={`grid aspect-square place-items-center text-[16px] leading-none ${
+                        c.cur ? "text-black" : "text-black/32"
                       }`}
                     >
                       <span
-                        className={`grid size-9 place-items-center rounded-full ${isSel ? "bg-[rgba(244,241,234,0.9)]" : ""}`}
+                        className={`grid size-10 place-items-center rounded-[16px] transition-colors ${isSel ? "bg-black text-lime" : "hover:bg-cream"}`}
                       >
                         {c.d}
                       </span>
