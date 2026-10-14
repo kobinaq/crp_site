@@ -184,7 +184,11 @@ export function decisionEmail(
   const copy = emailCopy[language];
   if (status === "rejected") return { subject: copy.rejectedSubject, html: render(language, [copy.applicant, copy.rejected], null) };
   if (status === "online_offered") return { subject: copy.onlineSubject, html: render(language, [copy.applicant, copy.online], link ? { label: copy.onlineButton, url: link } : null) };
-  if (status === "accepted") return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], link ? { label: copy.interviewButton, url: link } : null) };
+  if (status === "accepted") {
+    // No booking link (Calendly off): no button, and copy that doesn't point at one.
+    if (!link) return { subject: copy.acceptedSubject, html: render(language, [copy.congratulations, copy.interviewManual], null) };
+    return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], { label: copy.interviewButton, url: link }) };
+  }
   return { subject: copy.selectedSubject, html: render(language, [copy.congratulations, copy.selected], null) };
 }
 
