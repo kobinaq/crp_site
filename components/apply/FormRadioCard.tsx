@@ -1,7 +1,5 @@
 "use client";
 
-import { LimeCheck } from "./LimeCheck";
-
 export function FormRadioCard({
   label,
   selected,
@@ -16,19 +14,19 @@ export function FormRadioCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-2.5 rounded-[28px] px-5 py-4 text-left desk:gap-3 desk:rounded-[32px] desk:p-5 ${
+      className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-2.5 rounded-[28px] px-5 py-4 text-left desk:gap-3 desk:rounded-[32px] desk:p-6 ${
         selected ? "bg-black text-white" : "bg-cream text-black"
       }`}
     >
       <span
         aria-hidden
         className={`grid size-7 shrink-0 place-items-center rounded-full border desk:size-8 ${
-          selected ? "border-white bg-black text-lime" : "border-black bg-transparent"
+          selected ? "border-white bg-black" : "border-black bg-transparent"
         }`}
       >
-        {selected ? <LimeCheck /> : null}
+        {selected ? <span className="size-3 rounded-full bg-lime desk:size-3.5" /> : null}
       </span>
-      <span className="text-[16px] leading-[1.2] tracking-[-0.64px] desk:text-[18px]">
+      <span className="text-[16px] leading-[1.2] tracking-[-0.64px] desk:text-[20px] desk:tracking-[-0.8px]">
         {label}
       </span>
     </button>
