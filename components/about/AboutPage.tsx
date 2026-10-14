@@ -232,11 +232,11 @@ function TeamCard({
     expand === "left" ? "group-hover/left:w-[320px]" : expand === "lead" ? "group-hover/lead:w-[320px]" : expand === "right" ? "group-hover/right:w-[320px]" : "";
   const clear =
     expand === "left" ? "group-hover/left:opacity-0" : expand === "lead" ? "group-hover/lead:opacity-0" : expand === "right" ? "group-hover/right:opacity-0" : "";
-  const ticket = useTicketLabel(role);
+  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(role);
 
   return (
     <article
-      ref={ticket.cardRef}
+      ref={cardRef}
       aria-label={`${name}. ${role}`}
       className={`relative h-[200px] w-[200px] shrink-0 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${wide}`}
     >
@@ -253,7 +253,7 @@ function TeamCard({
         <p className="absolute bottom-5 left-0 right-0 px-5 text-center text-[18px] leading-[1.05] tracking-[-0.72px] text-white">
           {name}
         </p>
-        <TicketTab placement="top" ink label={ticket.text} labelPx={ticket.px} maxWidth={160} />
+        <TicketTab placement="top" ink label={ticketText} labelPx={ticketPx} maxWidth={160} />
       </div>
     </article>
   );
@@ -302,7 +302,7 @@ function TeamMemberSheet({
   const copy = useCopy();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const ticket = useTicketLabel(member.role);
+  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(member.role);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -339,7 +339,7 @@ function TeamMemberSheet({
           />
           <div
             ref={(el) => {
-              ticket.cardRef.current = el;
+              cardRef.current = el;
             }}
             className="relative aspect-square w-full overflow-hidden rounded-[64px]"
           >
@@ -351,7 +351,7 @@ function TeamMemberSheet({
               style={member.imagePosition ? { objectPosition: member.imagePosition } : undefined}
               sizes="326px"
             />
-            <TicketTab placement="top" ink label={ticket.text} labelPx={ticket.px} maxWidth={200} />
+            <TicketTab placement="top" ink label={ticketText} labelPx={ticketPx} maxWidth={200} />
             <p
               id={titleId}
               className="absolute bottom-6 left-0 right-0 px-8 text-center text-[24px] leading-none tracking-[-0.96px] text-white"
