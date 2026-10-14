@@ -945,6 +945,18 @@ test("operations credentials bind the audit actor and reject legacy shared crede
   try { assert.equal((await h.opsOverview()).status, 401); } finally { process.env.OPERATIONS_TOKENS = before; }
 });
 
+test("interest signup tells new and repeat addresses apart without exposing details", async () => {
+  const email = nextEmail();
+  h.state.ip = `192.0.2.${++ipCounter % 250}`;
+  const input = { email, ageGroup: "19_plus", track: "online" };
+  assert.deepEqual(await h.actions.submitInterest(input), { ok: true, status: "ok" });
+  await sql.query("insert into interest (email,name,age_group,track) values ($1,'Secret Name','under_19','online')", [email]);
+  const repeat = await h.actions.submitInterest(input);
+  assert.deepEqual(repeat, { ok: true, status: "already_recorded" });
+  assert.doesNotMatch(JSON.stringify(repeat), /Secret Name|under_19/);
+  assert.deepEqual(await h.actions.submitInterest({ email: "not-an-email" }), { ok: false, status: "error" });
+});
+
 for (const kind of ["waitlist", "interest"]) {
   test(`${kind} preferences change only after the mailbox owner confirms, once`, async () => {
     const database = h.load("lib/db/index.ts").getDb();
@@ -954,7 +966,7 @@ for (const kind of ["waitlist", "interest"]) {
     const submit = kind === "waitlist" ? h.actions.submitWaitlist : h.actions.submitInterest;
     h.state.ip = `192.0.2.${++ipCounter % 250}`;
     const input = { email, ageGroup: "19_plus", track: "in_person" };
-    assert.deepEqual(await submit(input), { ok: true });
+    assert.deepEqual(await submit(input), kind === "waitlist" ? { ok: true } : { ok: true, status: "already_recorded" });
     let saved = (await sql.query(`select * from ${kind} where email = $1`, [email])).rows[0];
     assert.equal(kind === "waitlist" ? saved.status : saved.track, kind === "waitlist" ? "unsubscribed" : "online");
     const [queued] = (await sql.query("select * from jobs where payload->>'to' = $1", [email])).rows;

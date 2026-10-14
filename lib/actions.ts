@@ -2,8 +2,10 @@
 import { requestCaptureConfirmation } from "@/lib/capture-confirmation";
 
 import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 import {
   getDb,
+  interest,
   nominations,
   partnerInquiries,
 } from "@/lib/db";
@@ -60,13 +62,24 @@ export async function submitWaitlist(raw: unknown): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-export async function submitInterest(raw: unknown): Promise<{ ok: boolean }> {
-  if (!(await passedTurnstile(raw))) return { ok: false };
+// `ok` stays for existing callers; `status` lets the apply form tell a repeat
+// signup apart. Only checked after Turnstile and the rate limits, and it only
+// reveals that the address is on the interest list (no stored details). The
+// confirmation email still goes out so the owner can update their preferences.
+export type InterestResult =
+  | { ok: true; status: "ok" | "already_recorded" }
+  | { ok: false; status: "error" };
+
+export async function submitInterest(raw: unknown): Promise<InterestResult> {
+  const failed = { ok: false, status: "error" } as const;
+  if (!(await passedTurnstile(raw))) return failed;
   const parsed = interestInput.safeParse(raw);
-  if (!parsed.success) return { ok: false };
-  if (!(await withinLimits("interest", parsed.data.email, 20, 3))) return { ok: false };
-  await requestCaptureConfirmation(getDb(), "interest", parsed.data);
-  return { ok: true };
+  if (!parsed.success) return failed;
+  if (!(await withinLimits("interest", parsed.data.email, 20, 3))) return failed;
+  const db = getDb();
+  const [existing] = await db.select({ id: interest.id }).from(interest).where(eq(interest.email, parsed.data.email)).limit(1);
+  await requestCaptureConfirmation(db, "interest", parsed.data);
+  return { ok: true, status: existing ? "already_recorded" : "ok" };
 }
 
 export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
