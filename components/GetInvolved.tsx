@@ -4,7 +4,14 @@ import { GetInvolvedTab } from "./GetInvolvedPill";
 import { PartnerCard, YouthAmbassadorCard } from "./GetInvolvedCards";
 import { useCopy } from "./LanguageProvider";
 
-export function GetInvolved({ embedded = false }: { embedded?: boolean }) {
+export function GetInvolved({
+  embedded = false,
+  compactMobile = false,
+}: {
+  embedded?: boolean;
+  /** About page: Figma 297px mobile cards with 20px titles. */
+  compactMobile?: boolean;
+}) {
   const copy = useCopy();
   return (
     <section
@@ -24,9 +31,13 @@ export function GetInvolved({ embedded = false }: { embedded?: boolean }) {
           {copy.involved.title}
         </h2>
 
-        <div className="mt-10 grid gap-0 desk:mt-12 desk:grid-cols-2 desk:items-stretch">
-          <YouthAmbassadorCard />
-          <PartnerCard />
+        <div
+          className={`mt-10 grid gap-0 desk:mt-12 desk:grid-cols-2 desk:items-stretch ${
+            compactMobile ? "mx-auto w-[297px] max-w-full desk:mx-0 desk:w-auto desk:max-w-none" : ""
+          }`}
+        >
+          <YouthAmbassadorCard compact={compactMobile} />
+          <PartnerCard compact={compactMobile} />
         </div>
       </div>
     </section>

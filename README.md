@@ -10,30 +10,6 @@ npm run dev
 
 Other scripts: `npm run build`, `npm run start`, `npm run lint`.
 
-## Backend recovery update
-
-Before running the updated backend, apply migrations with `npm run db:migrate`
-against the intended database. Migration `0008_backend_recovery` adds the Excel
-decision batch position and backfills existing records missing from the sync
-feed. It briefly locks the four source tables while taking the baseline; allow
-time for this when scheduling deployment. The backfill excludes private identity
-session links and IDs. `db:push` alone does not perform this data backfill.
-
-Expired worker leases are reclaimed automatically. Email jobs whose first attempt
-was more than 23 hours ago are parked for provider reconciliation, avoiding a
-blind resend outside the provider's idempotency window. Recovery links are minted
-at delivery and require a confirmation POST; an email scanner's GET does not
-consume them. Existing applications are not retroactively marked as having given
-explicit consent; new submissions must send `consent: true` after acceptance.
-
-Excel rotates through batches of 200 decision rows. Editing reviewer fields
-creates a new decision ID; replaying the same ID with different content through
-the decisions API returns `conflict`. Changing only the system version is not a
-new decision. Run `npm test` for disposable PostgreSQL integration tests.
-
-See [BACKEND_SECURITY.md](BACKEND_SECURITY.md) for email confirmation, individual
-operator credentials, VideoAsk form binding, and deployment requirements.
-
 ## Application verification
 
 Applicants complete one VideoAsk form configured by `VIDEOASK_FORM_URL` and
@@ -83,11 +59,3 @@ events update `interviewAt` without changing pipeline status.
 Fiber), loaded through `components/platform/PlatformGlobe.tsx` with
 `next/dynamic` (`ssr: false`) so it never runs on the server;
 `GlobeLoading` reserves the footprint while the canvas mounts.
-
-- It auto-rotates left→right and is drag-interactive: all directions on
-  desktop (yaw + clamped pitch), horizontal only on touch. The canvas uses
-  `touch-action: pan-y` so vertical page scrolling stays smooth on mobile.
-- Rotation and hover/interaction are disabled under `prefers-reduced-motion`.
-- Pins come from `lib/pins.ts` (`pins`, `pinGroups`), grouped into Beacons,
-  Missions and Ambassadors; `PlatformSection` cycles/filters the visible groups.
-- The earth texture is `public/textures/earth-tinted.png`.

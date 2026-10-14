@@ -33,6 +33,8 @@ type GlobeProps = {
   pins?: readonly Pin[];
   /** Fired once the earth texture is up and pins have been projected once. */
   onReady?: () => void;
+  /** Starting spin angle in radians. */
+  initialYaw?: number;
 };
 
 // Pin id -> its wrapper div, shared by the DOM pin layer and the projector in the canvas.
@@ -80,13 +82,15 @@ function GlobeScene({
   visiblePins,
   pinElsRef,
   onProjected,
+  initialYaw = 0,
 }: {
   visiblePins: readonly Pin[];
   pinElsRef: RefObject<PinElMap>;
   onProjected: () => void;
+  initialYaw?: number;
 }) {
   const groupRef = useRef<Group>(null);
-  const yaw = useRef(0);
+  const yaw = useRef(initialYaw);
   const pitch = useRef(0);
   const dragging = useRef(false);
   const last = useRef({ x: 0, y: 0 });
@@ -252,6 +256,7 @@ export default function Globe({
   emphasis,
   pins: source = pins,
   onReady,
+  initialYaw,
 }: GlobeProps) {
   const pinElsRef = useRef<PinElMap>(new Map());
   const [pinsReady, setPinsReady] = useState(false);
@@ -285,6 +290,7 @@ export default function Globe({
             visiblePins={visiblePins}
             pinElsRef={pinElsRef}
             onProjected={handleProjected}
+            initialYaw={initialYaw}
           />
         </Suspense>
       </Canvas>
