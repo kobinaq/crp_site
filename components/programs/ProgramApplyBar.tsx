@@ -18,6 +18,8 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
   // Figma labels the bar "Apply" when it opens ApplyFlow; the production
   // ExpressInterestPopup path (and nominate mode) keep "Express interest".
   const applyLabel = applyFlow && !nominate;
+  // Same gate, nominate mode: the bar opens NominateFlow, so it says "Nominate".
+  const nominateLabel = applyFlow && nominate;
 
   return (
     <>
@@ -26,11 +28,11 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
           id="apply"
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={applyLabel ? tr("Apply") : copy.a11y.expressInterest}
+          aria-label={applyLabel ? tr("Apply") : nominateLabel ? tr("Nominate") : copy.a11y.expressInterest}
           className="gradient-brand pointer-events-auto flex w-full max-w-[632px] items-center justify-center rounded-full px-6 py-6 shadow-[0_0_5.45px_rgba(0,0,0,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] desk:h-[80px] desk:px-8 desk:py-0 desk:shadow-[0_8px_28px_rgba(236,38,143,0.35)]"
         >
           <span className="text-[20px] font-medium leading-[0.9] tracking-[-0.8px] text-white desk:font-semibold desk:uppercase desk:tracking-[0.8px]">
-            {applyLabel ? tr("Apply") : copy.apply.interest}
+            {applyLabel ? tr("Apply") : nominateLabel ? tr("Nominate") : copy.apply.interest}
           </span>
         </button>
       </div>

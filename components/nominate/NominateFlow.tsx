@@ -22,11 +22,13 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
   const [nominee, setNominee] = useState<NomineeData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryable, setRetryable] = useState(false);
 
   const handleNominatorSubmit = async (data: NominatorData) => {
     if (!nominee || submitting) return;
     setSubmitting(true);
     setError(null);
+    setRetryable(false);
     try {
       const res = await submitNomination({
         ...nominee,
@@ -40,7 +42,9 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
       setStep("thanks");
     } catch (err) {
       console.error("[nominate] submit failed", err);
-      setError(tr("Something went wrong. Please try again."));
+      // Server error / dropped connection: details are kept, so offer a retry.
+      setError(tr("We couldn't send your nomination because of a problem on our side. Your details are still here, so you can try again in a moment."));
+      setRetryable(true);
       setSubmitting(false);
     }
   };
@@ -61,6 +65,11 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
         onSubmit={handleNominatorSubmit}
         submitting={submitting}
         error={error}
+        retryable={retryable}
+        onDismissError={() => {
+          setError(null);
+          setRetryable(false);
+        }}
       />
     );
   }
