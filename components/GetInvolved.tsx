@@ -1,6 +1,5 @@
 "use client";
 
-import { GetInvolvedTab } from "./GetInvolvedPill";
 import { PartnerCard, WaitlistCard, YouthAmbassadorCard } from "./GetInvolvedCards";
 import { useCopy } from "./LanguageProvider";
 
@@ -26,12 +25,9 @@ export function GetInvolved({
           ? `relative z-10 bg-ink px-5 text-white desk:px-16 desk:py-24 ${
               contactMobile ? "pb-[161px] pt-[97px]" : "py-16"
             }`
-          : "relative z-10 bg-ink px-5 py-16 text-white snap-section desk:box-border desk:flex desk:h-svh desk:flex-col desk:justify-center desk:px-8 desk:py-24"
+          : "relative z-10 bg-ink px-5 py-16 text-white snap-section desk:px-8 desk:py-24"
       }
     >
-      {embedded ? null : (
-        <GetInvolvedTab className="absolute bottom-full left-1/2 z-40 -translate-x-1/2 translate-y-px max-desk:!hidden" />
-      )}
       <div className="mx-auto w-full max-w-[1072px]">
         <h2 className="text-center text-[32px] leading-[0.9] tracking-[-0.04em] desk:text-[clamp(28px,6vw,48px)]">
           {copy.involved.title}

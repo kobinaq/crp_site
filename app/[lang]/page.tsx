@@ -32,7 +32,7 @@ export default function Home() {
         <GetInvolved compactMobile />
         <Waitlist />
         {/* Figma slogan ticker (shared with About); partners band stays hidden. */}
-        <AboutTicker desktop className="pt-16 desk:pt-0" />
+        <AboutTicker desktop className="pt-16 desk:pb-[160px] desk:pt-0" />
         <Sponsors />
       </main>
       <Footer />

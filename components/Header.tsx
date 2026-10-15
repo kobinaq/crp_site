@@ -198,13 +198,13 @@ export function Header({
         </div>
       </div>
 
-      {/* 88px bar from Figma: 24px padding around the 40px language pill. */}
+      {/* 88px bar from Figma: 24px padding around the 40px language pill; centred at the 1200px frame width on wide screens. */}
       <div className={`hidden desk:block ${showPill ? "px-[32px] py-[8px]" : ""}`}>
         <div
           className={`pointer-events-auto relative mx-auto flex items-center justify-between ${
             showPill
               ? `max-w-[1200px] rounded-[56px] p-[16px] ${PILL}`
-              : "px-[64px] py-[24px]"
+              : "max-w-[1200px] px-[64px] py-[24px]"
           } ${instant ? "" : PILL_TWEEN}`}
         >
           <nav

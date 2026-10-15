@@ -302,13 +302,13 @@ export function PlatformSection() {
       ref={sectionRef}
       id="platform"
       data-nav-tone="dark"
-      className="relative isolate h-[954px] overflow-x-clip pt-0 snap-section desk:h-svh desk:overflow-visible desk:pt-0"
+      className="relative isolate h-[954px] overflow-x-clip pt-0 snap-section desk:h-[805px] desk:overflow-visible desk:pt-0"
     >
       <PlatformBackdrop />
 
       <div className="relative mx-auto flex h-full w-full max-w-[1200px] flex-col items-center @container">
         <ComingSoonBadge className="absolute top-[32px] right-0 z-40 w-[81px] desk:!hidden" />
-        <div className="relative z-20 flex w-full flex-col items-center gap-[11px] px-0 pt-[96px] text-center leading-[0.9] desk:max-w-[955px] desk:gap-0 desk:px-0 desk:pt-[12svh]">
+        <div className="relative z-20 flex w-full flex-col items-center gap-[11px] px-0 pt-[96px] text-center leading-[0.9] desk:max-w-[955px] desk:gap-0 desk:px-0 desk:pt-[96px]">
           <DisplayWordmark
             word="Platform"
             size="platform"
@@ -319,7 +319,7 @@ export function PlatformSection() {
           </p>
         </div>
 
-        <div className="absolute top-[341px] left-1/2 z-10 size-[474px] -translate-x-1/2 desk:top-[42.5%] desk:size-[min(631px,78.4svh)]">
+        <div className="absolute top-[341px] left-1/2 z-10 size-[474px] -translate-x-1/2 desk:top-[42.5%] desk:size-[631px]">
           <div className="relative size-full">
             <div className="absolute inset-0 desk:top-1/2 desk:left-1/2 desk:size-[75.75%] desk:-translate-x-1/2 desk:-translate-y-1/2">
               <PlatformGlobe

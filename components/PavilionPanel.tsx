@@ -240,17 +240,20 @@ export function PavilionPanel() {
                   size="xl"
                   className="gap-[15.641px]"
                 />
+                {/* Desktop (Figma 2308:196): flag + location in a 202x104 blurred panel. */}
+                <div className="contents desk:relative desk:z-10 desk:-mt-[50px] desk:flex desk:h-[104px] desk:w-[202px] desk:flex-col desk:items-center desk:gap-2 desk:rounded-[12px] desk:backdrop-blur-[12px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/turkey-flag.svg"
                   alt=""
                   width={72}
                   height={48}
-                  className="relative z-10 -mt-[36px] h-8 w-12 overflow-clip desk:-mt-[52px] desk:h-[48px] desk:w-[72px]"
+                  className="relative z-10 -mt-[36px] h-8 w-12 overflow-clip desk:mt-0 desk:h-[48px] desk:w-[72px]"
                 />
-                <div className="relative z-10 mt-2 flex flex-col items-center gap-1 whitespace-nowrap font-semibold uppercase leading-[0.9] mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:gap-2">
+                <div className="relative z-10 mt-2 flex flex-col items-center gap-1 whitespace-nowrap font-semibold uppercase leading-[0.9] mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:mt-0 desk:gap-2">
                   <p className="text-[18px] tracking-[0.72px] text-white desk:text-[24px] desk:tracking-[0.96px]">{copy.pavilion.locationPlace}</p>
                   <p className="text-[14px] tracking-[0.56px] text-white/72 desk:text-[20px] desk:tracking-[0.8px]">{copy.pavilion.locationOnline}</p>
+                </div>
                 </div>
               </div>
 

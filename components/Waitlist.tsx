@@ -73,6 +73,9 @@ function CheckIcon() {
   );
 }
 
+const WAITLIST_INPUT =
+  "w-full min-w-0 bg-transparent px-3 text-[clamp(18px,4.5vw,32px)] tracking-[-0.04em] text-black outline-none placeholder:text-[13px] placeholder:font-semibold placeholder:uppercase placeholder:tracking-[0.04em] placeholder:text-black/30 desk:px-5 desk:placeholder:text-[20px] desk:placeholder:text-black/32";
+
 export function Waitlist() {
   const copy = useCopy();
   const { locale } = useLanguage();
@@ -84,6 +87,7 @@ export function Waitlist() {
   const shellRef = useRef<HTMLDivElement>(null);
   const [showTurnstile, setShowTurnstile] = useState(false);
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [phase, setPhase] = useState<WaitlistPhase>("idle");
   const [pillWidth, setPillWidth] = useState<number | "100%">("100%");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -136,6 +140,8 @@ export function Waitlist() {
     }
     const saved = await submit(() => submitWaitlist({
       email: email.trim(),
+      // Desktop only (Figma 2308:466); optional, and the waitlist table already has a name column.
+      ...(name.trim() ? { name: name.trim() } : {}),
       source: "homepage_waitlist",
       locale,
       turnstileToken,
@@ -190,7 +196,7 @@ export function Waitlist() {
             />
 
             <div className="relative z-10 flex h-full items-center justify-center px-[13px] desk:px-10">
-              <div ref={colRef} className="relative w-full max-w-[272px] desk:max-w-[442px]">
+              <div ref={colRef} className="relative w-full max-w-[272px] desk:max-w-[442px] desk:translate-y-[53px]">
                 <motion.p
                   role="status"
                   aria-hidden={!submitted}
@@ -206,14 +212,34 @@ export function Waitlist() {
                   noValidate
                   onSubmit={handleSubmit}
                   aria-busy={pending}
-                  className="flex justify-center"
+                  className="relative flex justify-center"
                 >
+                  {/* Desktop: name pill stacked 8px above the email pill (Figma 2308:466). */}
+                  <motion.div
+                    initial={false}
+                    animate={{ opacity: submitted ? 0 : 1 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.22, ease: MORPH_EASE }}
+                    className="absolute inset-x-0 bottom-[calc(100%+8px)] hidden h-[98px] items-center rounded-[48px] bg-white p-2 desk:flex"
+                  >
+                    <input
+                      type="text"
+                      name="name"
+                      autoComplete="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder={copy.apply.namePlaceholder}
+                      aria-label={copy.apply.namePlaceholder}
+                      disabled={submitted || pending}
+                      tabIndex={submitted ? -1 : 0}
+                      className={WAITLIST_INPUT}
+                    />
+                  </motion.div>
                   <motion.div
                     ref={shellRef}
                     initial={false}
                     animate={{ width: pillWidth }}
                     transition={submitted ? morph : { duration: 0 }}
-                    className="flex h-[76px] items-center overflow-hidden rounded-[48px] bg-white p-2 desk:h-[98px] desk:rounded-full"
+                    className="flex h-[76px] items-center overflow-hidden rounded-[48px] bg-white p-2 desk:h-[98px]"
                   >
                     <motion.div
                       initial={false}
@@ -238,7 +264,7 @@ export function Waitlist() {
                         aria-describedby={invalid ? errorId : undefined}
                         disabled={submitted || pending}
                         tabIndex={submitted ? -1 : 0}
-                        className="w-full min-w-0 bg-transparent px-3 text-[clamp(18px,4.5vw,32px)] tracking-[-0.04em] text-black outline-none placeholder:text-[13px] placeholder:font-semibold placeholder:uppercase placeholder:tracking-[0.04em] placeholder:text-black/30 desk:px-5 desk:placeholder:text-[20px]"
+                        className={WAITLIST_INPUT}
                       />
                     </motion.div>
 

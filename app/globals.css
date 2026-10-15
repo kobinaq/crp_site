@@ -130,10 +130,10 @@ body {
 
 @media (min-width: 900px) {
   .platform-soon-badge {
-    /* Figma 2308:277: ~150px badge overlapping the globe's top-right edge. */
-    left: 82.6%;
-    top: -1.6%;
-    width: min(151px, 24%);
+    /* Figma 2308:277: 163px star centred at (880, 406) of the 1200x805 section. */
+    left: 81.5%;
+    top: -2.8%;
+    width: min(163px, 25.8%);
   }
 }
 
