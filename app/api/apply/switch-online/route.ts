@@ -6,6 +6,7 @@ import { lockApplicant, transition } from "@/lib/lifecycle";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { enqueueEmail } from "@/lib/jobs";
 import { receivedEmail } from "@/lib/emails";
+import { checkOrigin, INVALID_ORIGIN } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +22,8 @@ export function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (origin && origin !== req.nextUrl.origin) {
-    return NextResponse.json({ error: "invalid origin" }, { status: 403 });
-  }
+  const verdict = checkOrigin(req);
+  if (verdict === "reject") return NextResponse.json(INVALID_ORIGIN, { status: 403 });
   const expired = new URL("/apply/complete?switch=expired", req.nextUrl.origin);
   const done = new URL("/apply/complete?switch=ok", req.nextUrl.origin);
   if (!(await rateLimit("switch-online:ip", clientIp(req.headers), 30, 3600))) {
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
   const form = await req.formData().catch(() => null);
   const token = form?.get("token");
-  if (typeof token !== "string") return NextResponse.redirect(expired, 303);
+  if (typeof token !== "string") return verdict === "needs-token" ? NextResponse.json(INVALID_ORIGIN, { status: 403 }) : NextResponse.redirect(expired, 303);
 
   const moved = await getDb().transaction(async (tx) => {
     const applicantId = await consumeAccessToken(tx, token, "switch_online");
@@ -67,5 +66,6 @@ export async function POST(req: NextRequest) {
     return result;
   });
 
+  if (!moved && verdict === "needs-token") return NextResponse.json(INVALID_ORIGIN, { status: 403 });
   return NextResponse.redirect(moved?.ok ? done : expired, 303);
 }
