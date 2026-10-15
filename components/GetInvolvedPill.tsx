@@ -22,6 +22,9 @@ const OPEN_EVENT = "get-involved:open";
 type PillMode = "docked" | "riding" | "immersed" | "leaving";
 
 function readMode(): PillMode {
+  // Desktop: stay hidden until the reader has scrolled past [data-pill-after] (Home hero) so the pill never covers its headlines.
+  const after = document.querySelector<HTMLElement>("[data-pill-after]");
+  if (after && window.matchMedia("(min-width: 900px)").matches && after.getBoundingClientRect().bottom > 0) return "riding";
   // Hands off to a docked tab (data-pill-handoff) when a page has one; Home no longer does (Figma 2308:547).
   const section = document.querySelector<HTMLElement>("[data-pill-handoff]");
   if (!section) return "docked";

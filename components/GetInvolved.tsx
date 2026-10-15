@@ -11,7 +11,7 @@ export function GetInvolved({
   embedded?: boolean;
   /** About page: Figma 297px mobile cards with 20px titles. */
   compactMobile?: boolean;
-  /** Contact page: Figma mobile shows Join the waitlist + Partner up (297×294). Desktop unchanged. */
+  /** Contact page: Join the waitlist + Partner up (mobile 297×294; desktop Figma 2308:7412). */
   contactMobile?: boolean;
 }) {
   const narrow = compactMobile || contactMobile;
@@ -39,14 +39,7 @@ export function GetInvolved({
           }`}
         >
           {contactMobile ? (
-            <>
-              <div className="desk:hidden">
-                <WaitlistCard />
-              </div>
-              <div className="hidden desk:contents">
-                <YouthAmbassadorCard compact />
-              </div>
-            </>
+            <WaitlistCard />
           ) : (
             <YouthAmbassadorCard compact={compactMobile} />
           )}

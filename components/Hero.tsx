@@ -68,6 +68,7 @@ export function Hero() {
   return (
     <section
       id="top"
+      data-pill-after
       className="relative overflow-hidden pt-8 desk:pt-0 [--hero-w:var(--column-w)] [--hero-peek-t:calc(var(--hero-h)*0.14)] desk:[--hero-peek-t:calc(var(--hero-h)*0.0784)] [--hero-img-zoom:7.3] desk:[--hero-img-zoom:3.6]"
       style={
         {
