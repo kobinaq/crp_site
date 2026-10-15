@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ExpressInterestPopup } from "../ExpressInterestPopup";
 import { ApplyFlow } from "../apply/ApplyFlow";
+import { NominateFlow } from "../nominate/NominateFlow";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useLanguage } from "../LanguageProvider";
 import { useText } from "@/lib/ui-text";
@@ -35,7 +36,9 @@ export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate
       </div>
 
       {applyFlow ? (
-        open ? <ApplyFlow onClose={() => setOpen(false)} /> : null
+        open ? (
+          nominate ? <NominateFlow onClose={() => setOpen(false)} /> : <ApplyFlow onClose={() => setOpen(false)} />
+        ) : null
       ) : (
         <ExpressInterestPopup
           open={open}

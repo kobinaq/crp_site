@@ -7,7 +7,7 @@ import {
   APPLY_GRADIENT,
 } from "./age-selection/AgeSelectionLayout";
 import { ExpressInterestPopup } from "./ExpressInterestPopup";
-import { ApplyFlow } from "./apply/ApplyFlow";
+import { NominateFlow } from "./nominate/NominateFlow";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useCopy } from "./LanguageProvider";
 
@@ -85,7 +85,8 @@ export function NominatePage() {
         cta={<NominateCta onExpress={() => setInterestOpen(true)} />}
       />
       {applyFlow ? (
-        interestOpen ? <ApplyFlow onClose={() => setInterestOpen(false)} /> : null
+        // Gate on (dev / previews): the nomination flow. Production keeps the interest popup.
+        interestOpen ? <NominateFlow onClose={() => setInterestOpen(false)} /> : null
       ) : (
         <ExpressInterestPopup
           open={interestOpen}
