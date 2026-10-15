@@ -48,21 +48,21 @@ export function ThanksStep({ onExit }: { onExit: () => void }) {
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1 items-center justify-center px-4 desk:px-16">
-        <div className="relative aspect-[1072/836] w-full max-w-[1072px] max-h-full overflow-hidden rounded-[88px] bg-white desk:rounded-[154px]">
+      <main className="flex min-h-0 flex-1 items-center justify-center px-4 max-desk:items-stretch max-desk:px-3 max-desk:pb-0.5 desk:px-16">
+        <div className="relative aspect-[1072/836] w-full max-w-[1072px] max-h-full overflow-hidden rounded-[88px] bg-white max-desk:aspect-auto max-desk:h-full desk:rounded-[154px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/nominate/thank-you-union.png"
             alt=""
             width={1072}
             height={354}
-            className="pointer-events-none absolute left-1/2 top-[28.827%] h-[42.344%] w-[118%] max-w-none -translate-x-1/2 object-fill"
+            className="pointer-events-none absolute left-1/2 top-[28.827%] h-[42.344%] w-[118%] max-w-none -translate-x-1/2 object-fill max-desk:top-[31.25%] max-desk:h-[37.6%] max-desk:w-[151.7%]"
           />
           <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center text-white">
             <div className="flex w-full max-w-[632px] flex-col items-center gap-6">
               <h1 className="text-[clamp(28px,4.5vw,48px)] leading-[0.9] tracking-[-0.04em] desk:text-[48px] desk:tracking-[-1.92px]">
                 {tr("Thank you!")}</h1>
-              <p className="text-[clamp(18px,3vw,32px)] leading-[0.9] tracking-[-0.04em] desk:text-[32px] desk:tracking-[-1.28px]">
+              <p className="text-[clamp(18px,3vw,32px)] leading-[0.9] tracking-[-0.04em] max-desk:text-[20px] max-desk:tracking-[-0.8px] desk:text-[32px] desk:tracking-[-1.28px]">
                 {tr("We've received your nomination.")}<br />
                 {tr("Check your email for further steps.")}</p>
             </div>
@@ -70,11 +70,11 @@ export function ThanksStep({ onExit }: { onExit: () => void }) {
         </div>
       </main>
 
-      <footer className="flex shrink-0 justify-center p-[10px]">
+      <footer className="flex shrink-0 justify-center p-[10px] max-desk:p-2">
         <button
           type="button"
           onClick={onExit}
-          className="gradient-brand flex h-14 w-full max-w-[632px] items-center justify-center rounded-full desk:h-20"
+          className="gradient-brand flex h-14 w-full max-w-[632px] items-center justify-center rounded-full max-desk:h-16 desk:h-20"
         >
           <span className="text-[16px] font-semibold uppercase leading-[0.9] tracking-[0.8px] text-white mix-blend-hard-light desk:text-[20px]">
             {tr("Exit")}</span>

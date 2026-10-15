@@ -9,7 +9,7 @@ import { DateField } from "../apply/DateField";
 import { FormShell } from "../apply/FormShell";
 import { FormRadioCard } from "../apply/FormRadioCard";
 import { ContinueButton } from "../apply/ContinueButton";
-import { FIELD, PLACEHOLDER } from "../apply/fieldStyles";
+import { FIELD, FIELD_M, PLACEHOLDER, PLACEHOLDER_M } from "../apply/fieldStyles";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GHANA = COUNTRIES.find((c) => c.code === "GH") ?? COUNTRIES[0];
@@ -53,10 +53,12 @@ export function NomineeStep({
   return (
     <FormShell
       onBack={onBack}
+      mobileCard
       footer={
         <ContinueButton
           label={tr("Continue")}
           disabled={!valid}
+          className="max-desk:h-16"
           onClick={() => {
             if (!valid) return;
             onContinue({
@@ -74,26 +76,26 @@ export function NomineeStep({
         />
       }
     >
-      <h1 className="text-center text-[26px] leading-[0.9] tracking-[-1.04px] text-black desk:text-[36px] desk:tracking-[-1.44px]">
+      <h1 className="text-center text-[26px] leading-[0.9] tracking-[-1.04px] text-black max-desk:mt-[30px] max-desk:text-[28px] max-desk:tracking-[-1.12px] desk:text-[36px] desk:tracking-[-1.44px]">
         {tr("About the nominee")}</h1>
 
-      <div className="mt-5 flex flex-col gap-1.5 desk:mt-7 desk:gap-2">
-        <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
+      <div className="mt-5 flex flex-col gap-1.5 max-desk:mt-[44px] max-desk:gap-2 max-desk:px-6 desk:mt-7 desk:gap-2">
+        <div className="flex min-w-0 flex-col gap-1.5 max-desk:gap-2 desk:flex-row desk:gap-2">
+          <div className={`${FIELD} ${FIELD_M} min-w-0 shrink-0 pl-5 pr-6 max-desk:pl-6 desk:shrink desk:flex-1`}>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={tr("*NAME")}
               aria-label={tr("Nominee full name")}
-              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
+              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER} ${PLACEHOLDER_M}`}
             />
           </div>
-          <DateField value={dob} onChange={setDob} className="desk:w-[206px]" />
+          <DateField value={dob} onChange={setDob} className="desk:w-[206px]" mobileTall />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
+        <div className="flex min-w-0 flex-col gap-1.5 max-desk:gap-2 desk:flex-row desk:gap-2">
+          <div className={`${FIELD} ${FIELD_M} min-w-0 shrink-0 pl-5 pr-6 max-desk:pl-6 desk:shrink desk:flex-1`}>
             <input
               type="email"
               value={email}
@@ -101,47 +103,51 @@ export function NomineeStep({
               placeholder={tr("*EMAIL")}
               aria-label={tr("Nominee email")}
               spellCheck={false}
-              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
+              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER} ${PLACEHOLDER_M}`}
             />
           </div>
-          <div className={`${FIELD} min-w-0 gap-3 pl-3 pr-5 desk:w-[312px]`}>
-            <CountryDropdown variant="inline" value={dialCountry} onChange={setDialCountry} />
+          <div className={`${FIELD} ${FIELD_M} min-w-0 gap-3 pl-3 pr-5 max-desk:pl-4 desk:w-[312px]`}>
+            <CountryDropdown variant="inline" value={dialCountry} onChange={setDialCountry} mobileTall />
             <input
               type="tel"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               placeholder={tr("MOBILE")}
               aria-label={tr("Nominee mobile number")}
-              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
+              className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER} ${PLACEHOLDER_M}`}
             />
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
+        <div className="flex min-w-0 flex-col gap-1.5 max-desk:gap-2 desk:flex-row desk:gap-2">
           <CountryDropdown
             variant="field"
             label={tr("Nationality")}
             value={nationality}
             onChange={setNationality}
+            mobileTall
           />
           <CountryDropdown
             variant="field"
             label={tr("Currently based in")}
             value={basedIn}
             onChange={setBasedIn}
+            mobileTall
           />
         </div>
 
-        <div className="mt-0.5 flex min-w-0 gap-1.5 desk:gap-2">
+        <div className="mt-0.5 flex min-w-0 gap-1.5 max-desk:mt-0 max-desk:gap-[2px] desk:gap-2">
           <FormRadioCard
             label={tr("Only program")}
             selected={track === "online"}
             onSelect={() => setTrack("online")}
+            mobileTall
           />
           <FormRadioCard
             label={tr("Travel to Antalya")}
             selected={track === "in_person"}
             onSelect={() => setTrack("in_person")}
+            mobileTall
           />
         </div>
       </div>
