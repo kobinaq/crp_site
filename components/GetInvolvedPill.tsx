@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GetInvolvedPopup } from "./GetInvolvedPopup";
 import { useCopy } from "./LanguageProvider";
+import { useConsent } from "./cookies/ConsentProvider";
 
 const AVATARS = [
   "/images/involved-youth.png",
@@ -104,6 +105,8 @@ export function GetInvolvedPill() {
   const [rise, setRise] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const closePopup = useCallback(() => setPopupOpen(false), []);
+  // The cookie banner sits where the pill docks; hide the pill until a choice is made.
+  const { bannerVisible } = useConsent();
 
   useEffect(() => {
     const onOpen = () => setPopupOpen(true);
@@ -154,7 +157,8 @@ export function GetInvolvedPill() {
     <>
       <div
         ref={ref}
-        className="fixed bottom-0 left-1/2 z-40 flex"
+        data-testid="get-involved-pill"
+        className={`fixed bottom-0 left-1/2 z-40 ${bannerVisible ? "hidden" : "flex"}`}
         style={{
           transform: `translate(-50%, ${rise ? 100 : 0}%)`,
           transition: rise ? "none" : `transform ${RISE_MS}ms ${RISE_EASE}`,

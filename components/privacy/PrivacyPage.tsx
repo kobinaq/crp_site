@@ -1,6 +1,7 @@
 "use client";
 
 import { useCopy } from "../LanguageProvider";
+import { CookieSection } from "./CookieSection";
 
 const BODY =
   "text-[15px] leading-[1.2] tracking-[-0.6px] text-black/84 desk:text-[20px] desk:tracking-[-0.8px]";
@@ -40,6 +41,7 @@ export function PrivacyPage() {
               </div>
             </div>
           ))}
+          <CookieSection />
         </article>
       </div>
     </section>
