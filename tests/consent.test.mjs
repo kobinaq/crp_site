@@ -83,7 +83,7 @@ test('inventory covers every cookie the code sets, with translated copy',()=>{
  for(const locale of ['en','fr','es','pt']){
   const ui=JSON.parse(readFileSync(`lib/translations/ui-${locale}.json`,'utf8'));
   for(const item of COOKIE_INVENTORY)for(const text of [item.purpose,item.duration])assert.ok(ui[text],`${locale}: ${text}`);
-  for(const text of ['Analytics','Anonymous usage statistics that help us improve the site.'])assert.ok(ui[text],`${locale}: ${text}`);
+  for(const text of ['Analytics','Anonymous usage statistics with PostHog that help us improve the site. Sets the ph_<project_key>_posthog cookie (about 1 year).','About 1 year'])assert.ok(ui[text],`${locale}: ${text}`);
  }
 });
 
@@ -93,7 +93,8 @@ test('the language cookie is only written with functional consent',()=>{
  assert.doesNotMatch(src,/localStorage\.setItem/);
 });
 
-test('no analytics SDK is bundled yet',()=>{
+test('the analytics SDK is a dependency loaded only by the consent-gated provider',()=>{
  const pkg=JSON.parse(readFileSync('package.json','utf8'));
- assert.ok(!Object.keys({...pkg.dependencies,...pkg.devDependencies}).some((d)=>/posthog/.test(d)));
+ assert.ok(pkg.dependencies['posthog-js']);
+ assert.doesNotMatch(readFileSync('lib/consent.ts','utf8'),/from ["']posthog-js|import\(["']posthog-js/);
 });
