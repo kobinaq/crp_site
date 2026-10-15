@@ -147,7 +147,6 @@ export function NomineeStep({
         <div
           role="group"
           aria-label={tr("Program")}
-          aria-invalid={trackError || undefined}
           aria-describedby={trackError ? "nominee-track-error" : undefined}
           className="mt-0.5 flex min-w-0 gap-1.5 max-desk:mt-0 max-desk:gap-[2px] desk:gap-2"
         >
