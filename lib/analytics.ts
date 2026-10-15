@@ -10,11 +10,23 @@
  * and sends nothing until opt_in_capturing(), and returns to that state after
  * reset(). Never call identify() or set person properties with emails, names
  * or any other personal data.
+ *
+ * Every event carries the super property `environment` (NEXT_PUBLIC_VERCEL_ENV,
+ * else "development") so preview traffic can be filtered out. It is registered
+ * after each opt-in (reset() clears it, so it is registered again on the next
+ * opt-in) and never while opted out. The opt-in pageview is sent inside
+ * opt_in_capturing(), before register() can run, so before_send also adds it
+ * to any event that lacks it (before_send only runs for events being sent).
  */
 import type { PostHog, PostHogConfig } from "posthog-js";
 import { clearAnalyticsStorage } from "@/lib/consent";
 
 export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+
+/** The `environment` super property: Vercel's environment, or "development" when unset. */
+export function analyticsEnvironment(vercelEnv: string | undefined = process.env.NEXT_PUBLIC_VERCEL_ENV): string {
+  return vercelEnv || "development";
+}
 
 /** URL properties PostHog records; their query strings can carry tokens, so they are scrubbed. */
 const URL_PROPERTIES = ["$current_url", "$referrer", "$initial_current_url", "$initial_referrer", "$prev_pageview_url"];
@@ -43,7 +55,15 @@ export function scrubEvent(event: Event | null): Event | null {
   return event;
 }
 
-export function posthogOptions(apiHost: string): Partial<PostHogConfig> {
+/** before_send step: adds `environment` to an event that does not have it yet. */
+export function stampEnvironment(environment: string) {
+  return (event: Event | null): Event | null => {
+    if (event?.properties && event.properties.environment === undefined) event.properties.environment = environment;
+    return event;
+  };
+}
+
+export function posthogOptions(apiHost: string, environment = analyticsEnvironment()): Partial<PostHogConfig> {
   return {
     api_host: apiHost,
     person_profiles: "identified_only",
@@ -61,7 +81,7 @@ export function posthogOptions(apiHost: string): Partial<PostHogConfig> {
     advanced_disable_flags: true,
     disable_surveys: true,
     disable_external_dependency_loading: true,
-    before_send: scrubEvent,
+    before_send: [scrubEvent, stampEnvironment(environment)],
   };
 }
 
@@ -72,7 +92,17 @@ type Loader = () => Promise<PostHog>;
  * in, `sync(false)` opts out and clears; calls are serialised so a fast
  * grant/withdraw cannot leave capturing on.
  */
-export function createAnalytics({ key, host, load }: { key: string; host: string; load: Loader }) {
+export function createAnalytics({
+  key,
+  host,
+  load,
+  environment = analyticsEnvironment(),
+}: {
+  key: string;
+  host: string;
+  load: Loader;
+  environment?: string;
+}) {
   let client: Promise<PostHog> | null = null;
   let wanted = false;
   let queue: Promise<void> = Promise.resolve();
@@ -80,11 +110,14 @@ export function createAnalytics({ key, host, load }: { key: string; host: string
   async function apply() {
     if (wanted) {
       client ??= load().then((posthog) => {
-        posthog.init(key, posthogOptions(host));
+        posthog.init(key, posthogOptions(host, environment));
         return posthog;
       });
       const posthog = await client;
-      if (wanted && !posthog.has_opted_in_capturing()) posthog.opt_in_capturing({ captureEventName: false });
+      if (!wanted) return;
+      if (!posthog.has_opted_in_capturing()) posthog.opt_in_capturing({ captureEventName: false });
+      // Opted in now: (re-)register, as reset() on an earlier withdrawal cleared it.
+      posthog.register({ environment });
     } else if (client) {
       const posthog = await client;
       if (!wanted) {
