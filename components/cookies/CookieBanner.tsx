@@ -45,7 +45,7 @@ export function CookieBanner({
             {tr("We use cookies")}
           </h2>
           <p className="text-[14px] leading-[1.2] tracking-[-0.56px] desk:text-[20px] desk:leading-none desk:tracking-[-0.8px]">
-            {tr("We use necessary cookies to run this site, and optional cookies to remember your preferences, such as your language. You can manage your choices anytime.")}
+            {tr("We use necessary cookies to run this site, and optional cookies to remember your language and collect anonymous usage statistics. You can manage your choices anytime.")}
           </p>
         </div>
 

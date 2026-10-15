@@ -15,6 +15,10 @@ const CATEGORY_COPY: Record<"necessary" | OptionalCategory, { name: string; desc
     name: "Functional",
     description: "Remembers your language choice on this device.",
   },
+  analytics: {
+    name: "Analytics",
+    description: "Anonymous usage statistics that help us improve the site.",
+  },
 };
 
 const ROW = "flex items-center gap-3 border-b border-black/12 py-5 last:border-b-0 desk:justify-between desk:py-3";

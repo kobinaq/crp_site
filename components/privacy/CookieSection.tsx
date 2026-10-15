@@ -12,6 +12,7 @@ const LABEL =
 const CATEGORIES: { category: ConsentCategory; title: string }[] = [
   { category: "necessary", title: "Strictly necessary" },
   { category: "functional", title: "Functional" },
+  { category: "analytics", title: "Analytics" },
 ];
 
 /** Privacy page "Cookies" section (#cookies): the same inventory the consent panel controls. */
@@ -25,7 +26,7 @@ export function CookieSection() {
         {tr("Cookies and local storage")}
       </h3>
       <p className={BODY}>
-        {tr("We only use the cookies this site needs to work, plus an optional one that remembers your language. We do not use analytics or advertising cookies. Optional cookies are only set after you allow them, and you can change your choice anytime.")}
+        {tr("We use the cookies this site needs to work. With your permission, we also remember your language and collect anonymous usage statistics with PostHog to improve the site. We do not use advertising cookies. Optional cookies are only set after you allow them, and they are removed if you withdraw your consent. You can change your choice anytime.")}
       </p>
       {CATEGORIES.map(({ category, title }) => (
         <div key={category} className="flex flex-col gap-3">
@@ -36,7 +37,7 @@ export function CookieSection() {
           <ul className="flex flex-col">
             {COOKIE_INVENTORY.filter((item) => item.category === category).map((item) => (
               <li key={item.name} className="grid gap-2 border-b border-black/12 py-3 desk:grid-cols-[180px_1fr_120px] desk:gap-4">
-                <span className={`${BODY} font-medium text-black`}>{item.name}</span>
+                <span className={`${BODY} font-medium text-black [overflow-wrap:anywhere]`}>{item.name}</span>
                 <span className={BODY}>{tr(item.purpose)}</span>
                 <span className={`${BODY} desk:text-right`}>
                   <span className={`${LABEL} desk:hidden`}>{tr("Duration")}: </span>
