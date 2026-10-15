@@ -37,6 +37,7 @@ export function NomineeStep({
   const [name, setName] = useState(initial?.nomineeName ?? "");
   const [email, setEmail] = useState(initial?.nomineeEmail ?? "");
   const [dob, setDob] = useState(initial?.nomineeDob ?? "");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [dialCountry, setDialCountry] = useState<Country>(GHANA);
   const [mobile, setMobile] = useState("");
   const [nationality, setNationality] = useState<Country | null>(null);
@@ -53,6 +54,7 @@ export function NomineeStep({
     name.trim().length > 0 &&
     EMAIL_RE.test(email.trim()) &&
     /^\d{4}-\d{2}-\d{2}$/.test(dob);
+  const emailError = emailTouched && email.trim().length > 0 && !EMAIL_RE.test(email.trim());
 
   return (
     <FormShell
@@ -61,6 +63,7 @@ export function NomineeStep({
       footer={
         <ContinueButton
           label={tr("Continue")}
+          progress={0.5}
           disabled={!valid}
           className="max-desk:h-16"
           onClick={() => {
@@ -108,8 +111,11 @@ export function NomineeStep({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setEmailTouched(true)}
               placeholder={tr("*EMAIL")}
               aria-label={tr("Nominee email")}
+              aria-invalid={emailError || undefined}
+              aria-describedby={emailError ? "nominee-email-error" : undefined}
               spellCheck={false}
               className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER} ${PLACEHOLDER_M}`}
             />
@@ -163,6 +169,11 @@ export function NomineeStep({
             mobileTall
           />
         </div>
+        {emailError ? (
+          <p id="nominee-email-error" role="alert" className="text-center text-[13px] text-magenta">
+            {tr("Enter a valid email")}
+          </p>
+        ) : null}
         {trackError ? (
           <p id="nominee-track-error" role="alert" className="text-center text-[13px] text-magenta">
             {tr("Please choose a program.")}

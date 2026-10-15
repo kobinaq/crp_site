@@ -264,7 +264,7 @@ export function CountryDropdown({
         aria-haspopup="listbox"
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open && ranked[safeActive] ? `${listId}-${ranked[safeActive].country.code}` : undefined}
-        aria-label={variant === "inline" ? tr("Country code") : undefined}
+        aria-label={variant === "inline" ? tr("Country code") : value && label ? `${label}: ${shownLabel}` : label}
         className={
           variant === "field"
             ? lg
@@ -297,7 +297,6 @@ export function CountryDropdown({
           value ? (
             <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
               <Flag code={value.code} />
-              <span className="shrink-0 text-[14px] font-semibold text-black/60">{value.dial}</span>
               <span className="truncate text-[16px] text-black">{shownLabel}</span>
             </span>
           ) : (

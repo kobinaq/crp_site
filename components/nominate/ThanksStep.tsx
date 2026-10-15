@@ -69,7 +69,7 @@ export function ThanksStep({ onExit, onBack }: { onExit: () => void; onBack?: ()
             className="pointer-events-none absolute left-1/2 top-[28.827%] h-[42.344%] w-[118%] max-w-none -translate-x-1/2 object-fill max-desk:top-[31.25%] max-desk:h-[37.6%] max-desk:w-[175%]"
           />
           <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center text-white">
-            <div className="flex w-full max-w-[632px] flex-col items-center gap-6">
+            <div className="flex w-full max-w-[632px] flex-col items-center gap-6 max-desk:gap-4">
               <h1 className="text-[clamp(28px,4.5vw,48px)] leading-[0.9] tracking-[-0.04em] desk:text-[48px] desk:tracking-[-1.92px]">
                 {tr("Thank you!")}</h1>
               <p className="text-[clamp(18px,3vw,32px)] leading-[0.9] tracking-[-0.04em] max-desk:text-[20px] max-desk:tracking-[-0.8px] desk:text-[32px] desk:tracking-[-1.28px]">
