@@ -17,7 +17,7 @@ export function FormRadioCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-2.5 rounded-[28px] px-5 py-4 text-left desk:gap-3 desk:rounded-[32px] desk:p-6 ${mobileTall ? "max-desk:h-[102px] max-desk:gap-4 max-desk:rounded-[40px] max-desk:px-6" : ""} ${
+      className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-2.5 rounded-[28px] px-5 py-4 text-left desk:gap-3 desk:rounded-[32px] desk:p-6 ${mobileTall ? "max-desk:h-[102px] max-desk:gap-4 max-desk:rounded-[40px] max-desk:px-6 max-[380px]:px-4" : ""} ${
         selected ? "bg-black text-white" : "bg-cream text-black"
       }`}
     >

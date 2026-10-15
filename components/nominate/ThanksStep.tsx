@@ -8,7 +8,7 @@ import { Logo } from "../Logo";
 import { applicationLocales } from "@/lib/locale";
 import { useLanguage } from "../LanguageProvider";
 
-export function ThanksStep({ onExit }: { onExit: () => void }) {
+export function ThanksStep({ onExit, onBack }: { onExit: () => void; onBack?: () => void }) {
   const tr = useText();
   const { locale, setLocale } = useLanguage();
 
@@ -22,7 +22,17 @@ export function ThanksStep({ onExit }: { onExit: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex h-dvh flex-col overflow-hidden bg-cream">
-      <header className="relative flex h-[68px] shrink-0 items-center justify-end px-4 max-desk:px-8 desk:h-[88px] desk:px-16 desk:py-6">
+      <header className="relative flex h-[68px] shrink-0 items-center justify-end px-4 max-desk:justify-between max-desk:px-8 desk:h-[88px] desk:px-16 desk:py-6">
+        {/* Phones only (Figma 2308:9574): back button on the left; desktop keeps its layout. */}
+        <button
+          type="button"
+          onClick={onBack ?? onExit}
+          aria-label={tr("Back")}
+          className="grid size-8 place-items-center rounded-full bg-white transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105 active:scale-95 desk:hidden"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/apply/arrow-left.svg" alt="" width={16} height={16} className="size-4" />
+        </button>
         <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 desk:top-5 desk:translate-y-0">
           <Logo
             tone="color"

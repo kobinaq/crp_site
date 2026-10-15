@@ -41,9 +41,13 @@ export function NomineeStep({
   const [mobile, setMobile] = useState("");
   const [nationality, setNationality] = useState<Country | null>(null);
   const [basedIn, setBasedIn] = useState<Country | null>(null);
-  const [track, setTrack] = useState<"in_person" | "online">(
-    initial?.track ?? "in_person",
-  );
+  // No default track (Figma 2308:9574): the nominee's program must be chosen explicitly.
+  const [track, setTrack] = useState<"in_person" | "online" | null>(initial?.track ?? null);
+  const [trackError, setTrackError] = useState(false);
+  const chooseTrack = (t: "in_person" | "online") => {
+    setTrack(t);
+    setTrackError(false);
+  };
 
   const valid =
     name.trim().length > 0 &&
@@ -61,6 +65,10 @@ export function NomineeStep({
           className="max-desk:h-16"
           onClick={() => {
             if (!valid) return;
+            if (!track) {
+              setTrackError(true);
+              return;
+            }
             onContinue({
               nomineeName: name.trim(),
               nomineeEmail: email.trim(),
@@ -136,20 +144,31 @@ export function NomineeStep({
           />
         </div>
 
-        <div className="mt-0.5 flex min-w-0 gap-1.5 max-desk:mt-0 max-desk:gap-[2px] desk:gap-2">
+        <div
+          role="group"
+          aria-label={tr("Program")}
+          aria-invalid={trackError || undefined}
+          aria-describedby={trackError ? "nominee-track-error" : undefined}
+          className="mt-0.5 flex min-w-0 gap-1.5 max-desk:mt-0 max-desk:gap-[2px] desk:gap-2"
+        >
           <FormRadioCard
             label={tr("Only program")}
             selected={track === "online"}
-            onSelect={() => setTrack("online")}
+            onSelect={() => chooseTrack("online")}
             mobileTall
           />
           <FormRadioCard
             label={tr("Travel to Antalya")}
             selected={track === "in_person"}
-            onSelect={() => setTrack("in_person")}
+            onSelect={() => chooseTrack("in_person")}
             mobileTall
           />
         </div>
+        {trackError ? (
+          <p id="nominee-track-error" role="alert" className="text-center text-[13px] text-magenta">
+            {tr("Please choose a program.")}
+          </p>
+        ) : null}
       </div>
     </FormShell>
   );
