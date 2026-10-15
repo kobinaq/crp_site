@@ -1,0 +1,62 @@
+{
+  "en": {
+    "friend": "Dear friend,",
+    "greeting": "Dear {name},",
+    "signoff": "Best regards,<br />The Climate Refugee Pavilion Team",
+    "tagline": "Making climate mobility impossible to ignore",
+    "rights": "All rights reserved.",
+    "waitlistSubject": "You're on the list",
+    "waitlist": "Thanks for signing up. We've received your details and will email you with updates about the Climate Refugee Pavilion.",
+    "interestSubject": "We've received your interest",
+    "interest": "Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!",
+    "nominationSubject": "We've received your nomination",
+    "nomination": "Thank you for nominating {nominee}. We've received your nomination and will reach out to them with the next steps.",
+    "partnerSubject": "We've received your message",
+    "partner": "Thank you for reaching out about partnering with the Climate Refugee Pavilion. We've received your message and our team will get back to you soon."
+  },
+  "fr": {
+    "friend": "Bonjour,",
+    "greeting": "Bonjour {name},",
+    "signoff": "Cordialement,<br />L'équipe du Climate Refugee Pavilion",
+    "tagline": "Rendre la mobilité climatique impossible à ignorer",
+    "rights": "Tous droits réservés.",
+    "waitlistSubject": "Vous êtes sur la liste",
+    "waitlist": "Merci pour votre inscription. Nous avons bien reçu vos informations et vous tiendrons informé(e) par e-mail des actualités du Climate Refugee Pavilion.",
+    "interestSubject": "Nous avons bien reçu votre intérêt",
+    "interest": "Votre intérêt a bien été enregistré. Restez à l'écoute pour nos prochains programmes. Nous espérons vous voir très bientôt !",
+    "nominationSubject": "Nous avons bien reçu votre proposition",
+    "nomination": "Merci d'avoir proposé la candidature de {nominee}. Nous avons bien reçu votre proposition et prendrons contact avec cette personne pour les prochaines étapes.",
+    "partnerSubject": "Nous avons bien reçu votre message",
+    "partner": "Merci de nous avoir contactés au sujet d'un partenariat avec le Climate Refugee Pavilion. Nous avons bien reçu votre message et notre équipe vous répondra très prochainement."
+  },
+  "es": {
+    "friend": "Hola:",
+    "greeting": "Hola {name}:",
+    "signoff": "Un cordial saludo,<br />El equipo del Climate Refugee Pavilion",
+    "tagline": "Hacer que la movilidad climática sea imposible de ignorar",
+    "rights": "Todos los derechos reservados.",
+    "waitlistSubject": "Ya estás en la lista",
+    "waitlist": "Gracias por inscribirte. Hemos recibido tus datos y te enviaremos novedades sobre el Climate Refugee Pavilion por correo electrónico.",
+    "interestSubject": "Hemos recibido tu interés",
+    "interest": "Hemos registrado tu interés. Mantente atento a nuestros próximos programas. ¡Esperamos verte muy pronto!",
+    "nominationSubject": "Hemos recibido tu nominación",
+    "nomination": "Gracias por nominar a {nominee}. Hemos recibido tu nominación y nos pondremos en contacto con esa persona para los próximos pasos.",
+    "partnerSubject": "Hemos recibido tu mensaje",
+    "partner": "Gracias por escribirnos para colaborar con el Climate Refugee Pavilion. Hemos recibido tu mensaje y nuestro equipo te responderá pronto."
+  },
+  "pt": {
+    "friend": "Olá,",
+    "greeting": "Olá {name},",
+    "signoff": "Com os melhores cumprimentos,<br />A equipa do Climate Refugee Pavilion",
+    "tagline": "Tornar a mobilidade climática impossível de ignorar",
+    "rights": "Todos os direitos reservados.",
+    "waitlistSubject": "Já está na lista",
+    "waitlist": "Obrigado pela sua inscrição. Recebemos os seus dados e enviaremos novidades sobre o Climate Refugee Pavilion por e-mail.",
+    "interestSubject": "Recebemos o seu interesse",
+    "interest": "O seu interesse foi registado. Fique atento aos próximos programas. Esperamos vê-lo muito em breve!",
+    "nominationSubject": "Recebemos a sua nomeação",
+    "nomination": "Obrigado por nomear {nominee}. Recebemos a sua nomeação e entraremos em contacto com essa pessoa sobre os próximos passos.",
+    "partnerSubject": "Recebemos a sua mensagem",
+    "partner": "Obrigado por nos contactar sobre uma parceria com o Climate Refugee Pavilion. Recebemos a sua mensagem e a nossa equipa responderá em breve."
+  }
+}

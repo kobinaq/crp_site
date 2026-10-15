@@ -5,6 +5,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { loader } from "./helpers.mjs";
 import { startDatabase } from "./db.mjs";
+import { Webhook } from "svix";
 
 // End-to-end through the real application code against a disposable Postgres:
 // server actions, webhook routes, the review-sheet endpoint, the sync feed, the
@@ -27,6 +28,7 @@ before(async () => {
   process.env.VIDEOASK_FORM_ID = "FORM-fixture";
   process.env.VIDEOASK_FORM_URL = "https://videoask.invalid/form";
   process.env.CRON_SECRET = "cron";
+  process.env.RESEND_WEBHOOK_SECRET = `whsec_${Buffer.from("resend-test-signing-secret-32bytes").toString("base64")}`;
   process.env.CALENDLY_URL_EN = "https://calendly.invalid/en";
   process.env.CALENDLY_URL_FR = "https://calendly.invalid/fr";
   process.env.CALENDLY_URL_ES = "https://calendly.invalid/es";
@@ -118,11 +120,20 @@ function harness() {
         }),
       }));
     },
-    resend: null,
+    // Signed exactly as Resend (Svix) signs: svix-id, svix-timestamp, svix-signature.
+    resend: (payload, { id = `msg_${randomUUID()}`, secret = process.env.RESEND_WEBHOOK_SECRET, raw } = {}) => {
+      const body = raw ?? JSON.stringify(payload);
+      const now = new Date();
+      const signature = new Webhook(secret).sign(id, now, body);
+      return load("app/api/webhooks/resend/route.ts").POST(req("/api/webhooks/resend", {
+        headers: { "svix-id": id, "svix-timestamp": String(Math.floor(now.getTime() / 1000)), "svix-signature": signature },
+        body,
+      }));
+    },
     decisions: (rows) => load("app/api/decisions/route.ts").POST(req("/api/decisions", { headers: { "x-sync-secret": "sync" }, body: JSON.stringify(rows) })),
     sync: (table, query) => load("app/api/sync/[table]/route.ts").GET(req(`/api/sync/${table}?${query}`, { headers: { "x-sync-secret": "sync" } }), { params: Promise.resolve({ table }) }),
     verify: (cookies, query = "") => load("app/api/apply/verify/route.ts").GET(req(`/api/apply/verify${query}`, { cookies })),
-    previewResume: (token) => load("app/api/apply/resume/route.ts").GET(req(`/api/apply/resume?token=${encodeURIComponent(token)}`)),
+    openLink: (token, cookies = {}) => load("app/api/apply/resume/route.ts").GET(req(`/api/apply/resume?token=${encodeURIComponent(token)}&lang=en`, { cookies })),
     resume: (token) => load("app/api/apply/resume/route.ts").POST(req("/api/apply/resume", { body: new URLSearchParams({ token }).toString() })),
     switchOnline: (token) => load("app/api/apply/switch-online/route.ts").POST(req("/api/apply/switch-online", { body: new URLSearchParams({ token }).toString() })),
     calendly: (payload) => {
@@ -212,7 +223,7 @@ test("skills and travel attestations are required for an in-person application",
   assert.equal(stored.has_valid_passport, true);
 });
 
-test("an existing email grants no session and no email; a resume link is single-use and signs in", async () => {
+test("an existing email grants no session and no email; the email link confirms on GET and goes straight to VideoAsk", async () => {
   const first = await h.apply();
   const cookiesBefore = h.state.cookies.length;
   const jobsBefore = (await jobsFor(first.id)).length;
@@ -233,15 +244,36 @@ test("an existing email grants no session and no email; a resume link is single-
   assert.ok(await count("access_tokens", "applicant_id = $1 and used_at is null", [first.id]) >= 1);
   assert.equal(await count("access_tokens", "hash = $1", [token]), 0);
 
-  const preview = await h.previewResume(token);
-  assert.equal(preview.status, 200);
-  assert.match(await preview.text(), /method="post"/);
-  assert.ok(await count("access_tokens", "applicant_id = $1 and used_at is null", [first.id]) >= 1);
-  const landed = await h.resume(token);
-  assert.equal(landed.url, "https://example.invalid/apply/continue");
+  // One GET: no interstitial page, the address is confirmed, a session is
+  // issued, and the redirect goes straight to VideoAsk with the signed ref.
+  const videoask = h.load("lib/videoask.ts").videoaskLink(first.id);
+  assert.match(videoask, /^https:\/\/videoask\.invalid\/form#application_ref=/);
+  const landed = await h.openLink(token);
+  assert.equal(landed.url, videoask);
   assert.equal(landed.setCookies[0][0], "crp_session");
-  const replay = await h.resume(token);
-  assert.match(replay.url, /resume=expired/);
+  assert.ok((await row("applicants", first.id)).email_verified_at);
+  assert.equal(await count("access_tokens", "applicant_id = $1 and used_at is not null", [first.id]), 1);
+
+  // A scanner prefetch followed by the real click: the reopen still lands in
+  // VideoAsk and rotates the session, so the earlier opener is signed out.
+  const reopened = await h.openLink(token);
+  assert.equal(reopened.url, videoask);
+  assert.notEqual(reopened.setCookies[0][1], landed.setCookies[0][1]);
+  assert.equal((await h.verify({ crp_session: landed.setCookies[0][1] })).url, "https://example.invalid/apply");
+
+  // Past its expiry the link no longer signs anyone in...
+  await sql.query("update access_tokens set expires_at = now() - interval '1 minute' where applicant_id = $1", [first.id]);
+  const stale = await h.openLink(token);
+  assert.match(stale.url, /\/apply\?resume=expired$/);
+  assert.equal(stale.setCookies?.length ?? 0, 0);
+  // ...but the applicant's own signed-in browser is sent on to their step, not a dead end.
+  const own = await h.openLink(token, { crp_session: reopened.setCookies[0][1] });
+  assert.equal(own.url, videoask);
+  // A different applicant's session gains nothing from someone else's link.
+  const other = await h.apply();
+  const { signSession } = h.load("lib/session.ts");
+  assert.match((await h.openLink(token, { crp_session: signSession(other.id, 1) })).url, /resume=expired/);
+  assert.match((await h.openLink("A".repeat(43))).url, /resume=expired/);
 });
 
 test("email confirmation POSTs accept same-origin and null-origin-with-valid-token only", async () => {
@@ -250,10 +282,9 @@ test("email confirmation POSTs accept same-origin and null-origin-with-valid-tok
   const issue = async () => (await database.transaction((tx) => h.load("lib/access.ts").issueAccessToken(tx, a.id, "resume", 600))).raw;
   const resume = h.load("app/api/apply/resume/route.ts");
   const post = (token, headers) => resume.POST(h.req("/api/apply/resume", { headers, body: new URLSearchParams({ token }).toString() }));
-  const landed = (res) => res.url === "https://example.invalid/apply/continue";
+  const landed = (res) => res.url === h.load("lib/videoask.ts").videoaskLink(a.id);
   h.state.ip = "198.51.100.77";
 
-  assert.equal(resume.GET(h.req("/api/apply/resume?token=x")).headers.get("referrer-policy"), "same-origin");
   const first = await post(await issue(), { origin: "https://example.invalid" });
   assert.ok(landed(first), "matching origin");
   assert.ok(landed(await post(await issue(), { origin: "null" })), "null origin with a valid token");
@@ -267,12 +298,9 @@ test("email confirmation POSTs accept same-origin and null-origin-with-valid-tok
   assert.equal((await post(crossToken, { origin: "https://example.invalid", "sec-fetch-site": "cross-site" })).status, 403);
   assert.ok(landed(await post(crossToken, {})), "a rejected cross-site attempt does not burn the token");
 
+  // Legacy capture links have no dead end: an unknown link just goes home.
   const capture = h.load("app/api/capture/confirm/route.ts");
-  const confirm = (token, headers) => capture.POST(h.req("/api/capture/confirm", { headers, body: new URLSearchParams({ token }).toString() }));
-  assert.equal(capture.GET(h.req("/api/capture/confirm?token=x")).headers.get("referrer-policy"), "same-origin");
-  assert.equal((await confirm("A".repeat(43), { origin: "null" })).status, 403);
-  assert.equal((await confirm("A".repeat(43), { origin: "https://evil.invalid" })).status, 403);
-  assert.match((await confirm("A".repeat(43), { origin: "https://example.invalid" })).url, /result=expired/);
+  assert.equal((await capture.GET(h.req("/api/capture/confirm?token=" + "A".repeat(43)))).url, "https://example.invalid/");
 });
 
 test("the verify hand-off trusts the signed session, never the echoed applicant id", async () => {
@@ -333,6 +361,57 @@ test("the worker delivers queued email with an idempotency key, backs off on fai
   assert.equal(after.provider_id, `re_${job.dedupe_key}`);
   assert.equal(after.delivery_status, "accepted");
   assert.equal(calls, 1);
+});
+
+test("signed Resend delivery events are accepted and update the matching email job", async () => {
+  const a = await h.apply();
+  const [job] = await jobsFor(a.id);
+  await sql.query("update jobs set available_at = now() + interval '1 hour' where id <> $1 and status = 'pending'", [job.id]);
+  h.state.deliver = async (input, key) => ({ ok: true, id: `re_${key}` });
+  await h.cron();
+  const emailId = (await row("jobs", job.id)).provider_id;
+  assert.ok(emailId);
+
+  // Resend's real event shape.
+  const event = (type, createdAt) => ({
+    type,
+    created_at: createdAt,
+    data: {
+      email_id: emailId,
+      created_at: "2026-10-15 07:00:00.000000+00",
+      from: "Climate Refugee Pavilion <hello@example.invalid>",
+      to: ["applicant@example.invalid"],
+      subject: "Confirm your email",
+    },
+  });
+  const deliveredId = `msg_${randomUUID()}`;
+  const delivered = await h.resend(event("email.delivered", "2026-10-15T07:44:01.000Z"), { id: deliveredId });
+  assert.equal(delivered.status, 200);
+  assert.equal(delivered.body.ok, true);
+  assert.equal(delivered.body.outcome, "delivery delivered");
+  let after = await row("jobs", job.id);
+  assert.equal(after.delivery_status, "delivered");
+
+  // An older event arriving late does not overwrite the newer status.
+  const late = await h.resend(event("email.sent", "2026-10-15T07:44:00.000Z"));
+  assert.equal(late.body.outcome, "no matching email");
+  assert.equal((await row("jobs", job.id)).delivery_status, "delivered");
+
+  // A redelivery (same svix-id) is answered without reprocessing.
+  const replay = await h.resend(event("email.delivered", "2026-10-15T07:44:01.000Z"), { id: deliveredId });
+  assert.equal(replay.body.duplicate, true);
+  assert.equal(await count("webhook_events", "provider = 'resend' and event_key = $1", [deliveredId]), 1);
+
+  const bounced = await h.resend(event("email.bounced", "2026-10-15T07:45:00.000Z"));
+  assert.equal(bounced.body.outcome, "delivery bounced");
+  after = await row("jobs", job.id);
+  assert.equal(after.delivery_status, "bounced");
+
+  // Wrong signing secret is refused; a signed non-object body is a 400.
+  const forged = await h.resend(event("email.delivered", "2026-10-15T07:46:00.000Z"), { secret: `whsec_${Buffer.from("some-other-secret-value-32-bytes!").toString("base64")}` });
+  assert.equal(forged.status, 401);
+  assert.equal((await h.resend(null, { raw: "[1,2]" })).status, 400);
+  assert.equal((await h.resend(null, { raw: "not json" })).status, 400);
 });
 
 test("a VideoAsk webhook without a query stage uses its signed form reference", async () => {
@@ -1001,46 +1080,109 @@ test("interest signup tells new and repeat addresses apart without exposing deta
   h.state.ip = `192.0.2.${++ipCounter % 250}`;
   const input = { email, ageGroup: "19_plus", track: "online" };
   assert.deepEqual(await h.actions.submitInterest(input), { ok: true, status: "ok" });
-  await sql.query("insert into interest (email,name,age_group,track) values ($1,'Secret Name','under_19','online')", [email]);
+  await sql.query("update interest set name = 'Secret Name', age_group = 'under_19' where email = $1", [email]);
   const repeat = await h.actions.submitInterest(input);
   assert.deepEqual(repeat, { ok: true, status: "already_recorded" });
   assert.doesNotMatch(JSON.stringify(repeat), /Secret Name|under_19/);
+  // A repeat never overwrites the stored entry (no mailbox proof any more).
+  assert.equal((await sql.query("select age_group from interest where email = $1", [email])).rows[0].age_group, "under_19");
   assert.deepEqual(await h.actions.submitInterest({ email: "not-an-email" }), { ok: false, status: "error" });
 });
 
+const ackJobs = (to) => sql.query("select * from jobs where payload->>'to' = $1 order by created_at", [to]).then((r) => r.rows);
+const noConfirmation = async (to) => {
+  assert.equal(await count("jobs", "payload->>'to' = $1 and payload->>'template' = 'capture_confirmation'", [to]), 0);
+  assert.equal(await count("capture_tokens", "payload->>'email' = $1", [to]), 0);
+};
+
 for (const kind of ["waitlist", "interest"]) {
-  test(`${kind} preferences change only after the mailbox owner confirms, once`, async () => {
-    const database = h.load("lib/db/index.ts").getDb();
+  test(`${kind} sign-ups are saved on submit with no confirmation email, and acknowledged in the site language`, async () => {
     const email = nextEmail();
-    if (kind === "waitlist") await sql.query("insert into waitlist (email,status) values ($1,'unsubscribed')", [email]);
-    else await sql.query("insert into interest (email,age_group,track) values ($1,'under_19','online')", [email]);
     const submit = kind === "waitlist" ? h.actions.submitWaitlist : h.actions.submitInterest;
     h.state.ip = `192.0.2.${++ipCounter % 250}`;
-    const input = { email, ageGroup: "19_plus", track: "in_person" };
-    assert.deepEqual(await submit(input), kind === "waitlist" ? { ok: true } : { ok: true, status: "already_recorded" });
-    let saved = (await sql.query(`select * from ${kind} where email = $1`, [email])).rows[0];
-    assert.equal(kind === "waitlist" ? saved.status : saved.track, kind === "waitlist" ? "unsubscribed" : "online");
-    const [queued] = (await sql.query("select * from jobs where payload->>'to' = $1", [email])).rows;
-    await sql.query("update jobs set available_at = '1890-01-01' where id = $1", [queued.id]);
-    const { claimJobs, runClaimedJob, settle } = h.load("lib/jobs.ts");
-    const [claimed] = await claimJobs(database, 1);
-    const { handlers } = h.load("lib/worker.ts");
-    await settle(database, claimed, await runClaimedJob(claimed, handlers, database));
-    const sent = await row("jobs", queued.id);
-    const token = new URL(sent.payload.html.match(/href="([^"]+\/api\/capture\/confirm[^"]+)"/)[1]).searchParams.get("token");
-    const route = h.load("app/api/capture/confirm/route.ts");
-    const preview = route.GET(h.req(`/api/capture/confirm?token=${token}`));
-    assert.equal(preview.status, 200);
-    assert.equal(await count("capture_tokens", "used_at is not null and hash = $1", [h.load("lib/access.ts").hashToken(token)]), 0);
-    const req = () => h.req("/api/capture/confirm", { body: new URLSearchParams({ token }).toString() });
-    assert.match((await route.POST(req())).url, /result=confirmed/);
-    saved = (await sql.query(`select * from ${kind} where email = $1`, [email])).rows[0];
-    assert.equal(kind === "waitlist" ? saved.status : saved.track, kind === "waitlist" ? "subscribed" : "in_person");
-    assert.match((await route.POST(req())).url, /result=expired/);
+    const result = await submit({ email, name: "Ana", ageGroup: "19_plus", track: "in_person", locale: "pt" });
+    assert.deepEqual(result, kind === "waitlist" ? { ok: true } : { ok: true, status: "ok" });
+    const saved = (await sql.query(`select * from ${kind} where email = $1`, [email])).rows[0];
+    assert.ok(saved, "saved straight away");
+    if (kind === "interest") assert.equal(saved.track, "in_person");
     assert.equal(await count("sync_changes", "record_id = $1", [saved.id]), 1);
+    await noConfirmation(email);
+    const jobs = await ackJobs(email);
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].payload.template, kind);
+    assert.match(jobs[0].payload.html, /<html lang="pt"/);
+    assert.equal(jobs[0].payload.subject, kind === "waitlist" ? "Já está na lista" : "Recebemos o seu interesse");
+    assert.doesNotMatch(jobs[0].payload.html, /\/api\/capture\/confirm/);
+
+    // A repeat changes nothing and is not re-mailed.
+    await submit({ email, ageGroup: "under_19", track: "online", locale: "fr" });
+    assert.equal((await ackJobs(email)).length, 1);
+    if (kind === "interest") assert.equal((await sql.query("select track from interest where email = $1", [email])).rows[0].track, "in_person");
   });
 }
 
+test("acknowledgements fall back to English for a missing or unknown locale", async () => {
+  for (const locale of [undefined, "de"]) {
+    const email = nextEmail();
+    h.state.ip = `192.0.2.${++ipCounter % 250}`;
+    assert.deepEqual(await h.actions.submitInterest({ email, ageGroup: "19_plus", ...(locale ? { locale } : {}) }), { ok: true, status: "ok" });
+    const [job] = await ackJobs(email);
+    assert.match(job.payload.html, /<html lang="en"/);
+    assert.equal(job.payload.subject, "We've received your interest");
+  }
+});
+
+test("partner inquiries are saved on submit and acknowledged in the site language", async () => {
+  const email = nextEmail();
+  h.state.ip = `192.0.2.${++ipCounter % 250}`;
+  const result = await h.actions.submitPartner({ name: "Camille Dupont", email, organization: "Org Verte", designation: "Directrice", support: "Funding", locale: "fr" });
+  assert.deepEqual(result, { ok: true });
+  const saved = (await sql.query("select * from partner_inquiries where email = $1", [email])).rows[0];
+  assert.equal(saved.organization, "Org Verte");
+  assert.equal(await count("sync_changes", "record_id = $1", [saved.id]), 1);
+  await noConfirmation(email);
+  const [job] = await ackJobs(email);
+  assert.equal(job.payload.template, "partner");
+  assert.match(job.payload.html, /<html lang="fr"/);
+  assert.match(job.payload.html, /Bonjour Camille Dupont,/);
+  assert.equal(job.payload.subject, "Nous avons bien reçu votre message");
+});
+
+test("nominations are saved on submit and acknowledged once, in the site language", async () => {
+  const nominatorEmail = nextEmail();
+  const nomineeEmail = nextEmail();
+  h.state.ip = `192.0.2.${++ipCounter % 250}`;
+  const input = { nominatorName: "Lucía", nominatorEmail, nomineeName: "Mateo <b>", nomineeEmail, locale: "es" };
+  assert.deepEqual(await h.actions.submitNomination(input), { ok: true });
+  assert.equal(await count("nominations", "nominator_email = $1 and nominee_email = $2", [nominatorEmail, nomineeEmail]), 1);
+  await noConfirmation(nominatorEmail);
+  let jobs = await ackJobs(nominatorEmail);
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].payload.template, "nomination");
+  assert.match(jobs[0].payload.html, /<html lang="es"/);
+  assert.match(jobs[0].payload.html, /Gracias por nominar a Mateo &lt;b&gt;/);
+  assert.equal(jobs[0].payload.subject, "Hemos recibido tu nominación");
+  assert.deepEqual(await h.actions.submitNomination(input), { ok: true });
+  jobs = await ackJobs(nominatorEmail);
+  assert.equal(jobs.length, 1, "a repeated nomination is not re-mailed");
+});
+
+test("sign-ups queued for a confirmation email before the change are saved directly", async () => {
+  const email = nextEmail();
+  const database = h.load("lib/db/index.ts").getDb();
+  await sql.query("update jobs set available_at = now() + interval '1 hour' where status = 'pending'");
+  await sql.query("insert into jobs (kind, dedupe_key, payload, available_at) values ('email', $1, $2, '1900-01-01')",
+    [`email:capture:${randomUUID()}`, JSON.stringify({ template: "capture_confirmation", to: email, kind: "interest", input: { email, ageGroup: "19_plus", track: "online" } })]);
+  const { claimJobs, runClaimedJob, settle } = h.load("lib/jobs.ts");
+  const [claimed] = await claimJobs(database, 1);
+  assert.equal(claimed.payload.to, email);
+  const outcome = await runClaimedJob(claimed, h.load("lib/worker.ts").handlers, database);
+  assert.equal(outcome.status, "done");
+  await settle(database, claimed, outcome);
+  assert.equal(await count("interest", "email = $1", [email]), 1);
+  assert.equal(await count("capture_tokens", "payload->>'email' = $1", [email]), 0);
+  assert.equal((await ackJobs(email)).filter((j) => j.payload.template === "interest").length, 1);
+});
 
 test("Spanish applicants confirm ownership before the form advances", async () => {
   const a = await h.apply({ language: "es", unverified: true });
