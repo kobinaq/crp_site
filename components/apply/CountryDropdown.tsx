@@ -6,7 +6,7 @@ import { type KeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, use
 import { createPortal, flushSync } from "react-dom";
 import { useLanguage } from "../LanguageProvider";
 import { COUNTRIES, countryLabel, rankCountries, type Country } from "@/lib/countries";
-import { FIELD, FIELD_LG, LABEL, MINI_LABEL, VALUE_LG } from "./fieldStyles";
+import { FIELD, FIELD_LG, LABEL, LABEL_LG, MINI_LABEL, VALUE_LG } from "./fieldStyles";
 
 function Caret({ up = false }: { up?: boolean }) {
   return (
@@ -263,7 +263,7 @@ export function CountryDropdown({
         className={
           variant === "field"
             ? lg
-              ? `${FIELD} ${FIELD_LG} w-full gap-3 ${value && !(open && query) ? "pl-4" : "pl-5 desk:pl-6"} pr-6 desk:pr-8`
+              ? `${FIELD} ${FIELD_LG} w-full gap-3 ${value && !(open && query) ? "pl-4" : "pl-6"} pr-8`
               : `${FIELD} w-full gap-4 pl-5 pr-6`
             : "flex h-11 items-center gap-2 border-r border-black/8 pr-2"
         }
@@ -286,7 +286,7 @@ export function CountryDropdown({
               </span>
             </span>
           ) : (
-            <span className={`flex-1 text-left ${LABEL}`}>{label}</span>
+            <span className={`flex-1 text-left ${LABEL_LG}`}>{label}</span>
           )
         ) : variant === "field" ? (
           value ? (

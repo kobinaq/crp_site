@@ -5,7 +5,7 @@ import { useText } from "@/lib/ui-text";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "../LanguageProvider";
-import { FIELD, FIELD_LG, LABEL, MINI_LABEL, VALUE_LG } from "./fieldStyles";
+import { FIELD, FIELD_LG, LABEL, LABEL_LG, MINI_LABEL, VALUE_LG } from "./fieldStyles";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -144,7 +144,7 @@ export function DateField({
         ) : display ? (
           <span className="text-[16px] text-black">{display}</span>
         ) : (
-          <span className={LABEL}>{tr("*D.O.B")}</span>
+          <span className={lg ? LABEL_LG : LABEL}>{tr("*D.O.B")}</span>
         )}
       </button>
 
