@@ -11,7 +11,7 @@ import { motion, useTransform } from "framer-motion";
 import Image from "next/image";
 import Link from "@/components/LocaleLink";
 import { usePointerOrigin } from "@/lib/usePointerOrigin";
-import { useCopy } from "./LanguageProvider";
+import { useCopy, useLanguage } from "./LanguageProvider";
 import { TicketTab } from "./TicketTab";
 import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
 import { submitWaitlist } from "@/lib/actions";
@@ -292,6 +292,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Contact page mobile (Figma 2282:11398): 297×294 "Join the waitlist" card with an email field. */
 export function WaitlistCard() {
   const copy = useCopy();
+  const { locale } = useLanguage();
   const { pending, error, challengeKey, submit } = useCaptureSubmission();
   const [email, setEmail] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -308,7 +309,7 @@ export function WaitlistCard() {
       return;
     }
     const saved = await submit(() =>
-      submitWaitlist({ email: email.trim(), source: "contact_waitlist", turnstileToken: token }),
+      submitWaitlist({ email: email.trim(), source: "contact_waitlist", locale, turnstileToken: token }),
     );
     if (saved) setDone(true);
     else setToken(null);

@@ -33,6 +33,7 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
       const res = await submitNomination({
         ...nominee,
         ...data,
+        locale,
       });
       if (!res.ok) {
         setError(tr("Please check your details and try again."));

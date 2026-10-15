@@ -1,35 +1,56 @@
-import { randomBytes, randomUUID } from "crypto";
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
-import { captureTokens, jobs, waitlist, interest, type Db, type Store } from "@/lib/db";
-import { hashToken, RESUME_TOKEN_TTL_SECONDS } from "@/lib/access";
-import { appUrl } from "@/lib/config";
-import { captureConfirmationEmail, waitlistEmail, interestEmail } from "@/lib/emails";
+import { captureTokens, waitlist, interest, type Db, type Store } from "@/lib/db";
+import { hashToken } from "@/lib/access";
+import { waitlistEmail, interestEmail } from "@/lib/emails";
 import { waitlistInput, interestInput, type WaitlistInput, type InterestInput } from "@/lib/capture";
-import { enqueue, enqueueEmail, type Job, type EmailJobPayload } from "@/lib/jobs";
+import { enqueueEmail } from "@/lib/jobs";
 import { recordChange } from "@/lib/sync-log";
 
-export async function requestCaptureConfirmation(db: Db, kind: "waitlist" | "interest", input: WaitlistInput | InterestInput) {
-  await enqueue(db, { kind: "email", dedupeKey: `email:capture:${randomUUID()}`, payload: { template: "capture_confirmation", to: input.email, kind, input } });
+// Waitlist and interest sign-ups are saved as final the moment they are
+// submitted: no confirmation email, no token. A repeat submission of an
+// address that is already on file changes nothing (so nobody can overwrite or
+// resubscribe someone else's entry) and is not re-mailed.
+
+
+
+async function insertWaitlist(tx: Store, input: WaitlistInput): Promise<boolean> {
+  const { locale, ...fields } = input;
+  const [row] = await tx.insert(waitlist).values(fields).onConflictDoNothing({ target: waitlist.email }).returning();
+  if (!row) return false;
+  await recordChange(tx, "waitlist", row.id, "insert", row);
+  await enqueueEmail(tx, `email:waitlist:${row.id}`, { to: row.email, ...waitlistEmail(locale) }, "waitlist");
+  return true;
 }
-export async function prepareCaptureEmail(db: Db, job: Job): Promise<EmailJobPayload | null> {
-  return db.transaction(async (tx) => {
-    const [current] = await tx.select().from(jobs).where(and(eq(jobs.id, job.id), eq(jobs.lockToken, job.lockToken!))).for("update");
-    if (!current) return null;
-    let payload = current.payload;
-    let tokenHash = typeof payload.tokenHash === "string" ? payload.tokenHash : "";
-    if (!payload.html) {
-      const raw = randomBytes(32).toString("base64url");
-      tokenHash = hashToken(raw);
-      await tx.insert(captureTokens).values({ hash: tokenHash, kind: String(payload.kind), payload: payload.input as Record<string, unknown>, expiresAt: new Date(Date.now() + RESUME_TOKEN_TTL_SECONDS * 1000) });
-      const link = `${appUrl()}/api/capture/confirm?token=${raw}`;
-      payload = { ...payload, ...captureConfirmationEmail(link, payload.kind === "waitlist" ? "waitlist" : "interest"), tokenHash };
-      await tx.update(jobs).set({ payload }).where(eq(jobs.id, current.id));
-    }
-    const renewed = await tx.update(captureTokens).set({ expiresAt: new Date(Date.now() + RESUME_TOKEN_TTL_SECONDS * 1000) })
-      .where(and(eq(captureTokens.hash, tokenHash), isNull(captureTokens.usedAt))).returning({ hash: captureTokens.hash });
-    return renewed.length ? payload as EmailJobPayload : null;
-  });
+
+async function insertInterest(tx: Store, input: InterestInput): Promise<boolean> {
+  const { locale, ...fields } = input;
+  const [row] = await tx.insert(interest).values(fields).onConflictDoNothing({ target: interest.email }).returning();
+  if (!row) return false;
+  await recordChange(tx, "interest", row.id, "insert", row);
+  await enqueueEmail(tx, `email:interest:${row.id}`, { to: row.email, ...interestEmail(locale, row.name) }, "interest");
+  return true;
 }
+
+// Returns true when a new entry was created, false when the address was already on file.
+export function saveWaitlist(db: Db, input: WaitlistInput): Promise<boolean> {
+  return db.transaction((tx) => insertWaitlist(tx, input));
+}
+export function saveInterest(db: Db, input: InterestInput): Promise<boolean> {
+  return db.transaction((tx) => insertInterest(tx, input));
+}
+
+// Sign-ups made before confirmations were dropped may still be queued as a
+// "capture_confirmation" email job. The worker saves them directly instead of
+// mailing a link.
+export async function saveQueuedCapture(db: Db, kind: unknown, input: unknown): Promise<boolean> {
+  if (kind === "waitlist") return saveWaitlist(db, waitlistInput.parse(input));
+  if (kind === "interest") return saveInterest(db, interestInput.parse(input));
+  throw new Error("unknown capture kind");
+}
+
+// Links already sitting in inboxes from before the change: opening one saves
+// the sign-up straight away (no interstitial). Returns false for an unknown,
+// expired or already used link.
 export async function confirmCapture(db: Db, raw: string): Promise<boolean> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(raw)) return false;
   return db.transaction(async (tx) => {
@@ -37,20 +58,13 @@ export async function confirmCapture(db: Db, raw: string): Promise<boolean> {
       .where(and(eq(captureTokens.hash, hashToken(raw)), isNull(captureTokens.usedAt), gt(captureTokens.expiresAt, new Date())))
       .returning();
     if (!token) return false;
-    if (token.kind === "waitlist") {
-      const input = waitlistInput.parse(token.payload);
-      const [row] = await tx.insert(waitlist).values(input).onConflictDoUpdate({ target: waitlist.email, set: { status: "subscribed", updatedAt: new Date() } }).returning();
-      await recordChange(tx, "waitlist", row.id, "update", row);
-      await enqueueEmail(tx, `email:waitlist:${row.id}`, { to: row.email, ...waitlistEmail() }, "waitlist");
-    } else if (token.kind === "interest") {
-      const input = interestInput.parse(token.payload);
-      const [row] = await tx.insert(interest).values(input).onConflictDoUpdate({ target: interest.email, set: { ageGroup: input.ageGroup, track: input.track, updatedAt: new Date() } }).returning();
-      await recordChange(tx, "interest", row.id, "update", row);
-      await enqueueEmail(tx, `email:interest:${row.id}`, { to: row.email, ...interestEmail() }, "interest");
-    } else throw new Error("unknown capture kind");
+    if (token.kind === "waitlist") await insertWaitlist(tx, waitlistInput.parse(token.payload));
+    else if (token.kind === "interest") await insertInterest(tx, interestInput.parse(token.payload));
+    else throw new Error("unknown capture kind");
     return true;
   });
 }
+
 export async function purgeCaptureTokens(db: Store) {
   await db.delete(captureTokens).where(lt(captureTokens.expiresAt, new Date(Date.now() - 24 * 3600_000)));
 }

@@ -1,11 +1,9 @@
 "use server";
-import { requestCaptureConfirmation } from "@/lib/capture-confirmation";
+import { saveInterest, saveWaitlist } from "@/lib/capture-confirmation";
 
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
 import {
   getDb,
-  interest,
   nominations,
   partnerInquiries,
 } from "@/lib/db";
@@ -14,9 +12,7 @@ import { recordChange } from "@/lib/sync-log";
 import { rateLimit } from "@/lib/rate-limit";
 import { createApplication, requestResumeLink } from "@/lib/application";
 import { verifyTurnstile } from "@/lib/turnstile";
-import {
-  nominationEmail,
-} from "@/lib/emails";
+import { nominationEmail, partnerEmail } from "@/lib/emails";
 import {
   waitlistInput,
   interestInput,
@@ -58,14 +54,17 @@ export async function submitWaitlist(raw: unknown): Promise<{ ok: boolean }> {
   const parsed = waitlistInput.safeParse(raw);
   if (!parsed.success) return { ok: false };
   if (!(await withinLimits("waitlist", parsed.data.email, 20, 3))) return { ok: false };
-  await requestCaptureConfirmation(getDb(), "waitlist", parsed.data);
+  // Saved as final straight away; a new entry gets an acknowledgement email in
+  // the submitter's site language. A repeat address is a quiet success.
+  await saveWaitlist(getDb(), parsed.data);
   return { ok: true };
 }
 
 // `ok` stays for existing callers; `status` lets the apply form tell a repeat
 // signup apart. Only checked after Turnstile and the rate limits, and it only
-// reveals that the address is on the interest list (no stored details). The
-// confirmation email still goes out so the owner can update their preferences.
+// reveals that the address is on the interest list (no stored details). A new
+// entry is saved as final with no confirmation step and gets an
+// acknowledgement email; a repeat leaves the stored entry untouched.
 export type InterestResult =
   | { ok: true; status: "ok" | "already_recorded" }
   | { ok: false; status: "error" };
@@ -76,10 +75,8 @@ export async function submitInterest(raw: unknown): Promise<InterestResult> {
   const parsed = interestInput.safeParse(raw);
   if (!parsed.success) return failed;
   if (!(await withinLimits("interest", parsed.data.email, 20, 3))) return failed;
-  const db = getDb();
-  const [existing] = await db.select({ id: interest.id }).from(interest).where(eq(interest.email, parsed.data.email)).limit(1);
-  await requestCaptureConfirmation(db, "interest", parsed.data);
-  return { ok: true, status: existing ? "already_recorded" : "ok" };
+  const created = await saveInterest(getDb(), parsed.data);
+  return { ok: true, status: created ? "ok" : "already_recorded" };
 }
 
 export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
@@ -100,6 +97,7 @@ export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
     nomineeBasedIn,
     nomineeLocation,
     track,
+    locale,
   } = parsed.data;
   if (!(await withinLimits("nomination", nominatorEmail, 20, 10))) return { ok: false };
 
@@ -130,7 +128,7 @@ export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
     // A repeated nomination of the same person is acknowledged, not re-mailed.
     if (!row) return;
     await recordChange(tx, "nominations", row.id, "insert", row);
-    await enqueueEmail(tx, `email:nomination:${row.id}`, { to: nominatorEmail, ...nominationEmail(nomineeName) }, "nomination");
+    await enqueueEmail(tx, `email:nomination:${row.id}`, { to: nominatorEmail, ...nominationEmail(nomineeName, locale, nominatorName) }, "nomination");
   });
   return { ok: true };
 }
@@ -141,9 +139,11 @@ export async function submitPartner(raw: unknown): Promise<{ ok: boolean; reason
   if (!parsed.success) return { ok: false, reason: "invalid" };
   if (!(await withinLimits("partner", parsed.data.email, 20, 5))) return { ok: false, reason: "rate_limited" };
 
+  const { locale, ...fields } = parsed.data;
   await getDb().transaction(async (tx) => {
-    const [row] = await tx.insert(partnerInquiries).values(parsed.data).returning();
+    const [row] = await tx.insert(partnerInquiries).values(fields).returning();
     await recordChange(tx, "partners", row.id, "insert", row);
+    await enqueueEmail(tx, `email:partner:${row.id}`, { to: row.email, ...partnerEmail(row.name, locale) }, "partner");
   });
   return { ok: true };
 }

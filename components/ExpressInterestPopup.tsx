@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import { trail } from "@/lib/fonts";
 import { submitInterest } from "@/lib/actions";
 import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
-import { useCopy } from "./LanguageProvider";
+import { useCopy, useLanguage } from "./LanguageProvider";
 import { useCaptureSubmission } from "./useCaptureSubmission";
 
 /** Figma sponsor-block edge — inputs authored at this size, then scaled. */
@@ -165,6 +165,7 @@ export function ExpressInterestPopup({
   onClose,
 }: ExpressInterestPopupProps) {
   const copy = useCopy();
+  const { locale } = useLanguage();
   const { pending, error, challengeKey, submit } = useCaptureSubmission();
   const titleId = useId();
   const errorId = useId();
@@ -209,6 +210,7 @@ export function ExpressInterestPopup({
       name: name.trim(),
       ageGroup: interestDbAgeGroup(ageGroup),
       source: source ?? `apply_express_${ageGroup}`,
+      locale,
       turnstileToken,
     }));
     if (saved) setPhase("success");

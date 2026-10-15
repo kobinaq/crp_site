@@ -5,7 +5,7 @@ import { deliverEmail } from "@/lib/email";
 import { provisionIdentitySession } from "@/lib/application";
 import { purgeExpiredTokens } from "@/lib/access";
 import { purgeExpiredRateLimits } from "@/lib/rate-limit";
-import { prepareCaptureEmail, purgeCaptureTokens } from "@/lib/capture-confirmation";
+import { purgeCaptureTokens, saveQueuedCapture } from "@/lib/capture-confirmation";
 import { prepareResumeEmail } from "@/lib/resume-delivery";
 import {
   runDueJobs,
@@ -26,7 +26,13 @@ import { applicantSyncRowWithDocuments } from "@/lib/sync";
 // job being queued twice, not being attempted twice.
 export const handlers: Record<JobKind, JobHandler> = {
   async email(job, db) {
-    const payload = job.payload.template === "capture_confirmation" ? await prepareCaptureEmail(db, job) : ["resume", "application"].includes(String(job.payload.template)) ? await prepareResumeEmail(db, job) : job.payload as EmailJobPayload;
+    // Legacy: sign-ups queued for a confirmation email before confirmations
+    // were dropped are saved directly (with their acknowledgement) instead.
+    if (job.payload.template === "capture_confirmation") {
+      const created = await saveQueuedCapture(db, job.payload.kind, job.payload.input);
+      return { status: "done", providerId: null, deliveryStatus: created ? "saved without confirmation" : "already on file" };
+    }
+    const payload = ["resume", "application"].includes(String(job.payload.template)) ? await prepareResumeEmail(db, job) : job.payload as EmailJobPayload;
     if (!payload) return { status: "failed", error: "confirmation token unavailable or already used; request a new link" };
     const { to, subject, html } = payload;
     const result = await deliverEmail({ to, subject, html }, job.dedupeKey);

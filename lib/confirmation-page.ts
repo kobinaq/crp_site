@@ -1,5 +1,5 @@
 import { parseLocale } from "@/lib/locale";
-export function confirmationPage(raw: string, action: "/api/apply/resume" | "/api/capture/confirm" | "/api/apply/switch-online", title: string, requestedLocale?: string): Response {
+export function confirmationPage(raw: string, action: "/api/apply/switch-online", title: string, requestedLocale?: string): Response {
   const locale = parseLocale(requestedLocale);
   const copy = {
     en: [title, "Confirm only if you requested this email.", "Confirm"],

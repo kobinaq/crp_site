@@ -1,12 +1,14 @@
 import emailCopy from "@/lib/translations/application-emails.json";
-import type { ApplicationLocale } from "@/lib/locale";
+import ackCopy from "@/lib/translations/acknowledgement-emails.json";
+import { parseLocale, type ApplicationLocale, type Locale } from "@/lib/locale";
 
 // Branded transactional email shell, matching the Figma email frames
 // (2308:7356 desktop, 2308:7383 mobile): scalloped photo header, cream body,
 // a pink→orange gradient CTA pill, and a black footer with the swirl.
 //
-// Applicant-journey emails are localized; the top-of-funnel ones (waitlist,
-// interest, nomination) are English for now.
+// Applicant-journey emails follow the application language (en/fr/es); the
+// form acknowledgements (waitlist, interest, nomination, partner) follow the
+// site language at submission (en/fr/es/pt), falling back to English.
 
 export type Email = { subject: string; html: string };
 
@@ -37,21 +39,12 @@ const SMALL_FONT = "Geist, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const LINEAR = `linear-gradient(90deg,${MAGENTA} 0%,${ORANGE} 100%)`;
 const RADIAL = `radial-gradient(194px 181px at 93.8% 83.4%,${ORANGE} 0%,#F77346 25%,#F35A5E 50%,#F04077 75%,${MAGENTA} 100%)`;
 
-const pick = <T>(language: ApplicationLocale, en: T, fr: T, es: T): T => language === "fr" ? fr : language === "es" ? es : en;
-
 // Email-client-safe: table layout, inline styles, progressive gradient
 // fallbacks (solid bgcolor → linear → radial; VML for Outlook desktop).
 // Geometry follows Figma 2308:7356 (600px desktop) and 2308:7383 (320px mobile).
-function render(language: ApplicationLocale, bodyParas: string[], cta: Cta | null): string {
+function render(language: Locale, bodyParas: string[], cta: Cta | null): string {
   const year = new Date().getUTCFullYear();
-  const signoff = pick(
-    language,
-    "Best regards,<br />The Climate Refugee Pavilion Team",
-    "Cordialement,<br />L'équipe du Climate Refugee Pavilion",
-    "Un cordial saludo,<br />El equipo del Climate Refugee Pavilion",
-  );
-  const tagline = pick(language, "Making climate mobility impossible to ignore", "Rendre la mobilité climatique impossible à ignorer", "Hacer que la movilidad climática sea imposible de ignorar");
-  const rights = pick(language, "All rights reserved.", "Tous droits réservés.", "Todos los derechos reservados.");
+  const { signoff, tagline, rights } = ackCopy[language];
 
   // Figma separates paragraphs with an empty 14px/1.2 line (16.8px).
   const paras = [...bodyParas, signoff]
@@ -123,37 +116,29 @@ function render(language: ApplicationLocale, bodyParas: string[], cta: Cta | nul
 </body></html>`;
 }
 
-export function waitlistEmail(): Email {
-  return {
-    subject: "You're on the list",
-    html: render(
-      "en",
-      ["Dear friend,", "Thanks for signing up. We'll email you with updates about the Climate Refugee Pavilion."],
-      null,
-    ),
-  };
+// Acknowledgements for the non-application forms: a receipt, never a link.
+const ack = (locale: string | null | undefined) => ackCopy[parseLocale(locale)];
+
+export function waitlistEmail(locale?: string | null): Email {
+  const copy = ack(locale);
+  return { subject: copy.waitlistSubject, html: render(parseLocale(locale), [copy.friend, copy.waitlist], null) };
 }
 
-export function interestEmail(): Email {
-  return {
-    subject: "Thanks for your interest",
-    html: render(
-      "en",
-      ["Dear friend,", "Thanks for expressing interest in the programme. We'll be in touch as opportunities open up for your group."],
-      null,
-    ),
-  };
+export function interestEmail(locale?: string | null, name?: string | null): Email {
+  const copy = ack(locale);
+  const hello = name ? copy.greeting.replace("{name}", escapeHtml(name)) : copy.friend;
+  return { subject: copy.interestSubject, html: render(parseLocale(locale), [hello, copy.interest], null) };
 }
 
-export function nominationEmail(nomineeName: string): Email {
-  return {
-    subject: "Thanks for your nomination",
-    html: render(
-      "en",
-      ["Dear friend,", `Thanks for nominating ${escapeHtml(nomineeName)}. We'll reach out to them with the next steps.`],
-      null,
-    ),
-  };
+export function nominationEmail(nomineeName: string, locale?: string | null, nominatorName?: string | null): Email {
+  const copy = ack(locale);
+  const hello = nominatorName ? copy.greeting.replace("{name}", escapeHtml(nominatorName)) : copy.friend;
+  return { subject: copy.nominationSubject, html: render(parseLocale(locale), [hello, copy.nomination.replace("{nominee}", escapeHtml(nomineeName))], null) };
+}
+
+export function partnerEmail(name: string, locale?: string | null): Email {
+  const copy = ack(locale);
+  return { subject: copy.partnerSubject, html: render(parseLocale(locale), [copy.greeting.replace("{name}", escapeHtml(name)), copy.partner], null) };
 }
 
 export function applicationEmail(name: string, link: string | null, language: ApplicationLocale): Email {
@@ -190,11 +175,4 @@ export function decisionEmail(
     return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], { label: copy.interviewButton, url: link }) };
   }
   return { subject: copy.selectedSubject, html: render(language, [copy.congratulations, copy.selected], null) };
-}
-
-export function captureConfirmationEmail(link: string, kind: "waitlist" | "interest"): Email {
-  return { subject: "Confirm your email request", html: render("en", [
-    kind === "waitlist" ? "Confirm that you want to subscribe to Pavilion updates." : "Confirm that you want to save the interests you submitted to Pavilion.",
-    "The link expires in 30 minutes. If you did not request this change, ignore this email; your existing preferences will stay unchanged.",
-  ], { label: "Confirm request", url: link }) };
 }
