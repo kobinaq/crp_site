@@ -48,9 +48,10 @@ html {
   --column-w: min(75.4vw, 440px);
 }
 
+/* Desktop: Figma 2308:167 column is 561 of 1200; it stops growing past the frame width. */
 @media (min-width: 900px) {
   :root {
-    --column-w: min(54vw, 640px);
+    --column-w: min(46.75vw, 561px);
   }
 }
 
@@ -129,9 +130,10 @@ body {
 
 @media (min-width: 900px) {
   .platform-soon-badge {
-    left: 86.8%;
-    top: calc(-2.85% + 50px);
-    width: min(124px, 19.7%);
+    /* Figma 2308:277: ~150px badge overlapping the globe's top-right edge. */
+    left: 82.6%;
+    top: -1.6%;
+    width: min(151px, 24%);
   }
 }
 

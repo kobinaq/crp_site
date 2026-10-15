@@ -267,13 +267,14 @@ function PlatformBackdrop() {
   return (
     // Extend past the section so the wash fills the Content section's top-corner curves.
     <div className="pointer-events-none absolute inset-x-0 top-0 -bottom-[110px] -z-10 overflow-hidden bg-[#ec268f] desk:-bottom-[120px]">
-      <div className="absolute left-1/2 top-[calc(50%+0.5px)] h-[1168px] w-[1312px] -translate-x-1/2 -translate-y-1/2 desk:h-[1280px]">
+      {/* Desktop: the glow grows with the viewport so wide screens never show its edges. */}
+      <div className="absolute left-1/2 top-[calc(50%+0.5px)] h-[1168px] w-[1312px] -translate-x-1/2 -translate-y-1/2 desk:h-[max(1280px,calc(100%+240px))] desk:w-[max(1312px,calc(100vw+240px))]">
         <div className="relative size-full blur-[38px]">
         <Image
           src="/images/platform-wash.png"
           alt=""
           fill
-          sizes="1312px"
+          sizes="(min-width: 1312px) 100vw, 1312px"
           className="object-cover object-bottom"
         />
         </div>

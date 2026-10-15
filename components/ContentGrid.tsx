@@ -71,13 +71,13 @@ export function ContentGrid() {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1072px] flex-col items-center">
-        <DisplayWordmark kicker={copy.content.kicker} word="Content" size="xl" className="shrink-0" />
+        <DisplayWordmark kicker={copy.content.kicker} word="Content" size="section" className="shrink-0" />
 
-        <p className="mt-[11px] w-[360px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:mt-6 desk:w-auto desk:max-w-[840px] desk:text-[40px] desk:tracking-[-0.04em]">
+        <p className="mt-[11px] w-[360px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:mt-0 desk:w-auto desk:max-w-[840px] desk:text-[48px] desk:tracking-[-1.92px]">
           {copy.content.subtitle}
         </p>
 
-        <SectionReveal className="mt-8 w-full desk:mt-14">
+        <SectionReveal className="mt-8 w-full desk:mt-[34px]">
           <div className="rounded-[52px] bg-white/[0.12] p-2">
             <div className="relative flex flex-col gap-2 desk:block">
               {/* Video drives the height; on desktop it leaves room for the column. */}

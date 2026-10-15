@@ -4,7 +4,7 @@ type DisplayWordmarkProps = {
   word: string;
   kicker?: string;
   className?: string;
-  size?: "md" | "xl" | "platform";
+  size?: "md" | "xl" | "platform" | "section";
 };
 
 export function DisplayWordmark({
@@ -21,6 +21,12 @@ export function DisplayWordmark({
         "text-[18px] font-semibold uppercase tracking-[0.04em] text-lime mix-blend-hard-light [text-shadow:0_0_5.688px_rgba(0,0,0,0.25)] desk:text-[24px] desk:tracking-[0.96px]";
       wordClass = `${trail.className} uppercase leading-[0.9] tracking-[0.04em] text-lime text-[clamp(64px,23vw,128px)] desk:text-[130px] desk:tracking-[5.2px]`;
       break;
+    case "section":
+      // Mobile as "xl"; desktop at the 115px of Figma 2308:288 (OUR CONTENT).
+      theClass =
+        "text-[18px] font-semibold uppercase tracking-[0.04em] text-lime mix-blend-hard-light [text-shadow:0_0_5.688px_rgba(0,0,0,0.25)] desk:text-[24px] desk:tracking-[0.96px]";
+      wordClass = `${trail.className} uppercase leading-[0.9] tracking-[0.04em] text-lime text-[clamp(64px,23vw,128px)] desk:text-[115px] desk:tracking-[4.6px]`;
+      break;
     case "platform":
       theClass =
         "text-[18px] font-semibold uppercase tracking-[0.72px] text-lime mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:text-[26px] desk:tracking-[1.02px] desk:[text-shadow:0_0_5.7px_rgba(0,0,0,0.25)]";
@@ -36,7 +42,8 @@ export function DisplayWordmark({
     }
   }
 
-  const stackGap = size === "platform" ? "gap-[11px] desk:gap-4" : "";
+  const stackGap =
+    size === "platform" ? "gap-[11px] desk:gap-4" : size === "section" ? "desk:gap-4" : "";
 
   return (
     <div className={`flex flex-col items-center text-center ${stackGap} ${className}`}>
