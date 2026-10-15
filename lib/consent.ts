@@ -6,15 +6,13 @@
  * analytics (PostHog, anonymous usage statistics). There is no advertising, so
  * that Figma row is omitted.
  *
- * PostHog (analytics), when it is added:
- * - Initialise it only after hasConsent("analytics") is true, and listen with
- *   onConsentChange() to start it when consent is given later. Alternatively
- *   init with `opt_out_capturing_by_default: true` and call
- *   posthog.opt_in_capturing() / posthog.opt_out_capturing() on every change.
- * - Use persistence "localStorage+cookie" (cookie ph_<project_key>_posthog,
- *   12 months, plus ph_* localStorage), as listed in COOKIE_INVENTORY.
- * - On withdrawal its cookies and storage are removed: writeConsent() calls
- *   clearAnalyticsStorage() whenever analytics is off.
+ * PostHog (analytics) lives in lib/analytics.ts and components/analytics/PostHogProvider.tsx:
+ * - posthog-js is imported and initialised only after hasConsent("analytics"),
+ *   and follows onConsentChange(): opt_in_capturing() on grant;
+ *   opt_out_capturing(), reset() and clearAnalyticsStorage() on withdrawal.
+ * - Persistence "localStorage+cookie" (cookie ph_<project_key>_posthog, about
+ *   1 year, plus ph_* localStorage), as listed in COOKIE_INVENTORY.
+ * - writeConsent() also calls clearAnalyticsStorage() whenever analytics is off.
  * Do not load the SDK, or anything else that sets ph_* items, before consent.
  */
 
@@ -153,6 +151,6 @@ export const COOKIE_INVENTORY: InventoryItem[] = [
   { name: "crp_session", kind: "cookie", category: "necessary", duration: "12 hours", purpose: "Lets you continue your application after you confirm your email." },
   { name: "Cloudflare Turnstile", kind: "third-party", category: "necessary", duration: "Session", purpose: "Checks that forms are sent by a person, not a bot. Loaded only on forms." },
   { name: "crp-locale", kind: "cookie", category: "functional", duration: "12 months", purpose: "Remembers the language you chose." },
-  { name: "ph_<project_key>_posthog", kind: "cookie", category: "analytics", duration: "12 months", purpose: "PostHog: an anonymous ID and session, used for anonymous usage statistics that help us improve the site." },
+  { name: "ph_<project_key>_posthog", kind: "cookie", category: "analytics", duration: "About 1 year", purpose: "PostHog: an anonymous ID and session, used for anonymous usage statistics that help us improve the site." },
   { name: "ph_*", kind: "localStorage", category: "analytics", duration: "Until you withdraw consent", purpose: "PostHog local storage: settings and queued anonymous usage statistics, kept with the cookie above." },
 ];
