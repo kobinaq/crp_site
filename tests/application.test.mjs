@@ -5,6 +5,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { loader } from "./helpers.mjs";
 import { startDatabase } from "./db.mjs";
+import { Webhook } from "svix";
 
 // End-to-end through the real application code against a disposable Postgres:
 // server actions, webhook routes, the review-sheet endpoint, the sync feed, the
@@ -27,6 +28,7 @@ before(async () => {
   process.env.VIDEOASK_FORM_ID = "FORM-fixture";
   process.env.VIDEOASK_FORM_URL = "https://videoask.invalid/form";
   process.env.CRON_SECRET = "cron";
+  process.env.RESEND_WEBHOOK_SECRET = `whsec_${Buffer.from("resend-test-signing-secret-32bytes").toString("base64")}`;
   process.env.CALENDLY_URL_EN = "https://calendly.invalid/en";
   process.env.CALENDLY_URL_FR = "https://calendly.invalid/fr";
   process.env.CALENDLY_URL_ES = "https://calendly.invalid/es";
@@ -118,7 +120,16 @@ function harness() {
         }),
       }));
     },
-    resend: null,
+    // Signed exactly as Resend (Svix) signs: svix-id, svix-timestamp, svix-signature.
+    resend: (payload, { id = `msg_${randomUUID()}`, secret = process.env.RESEND_WEBHOOK_SECRET, raw } = {}) => {
+      const body = raw ?? JSON.stringify(payload);
+      const now = new Date();
+      const signature = new Webhook(secret).sign(id, now, body);
+      return load("app/api/webhooks/resend/route.ts").POST(req("/api/webhooks/resend", {
+        headers: { "svix-id": id, "svix-timestamp": String(Math.floor(now.getTime() / 1000)), "svix-signature": signature },
+        body,
+      }));
+    },
     decisions: (rows) => load("app/api/decisions/route.ts").POST(req("/api/decisions", { headers: { "x-sync-secret": "sync" }, body: JSON.stringify(rows) })),
     sync: (table, query) => load("app/api/sync/[table]/route.ts").GET(req(`/api/sync/${table}?${query}`, { headers: { "x-sync-secret": "sync" } }), { params: Promise.resolve({ table }) }),
     verify: (cookies, query = "") => load("app/api/apply/verify/route.ts").GET(req(`/api/apply/verify${query}`, { cookies })),
@@ -333,6 +344,57 @@ test("the worker delivers queued email with an idempotency key, backs off on fai
   assert.equal(after.provider_id, `re_${job.dedupe_key}`);
   assert.equal(after.delivery_status, "accepted");
   assert.equal(calls, 1);
+});
+
+test("signed Resend delivery events are accepted and update the matching email job", async () => {
+  const a = await h.apply();
+  const [job] = await jobsFor(a.id);
+  await sql.query("update jobs set available_at = now() + interval '1 hour' where id <> $1 and status = 'pending'", [job.id]);
+  h.state.deliver = async (input, key) => ({ ok: true, id: `re_${key}` });
+  await h.cron();
+  const emailId = (await row("jobs", job.id)).provider_id;
+  assert.ok(emailId);
+
+  // Resend's real event shape.
+  const event = (type, createdAt) => ({
+    type,
+    created_at: createdAt,
+    data: {
+      email_id: emailId,
+      created_at: "2026-10-15 07:00:00.000000+00",
+      from: "Climate Refugee Pavilion <hello@example.invalid>",
+      to: ["applicant@example.invalid"],
+      subject: "Confirm your email",
+    },
+  });
+  const deliveredId = `msg_${randomUUID()}`;
+  const delivered = await h.resend(event("email.delivered", "2026-10-15T07:44:01.000Z"), { id: deliveredId });
+  assert.equal(delivered.status, 200);
+  assert.equal(delivered.body.ok, true);
+  assert.equal(delivered.body.outcome, "delivery delivered");
+  let after = await row("jobs", job.id);
+  assert.equal(after.delivery_status, "delivered");
+
+  // An older event arriving late does not overwrite the newer status.
+  const late = await h.resend(event("email.sent", "2026-10-15T07:44:00.000Z"));
+  assert.equal(late.body.outcome, "no matching email");
+  assert.equal((await row("jobs", job.id)).delivery_status, "delivered");
+
+  // A redelivery (same svix-id) is answered without reprocessing.
+  const replay = await h.resend(event("email.delivered", "2026-10-15T07:44:01.000Z"), { id: deliveredId });
+  assert.equal(replay.body.duplicate, true);
+  assert.equal(await count("webhook_events", "provider = 'resend' and event_key = $1", [deliveredId]), 1);
+
+  const bounced = await h.resend(event("email.bounced", "2026-10-15T07:45:00.000Z"));
+  assert.equal(bounced.body.outcome, "delivery bounced");
+  after = await row("jobs", job.id);
+  assert.equal(after.delivery_status, "bounced");
+
+  // Wrong signing secret is refused; a signed non-object body is a 400.
+  const forged = await h.resend(event("email.delivered", "2026-10-15T07:46:00.000Z"), { secret: `whsec_${Buffer.from("some-other-secret-value-32-bytes!").toString("base64")}` });
+  assert.equal(forged.status, 401);
+  assert.equal((await h.resend(null, { raw: "[1,2]" })).status, 400);
+  assert.equal((await h.resend(null, { raw: "not json" })).status, 400);
 });
 
 test("a VideoAsk webhook without a query stage uses its signed form reference", async () => {

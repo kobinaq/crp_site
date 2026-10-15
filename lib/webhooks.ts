@@ -235,13 +235,20 @@ async function processIdentity(tx: Tx, payload: IdentityPayload): Promise<Proces
 
 // --- Resend delivery events ---------------------------------------------------
 
-export type ResendPayload = { type: string; created_at?: string; data?: { email_id?: string } };
+// Resend's payload: { type: "email.delivered", created_at, data: { email_id,
+// from, to: [...], subject, created_at, ... } }. data.email_id is the id the
+// send call returned, stored on the job as provider_id.
+export type ResendPayload = { type?: unknown; created_at?: unknown; data?: { email_id?: unknown } };
 
 async function processResend(tx: Tx, payload: ResendPayload): Promise<ProcessOutcome> {
-  const emailId = payload.data?.email_id;
-  if (!emailId || !payload.type?.startsWith("email.")) return { outcome: "ignored" };
-  const at = payload.created_at ? new Date(payload.created_at) : new Date();
-  const status = payload.type.slice("email.".length);
+  const emailId = typeof payload.data?.email_id === "string" ? payload.data.email_id : null;
+  const type = typeof payload.type === "string" ? payload.type : "";
+  if (!emailId || !type.startsWith("email.")) return { outcome: "ignored" };
+  // The event's own created_at orders events; data.created_at is when the email
+  // was created, shared by every event of that email, so it cannot order them.
+  const parsed = typeof payload.created_at === "string" ? new Date(payload.created_at) : null;
+  const at = parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+  const status = type.slice("email.".length);
   const rows = await tx
     .update(jobs)
     .set({ deliveryStatus: status, deliveryEventAt: at })
