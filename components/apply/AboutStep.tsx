@@ -369,7 +369,7 @@ export function AboutStep({
             {tr("Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!")}</Toast>
         ) : shown === "already-recorded" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
-            {tr("You're already on our interest list. We've emailed you a link in case you want to update your details.")}</Toast>
+            {tr("You're already on our interest list. Stay tuned for future programs.")}</Toast>
         ) : shown === "existing" ? (
           <Toast
             variant="error"
