@@ -10,7 +10,7 @@ import { CountryDropdown } from "../apply/CountryDropdown";
 import { PLACEHOLDER } from "../apply/fieldStyles";
 import { useText } from "@/lib/ui-text";
 import { submitPartner } from "@/lib/actions";
-import { useCopy } from "../LanguageProvider";
+import { useCopy, useLanguage } from "../LanguageProvider";
 import { Turnstile } from "../Turnstile";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -279,6 +279,7 @@ function initialSupport(intent: string | null) {
 
 export function PartnerReachPage() {
   const copy = useCopy();
+  const { locale } = useLanguage();
   const tr = useText();
   const params = useSearchParams();
   const form = copy.partnerPage.reachOutForm;
@@ -335,6 +336,7 @@ export function PartnerReachPage() {
         support: supportLabel,
         sponsorship: sponsorship.trim() || undefined,
         message: message.trim() || undefined,
+        locale,
         turnstileToken,
       });
       if (!result.ok) {

@@ -189,6 +189,7 @@ export function AboutStep({
         ageGroup: age < minApplicantAge() ? "under_19" : "19_plus",
         track: track ?? undefined,
         source: "apply_form",
+        locale,
         turnstileToken,
       });
       if (!res.ok) {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { applicationLocales } from "@/lib/locale";
+import { applicationLocales, locales } from "@/lib/locale";
 import { SKILL_LABELS, isSkillLabel } from "@/lib/apply-skills";
 
 // One address, one applicant: trimmed and lower-cased so "Ada@Example.com" and
@@ -18,11 +18,16 @@ export function isCalendarDate(value: string): boolean {
 }
 const dateInput = z.string().refine(isCalendarDate, "not a calendar date");
 
+// The site language at submission, used for the acknowledgement email. An
+// unknown or missing value falls back to English rather than failing the form.
+const localeInput = z.enum(locales).catch("en");
+
 // Boundary schemas: raw form input is untyped until it passes one of these.
 export const waitlistInput = z.object({
   email: emailInput,
   name: z.string().trim().min(1).optional(),
   source: z.string().max(120).optional(),
+  locale: localeInput,
 });
 
 export const interestInput = z.object({
@@ -31,6 +36,7 @@ export const interestInput = z.object({
   ageGroup: z.enum(["under_19", "19_plus"]),
   track: z.enum(["in_person", "online"]).optional(),
   source: z.string().max(120).optional(),
+  locale: localeInput,
 });
 
 export const resumeInput = z.object({ email: emailInput });
@@ -70,6 +76,7 @@ export const partnerInput = z.object({
   support: z.string().trim().min(1).max(400),
   sponsorship: z.string().trim().max(200).optional(),
   message: z.string().trim().max(4000).optional(),
+  locale: localeInput,
 });
 
 export const nominationInput = z.object({
@@ -86,6 +93,7 @@ export const nominationInput = z.object({
   nomineeBasedIn: z.string().trim().max(120).optional(),
   nomineeLocation: z.string().trim().max(200).optional(),
   track: z.enum(["in_person", "online"]).optional(),
+  locale: localeInput,
 });
 
 export type WaitlistInput = z.infer<typeof waitlistInput>;

@@ -1,5 +1,5 @@
-// CSRF gate for the email-confirmation POSTs (/api/apply/resume,
-// /api/capture/confirm, /api/apply/switch-online).
+// CSRF gate for the email-link POSTs (/api/apply/switch-online, and the
+// legacy POST of /api/apply/resume).
 //
 // - "ok": the request is provably same-origin (Sec-Fetch-Site: same-origin, a
 //   matching Origin, or no Origin at all from an older client).

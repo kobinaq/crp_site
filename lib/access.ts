@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "crypto";
-import { and, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { accessTokens, type Store } from "@/lib/db";
 
 export type TokenPurpose = "resume" | "switch_online";
@@ -37,6 +37,25 @@ export async function consumeAccessToken(tx: Store, raw: string, purpose: TokenP
       eq(accessTokens.hash, hashToken(raw)),
       eq(accessTokens.purpose, purpose),
       isNull(accessTokens.usedAt),
+      gt(accessTokens.expiresAt, new Date()),
+    ))
+    .returning({ applicantId: accessTokens.applicantId });
+  return row?.applicantId ?? null;
+}
+
+// For sign-in links (the application email's button). Mail scanners often
+// open links before the person does, so a genuine link keeps working until it
+// expires: the first open stamps used_at, a reopen within the lifetime
+// redeems it again (and the caller rotates the session, so only the latest
+// opener stays signed in). Unknown, expired, or other-purpose tokens give null.
+export async function redeemAccessToken(tx: Store, raw: string, purpose: TokenPurpose): Promise<string | null> {
+  if (!raw || raw.length > 200) return null;
+  const [row] = await tx
+    .update(accessTokens)
+    .set({ usedAt: sql`coalesce(${accessTokens.usedAt}, now())` })
+    .where(and(
+      eq(accessTokens.hash, hashToken(raw)),
+      eq(accessTokens.purpose, purpose),
       gt(accessTokens.expiresAt, new Date()),
     ))
     .returning({ applicantId: accessTokens.applicantId });
