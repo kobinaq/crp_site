@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let payload: unknown;
+  // svix 2.x's Webhook.verify() only checks the signature and returns nothing,
+  // so the payload is parsed here, from the exact bytes that were verified.
   try {
-    payload = new Webhook(secret).verify(raw, {
+    new Webhook(secret).verify(raw, {
       "svix-id": svixId,
       "svix-timestamp": svixTimestamp,
       "svix-signature": svixSignature,
@@ -31,7 +32,13 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!payload || typeof payload !== "object") {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
