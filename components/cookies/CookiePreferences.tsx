@@ -104,7 +104,7 @@ export function CookiePreferences({
         aria-labelledby={`${id}-title`}
         tabIndex={-1}
         data-testid="cookie-preferences"
-        className={`${CARD} relative my-auto flex w-full max-w-[366px] flex-col gap-4 rounded-[16px] px-3 pb-3 pt-4 outline-none desk:max-w-[534px] desk:gap-6 desk:rounded-[32px] desk:p-6`}
+        className={`${CARD} relative my-auto flex w-full max-w-[366px] flex-col gap-3 rounded-[16px] px-3 pb-3 pt-4 outline-none desk:max-w-[534px] desk:gap-6 desk:rounded-[32px] desk:p-6`}
       >
         <div className="flex flex-col gap-3 desk:gap-6">
           <h2 id={`${id}-title`} className="text-[20px] leading-[0.9] tracking-[-0.8px] desk:text-[32px] desk:tracking-[-1.28px]">

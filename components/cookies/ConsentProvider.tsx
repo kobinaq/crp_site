@@ -29,6 +29,8 @@ import { CookiePreferences } from "./CookiePreferences";
 type ConsentContextValue = {
   /** undefined until hydrated (the cookie is read on the client only), null when not chosen yet. */
   consent: Consent | null | undefined;
+  /** The first-visit banner is on screen (no choice stored yet). */
+  bannerVisible: boolean;
   allows: (category: ConsentCategory) => boolean;
   save: (choices: ConsentChoices) => void;
   openPreferences: () => void;
@@ -70,6 +72,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ConsentContextValue>(
     () => ({
       consent,
+      bannerVisible: consent === null,
       allows: (category) => allows(consent ?? null, category),
       save,
       openPreferences,
@@ -79,14 +82,18 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
   return (
     <ConsentContext.Provider value={value}>
-      {children}
-      {consent === null && !panelOpen ? (
+      {/* First in the DOM so keyboard and screen-reader users reach it early; it is
+          fixed to the bottom visually. Stays mounted (inert) under the panel so focus
+          can return to MANAGE PREFERENCES when the panel closes. */}
+      {consent === null ? (
         <CookieBanner
+          hidden={panelOpen}
           onAcceptAll={() => save(ALL_OPTIONAL)}
           onRejectAll={() => save(NO_OPTIONAL)}
           onManage={openPreferences}
         />
       ) : null}
+      {children}
       {panelOpen ? (
         <CookiePreferences
           initial={consent?.choices ?? NO_OPTIONAL}
