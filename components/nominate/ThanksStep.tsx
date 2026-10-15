@@ -22,27 +22,27 @@ export function ThanksStep({ onExit }: { onExit: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex h-dvh flex-col overflow-hidden bg-cream">
-      <header className="relative flex h-[68px] shrink-0 items-center justify-end px-4 desk:h-[88px] desk:px-16 desk:py-6">
+      <header className="relative flex h-[68px] shrink-0 items-center justify-end px-4 max-desk:px-8 desk:h-[88px] desk:px-16 desk:py-6">
         <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 desk:top-5 desk:translate-y-0">
           <Logo
             tone="color"
-            imgClassName="h-10 w-auto object-contain desk:h-12 desk:w-[135px]"
+            imgClassName="h-10 w-auto object-contain max-desk:h-6 desk:h-12 desk:w-[135px]"
           />
         </div>
-        <div className="flex items-center rounded-full bg-white p-1">
+        <div className="flex items-center rounded-full bg-white p-1 max-desk:h-[27px] max-desk:p-[2px]">
           {applicationLocales.map((code) => (
             <button
               key={code}
               type="button"
               onClick={() => setLocale(code)}
               aria-pressed={locale === code}
-              className={`flex h-8 items-center justify-center rounded-full text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] mix-blend-hard-light ${
+              className={`flex h-8 items-center justify-center rounded-full text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] mix-blend-hard-light max-desk:h-full max-desk:text-[12px] max-desk:tracking-[0.48px] ${
                 locale === code
-                  ? "bg-black px-3 text-white"
-                  : "w-[52px] bg-transparent text-black/48"
+                  ? "bg-black px-3 text-white max-desk:px-2"
+                  : "w-[52px] bg-transparent text-black/48 max-desk:w-8"
               }`}
             >
-              <span className="w-7 text-center">{code}</span>
+              <span className="w-7 text-center max-desk:w-auto">{code}</span>
             </button>
           ))}
         </div>
@@ -56,7 +56,7 @@ export function ThanksStep({ onExit }: { onExit: () => void }) {
             alt=""
             width={1072}
             height={354}
-            className="pointer-events-none absolute left-1/2 top-[28.827%] h-[42.344%] w-[118%] max-w-none -translate-x-1/2 object-fill max-desk:top-[31.25%] max-desk:h-[37.6%] max-desk:w-[151.7%]"
+            className="pointer-events-none absolute left-1/2 top-[28.827%] h-[42.344%] w-[118%] max-w-none -translate-x-1/2 object-fill max-desk:top-[31.25%] max-desk:h-[37.6%] max-desk:w-[175%]"
           />
           <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center text-white">
             <div className="flex w-full max-w-[632px] flex-col items-center gap-6">
