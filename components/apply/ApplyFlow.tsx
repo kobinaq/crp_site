@@ -23,6 +23,7 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
   const [skills, setSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryable, setRetryable] = useState(false);
   const [existing, setExisting] = useState(false);
   const [consent, setConsent] = useState(false);
   // Display-only copy of who applied, for the check-email screen.
@@ -32,6 +33,7 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
     if (submitting || !consent) return;
     setSubmitting(true);
     setError(null);
+    setRetryable(false);
     setExisting(false);
     try {
       const result = await startApplication({ ...data, consent, language: data.language });
@@ -62,7 +64,10 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
       setStep("check-email");
     } catch (err) {
       console.error("[apply] submit failed", err);
-      setError(tr("Something went wrong. Please try again."));
+      // Server error / dropped connection: the details are still in the form,
+      // so say so and offer a retry (AboutStep shows it as a toast).
+      setError(tr("We couldn't send your application because of a problem on our side. Your details are still here, so you can try again in a moment."));
+      setRetryable(true);
       setSubmitting(false);
     }
   };
@@ -88,6 +93,11 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
         onSubmit={handleSubmit}
         submitting={submitting}
         error={error}
+        retryable={retryable}
+        onDismissError={() => {
+          setError(null);
+          setRetryable(false);
+        }}
         existing={existing}
       />
     );

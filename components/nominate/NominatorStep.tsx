@@ -6,6 +6,7 @@ import { useState } from "react";
 import { COUNTRIES, type Country } from "@/lib/countries";
 import { CountryDropdown } from "../apply/CountryDropdown";
 import { FormShell } from "../apply/FormShell";
+import { Toast } from "../apply/Toast";
 import { ContinueButton } from "../apply/ContinueButton";
 import { Turnstile, TURNSTILE_SITE_KEY } from "../Turnstile";
 import { FIELD, PLACEHOLDER } from "../apply/fieldStyles";
@@ -27,11 +28,16 @@ export function NominatorStep({
   onSubmit,
   submitting,
   error,
+  retryable = false,
+  onDismissError,
 }: {
   onBack: () => void;
   onSubmit: (data: NominatorData) => void;
   submitting: boolean;
   error: string | null;
+  // Server/network failure: show the error as a toast with Try again (like Apply).
+  retryable?: boolean;
+  onDismissError?: () => void;
 }) {
   const tr = useText();
   const [name, setName] = useState("");
@@ -51,31 +57,54 @@ export function NominatorStep({
   const turnstileReady = !TURNSTILE_SITE_KEY || Boolean(turnstileToken);
   const canSubmit = valid && turnstileReady && !submitting;
 
+  // Any server reply spends the single-use Turnstile token: re-issue the
+  // challenge whenever a new error arrives so Try again has a fresh one.
+  const [challengeKey, setChallengeKey] = useState(0);
+  const [seenError, setSeenError] = useState<string | null>(null);
+  if (error !== seenError) {
+    setSeenError(error);
+    if (error) {
+      setTurnstileToken(null);
+      setChallengeKey((k) => k + 1);
+    }
+  }
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit({
+      nominatorName: name.trim(),
+      nominatorEmail: email.trim(),
+      nominatorPhone: `${dialCountry.dial} ${mobile.trim()}`,
+      nominatorOrganization: organization.trim(),
+      nominatorRelation: relation.trim(),
+      turnstileToken,
+    });
+  };
+
   return (
     <FormShell
       onBack={onBack}
       footer={
         <>
-          {error ? (
+          {error && retryable ? (
+            <Toast
+              variant="error"
+              action={{ label: submitting ? tr("One moment…") : tr("Try again"), onClick: submit }}
+              onClose={() => onDismissError?.()}
+            >
+              {error}
+            </Toast>
+          ) : error ? (
             <p role="alert" className="text-center text-[13px] text-magenta">
               {error}
             </p>
           ) : null}
-          <Turnstile onToken={setTurnstileToken} size="compact" />
+          <Turnstile key={challengeKey} onToken={setTurnstileToken} size="compact" />
           <ContinueButton
             label={submitting ? tr("One moment…") : tr("Continue")}
-            disabled={!canSubmit}
-            onClick={() => {
-              if (!canSubmit) return;
-              onSubmit({
-                nominatorName: name.trim(),
-                nominatorEmail: email.trim(),
-                nominatorPhone: `${dialCountry.dial} ${mobile.trim()}`,
-                nominatorOrganization: organization.trim(),
-                nominatorRelation: relation.trim(),
-                turnstileToken,
-              });
-            }}
+            disabled={!canSubmit || Boolean(error && retryable)}
+            onClick={submit}
+            className={error && retryable ? "pointer-events-none opacity-60 blur-[6px]" : ""}
           />
         </>
       }
@@ -96,7 +125,7 @@ export function NominatorStep({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
+          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
             <input
               type="email"
               value={email}
@@ -121,7 +150,7 @@ export function NominatorStep({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
+          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
             <input
               type="text"
               value={organization}
@@ -131,7 +160,7 @@ export function NominatorStep({
               className={`w-full bg-transparent text-[15px] text-black outline-none ${PLACEHOLDER}`}
             />
           </div>
-          <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
+          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
             <input
               type="text"
               value={relation}

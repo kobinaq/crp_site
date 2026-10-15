@@ -39,7 +39,7 @@ function FloatInput({
   );
 }
 
-type ToastKind = "interest" | "success" | "already-recorded" | "existing" | "link-sent" | "link-failed";
+type ToastKind = "interest" | "interest-failed" | "success" | "already-recorded" | "existing" | "link-sent" | "link-failed" | "submit-failed";
 
 export type AboutData = {
   language: ApplicationLocale;
@@ -64,6 +64,8 @@ export function AboutStep({
   onSubmit,
   submitting,
   error,
+  retryable = false,
+  onDismissError,
   skills,
   existing = false,
 }: {
@@ -71,6 +73,9 @@ export function AboutStep({
   onSubmit: (data: AboutData) => void;
   submitting: boolean;
   error: string | null;
+  // The error came from a server/network failure: show it as a toast with a retry.
+  retryable?: boolean;
+  onDismissError?: () => void;
   skills: string[];
   // The address has already applied: offer to email its owner a resume link.
   existing?: boolean;
@@ -122,7 +127,17 @@ export function AboutStep({
     : followup === "failed" ? "link-failed"
     : existing ? "existing"
     : null;
-  const shown = resumeToast ?? toast;
+  // Any server reply spends the single-use Turnstile token, so a new error
+  // re-issues the challenge before a retry.
+  const [seenError, setSeenError] = useState<string | null>(null);
+  if (error !== seenError) {
+    setSeenError(error);
+    if (error) {
+      setTurnstileToken(null);
+      setChallengeKey((k) => k + 1);
+    }
+  }
+  const shown = resumeToast ?? toast ?? (error && retryable ? "submit-failed" : null);
 
   const valid =
     fullName.trim().length > 0 && EMAIL_RE.test(email.trim()) && /^\d{4}-\d{2}-\d{2}$/.test(dob);
@@ -158,7 +173,14 @@ export function AboutStep({
 
   const handleInterested = async () => {
     if (interestBusy) return;
+    if (TURNSTILE_SITE_KEY && !turnstileToken) return;
     setInterestBusy(true);
+    const failed = () => {
+      setInterestBusy(false);
+      setToast("interest-failed");
+      setTurnstileToken(null);
+      setChallengeKey((k) => k + 1);
+    };
     try {
       const age = ageFromDob(dob);
       const res = await submitInterest({
@@ -170,14 +192,14 @@ export function AboutStep({
         turnstileToken,
       });
       if (!res.ok) {
-        setInterestBusy(false);
+        failed();
         return;
       }
       setToast(res.status === "already_recorded" ? "already-recorded" : "success");
       window.setTimeout(() => router.push(localePath("/", locale)), 3000);
     } catch (err) {
       console.error("[apply] interest failed", err);
-      setInterestBusy(false);
+      failed();
     }
   };
 
@@ -303,7 +325,7 @@ export function AboutStep({
                 </div>
               ) : null}
 
-              {error ? (
+              {error && !retryable ? (
                 <p role="alert" className="text-center text-[13px] text-magenta">
                   {error}
                 </p>
@@ -327,6 +349,20 @@ export function AboutStep({
             onClose={() => setToast(null)}
           >
             {tr("This program is only for 19-26 year old individuals. To stay updated on upcoming programs you'll be eligible for, click on the I'm interested button.")}</Toast>
+        ) : shown === "interest-failed" ? (
+          <Toast
+            variant="error"
+            action={{ label: interestBusy ? tr("Sending…") : tr("Try again"), onClick: handleInterested }}
+            onClose={() => setToast(null)}
+          >
+            {tr("We couldn't save your interest just now. Nothing was lost; please try again in a moment.")}</Toast>
+        ) : shown === "submit-failed" ? (
+          <Toast
+            variant="error"
+            action={{ label: submitting ? tr("One moment…") : tr("Try again"), onClick: handleSubmit }}
+            onClose={() => onDismissError?.()}
+          >
+            {error}</Toast>
         ) : shown === "success" ? (
           <Toast variant="success" onClose={() => setToast(null)}>
             {tr("Your interest has been recorded, stay tuned for future programs. We hope to see you very soon!")}</Toast>

@@ -56,7 +56,6 @@ export function NomineeStep({
       footer={
         <ContinueButton
           label={tr("Continue")}
-          selectedCount={1}
           disabled={!valid}
           onClick={() => {
             if (!valid) return;
@@ -80,7 +79,7 @@ export function NomineeStep({
 
       <div className="mt-5 flex flex-col gap-1.5 desk:mt-7 desk:gap-2">
         <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
+          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
             <input
               type="text"
               value={name}
@@ -94,7 +93,7 @@ export function NomineeStep({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
-          <div className={`${FIELD} min-w-0 flex-1 pl-5 pr-6`}>
+          <div className={`${FIELD} min-w-0 shrink-0 pl-5 pr-6 desk:shrink desk:flex-1`}>
             <input
               type="email"
               value={email}
