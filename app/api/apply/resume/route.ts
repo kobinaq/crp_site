@@ -6,6 +6,7 @@ import { hashToken, redeemAccessToken } from "@/lib/access";
 import { nextStepUrl } from "@/lib/application";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { checkOrigin, INVALID_ORIGIN } from "@/lib/request-origin";
+import { allows, CONSENT_COOKIE, parseConsent } from "@/lib/consent";
 import { SESSION_COOKIE, sessionCookieOptions, signSession, verifySession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -49,7 +50,11 @@ function landing(req: NextRequest, redeemed: NonNullable<Redeemed>, status: 302 
   const res = NextResponse.redirect(new URL(nextStepUrl(applicant), req.nextUrl.origin), status);
   if (signIn) {
     res.cookies.set(SESSION_COOKIE, signSession(applicant.id, applicant.sessionVersion), sessionCookieOptions());
-    res.cookies.set(LOCALE_COOKIE, applicant.language, { path: "/", sameSite: "lax", maxAge: 31536000, secure: process.env.NODE_ENV === "production" });
+    // crp-locale is a functional cookie: only with the visitor's crp-consent.
+    // The redirect already carries the locale, so nothing depends on it here.
+    if (allows(parseConsent(req.cookies.get(CONSENT_COOKIE)?.value), "functional")) {
+      res.cookies.set(LOCALE_COOKIE, applicant.language, { path: "/", sameSite: "lax", maxAge: 31536000, secure: process.env.NODE_ENV === "production" });
+    }
   }
   return res;
 }
