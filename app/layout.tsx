@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { requestLocale, requestPath } from "@/lib/request-locale";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { ConsentProvider } from "@/components/cookies/ConsentProvider";
 import { copyFor } from "@/lib/messages";
 import { outfit } from "@/lib/fonts";
 import "./globals.css";
@@ -21,7 +22,7 @@ export default async function RootLayout({
           initialPath={await requestPath()}
           copy={copyFor(locale)}
         >
-          {children}
+          <ConsentProvider>{children}</ConsentProvider>
         </LanguageProvider>
       </body>
     </html>
