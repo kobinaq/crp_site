@@ -1228,7 +1228,9 @@ test("Spanish applicants confirm ownership before the form advances", async () =
   const link = new URL(sent.payload.html.match(/href="([^"]+\/api\/apply\/resume[^"]+)"/)[1]);
   assert.equal(link.searchParams.get("lang"), "es");
   const confirmed = await h.resume(link.searchParams.get("token"));
-  assert.equal(confirmed.setCookies.find(([name]) => name === "crp-locale")[1], "es");
+  // No crp-consent on this request, so the functional crp-locale cookie is not set.
+  assert.ok(confirmed.setCookies.some(([name]) => name === "crp_session"));
+  assert.equal(confirmed.setCookies.some(([name]) => name === "crp-locale"), false);
   const { videoaskReference, videoaskLink } = h.load("lib/videoask.ts");
   assert.match(videoaskLink(a.id), /form#application_ref=/);
   const send = (formId, reference = videoaskReference(a.id)) => h.load("app/api/webhooks/videoask/route.ts").POST(h.req("/api/webhooks/videoask", {
