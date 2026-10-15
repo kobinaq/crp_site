@@ -16,7 +16,6 @@ import { TicketTab } from "./TicketTab";
 import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
 import { submitWaitlist } from "@/lib/actions";
 import { useCaptureSubmission } from "./useCaptureSubmission";
-import { useIsMobile } from "@/lib/useIsMobile";
 
 /** Figma card edge length — internals are authored at this size. */
 const DESIGN = 536;
@@ -154,11 +153,11 @@ function YouthContent({ onNavigate, compact = false }: { onNavigate?: () => void
         />
         {/* Desktop (Figma 2308:444): close-up group selfie. */}
         <Image
-          src="/images/d.jpg"
+          src="/images/youth-selfie.jpg"
           alt={copy.involved.youthAlt}
           fill
           sizes="536px"
-          className="hidden object-cover desk:block"
+          className="hidden object-cover object-top desk:block"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/45" />
       </div>
@@ -297,7 +296,7 @@ export function PartnerCard({
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Contact page mobile (Figma 2282:11398): 297×294 "Join the waitlist" card with an email field. */
+/** Contact page (mobile Figma 2282:11398: 297×294; desktop Figma 2308:7412: square blob like Partner up): "Join the waitlist" card with an email field. */
 export function WaitlistCard() {
   const copy = useCopy();
   const { locale } = useLanguage();
@@ -306,8 +305,6 @@ export function WaitlistCard() {
   const [invalid, setInvalid] = useState(false);
   const [done, setDone] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  // Card is CSS-hidden on desktop; only mount the challenge where it's visible.
-  const isMobile = useIsMobile();
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -324,23 +321,23 @@ export function WaitlistCard() {
   };
 
   return (
-    <div className="relative h-[294px] w-full overflow-hidden rounded-[88px]">
+    <div className="relative h-[294px] w-full overflow-hidden rounded-[88px] desk:mx-auto desk:aspect-square desk:h-auto desk:rounded-blob-lg">
       <Image
         src="/images/waitlist.jpg"
         alt={copy.waitlist.photoAlt}
         fill
-        sizes="297px"
+        sizes="(min-width: 900px) 536px, 297px"
         className="object-cover"
       />
-      <div className="absolute inset-x-6 top-3 bottom-[84px] flex items-center justify-center">
-        <p className="text-center text-[20px] leading-[0.9] tracking-[-0.8px] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.35)]">
+      <div className="absolute inset-x-6 top-3 bottom-[84px] flex items-center justify-center desk:inset-x-8 desk:inset-y-0">
+        <p className={`text-center text-[20px] leading-[0.9] tracking-[-0.8px] text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.35)] desk:text-[clamp(24px,3.4vw,40px)] desk:tracking-[-0.04em]`}>
           {done ? copy.waitlist.checkEmail : copy.waitlist.title}
         </p>
       </div>
       <form
         noValidate
         onSubmit={onSubmit}
-        className="absolute left-1/2 top-[221.5px] w-[207px] -translate-x-1/2"
+        className="absolute left-1/2 top-[221.5px] w-[207px] -translate-x-1/2 desk:bottom-[7.5%] desk:top-auto desk:h-[15%] desk:w-[73%]"
       >
         <label className="sr-only" htmlFor="contact-waitlist-email">
           {copy.waitlist.emailPlaceholder}
@@ -359,12 +356,12 @@ export function WaitlistCard() {
             if (invalid) setInvalid(!EMAIL_RE.test(event.target.value.trim()));
           }}
           placeholder={`*${copy.waitlist.emailPlaceholder}`}
-          className={`h-[61px] w-full rounded-[48px] border bg-white pl-6 pr-8 text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px] text-black outline-none placeholder:text-black/48 focus-visible:ring-2 focus-visible:ring-white ${
+          className={`h-[61px] w-full rounded-[48px] border bg-white pl-6 pr-8 text-[12px] desk:h-full desk:rounded-full desk:pl-8 desk:text-[14px] desk:tracking-[0.56px] font-semibold uppercase leading-[0.9] tracking-[0.48px] text-black outline-none placeholder:text-black/48 focus-visible:ring-2 focus-visible:ring-white ${
             invalid ? "border-magenta" : "border-black/12"
           }`}
         />
       </form>
-      {isMobile ? <Turnstile key={challengeKey} onToken={setToken} /> : null}
+      <Turnstile key={challengeKey} onToken={setToken} />
       {error ? (
         <p role="alert" className="sr-only">
           {copy.waitlist.saveError}

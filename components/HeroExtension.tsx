@@ -66,27 +66,6 @@ export function HeroExtension() {
             <CaretDown />
           </SectionReveal>
         </div>
-        {/* Desktop (Figma 2308:167): the next square peeks out under the pavilion. */}
-        <div
-          aria-hidden
-          className="relative hidden w-full overflow-hidden desk:block"
-          style={{
-            height: "calc(var(--card-w) * 0.212)",
-            borderTopLeftRadius: "var(--card-r)",
-            borderTopRightRadius: "var(--card-r)",
-          }}
-        >
-          <div className="absolute inset-x-0 top-0 aspect-square">
-            <Image
-              src="/images/signal-field.jpg"
-              alt=""
-              fill
-              sizes="561px"
-              className="scale-y-[-1] object-cover"
-            />
-            <div className="absolute inset-0 bg-black/55" />
-          </div>
-        </div>
       </div>
     </section>
   );
