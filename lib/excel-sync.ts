@@ -20,6 +20,26 @@ const PAGE_SIZE = 100;
 const LOCK_MS = 4 * 60 * 1000;
 const TABLES: SyncTable[] = ["applicants", "waitlist", "interest", "nominations", "partners"];
 
+// Test records (QA uses addresses like crp-qa+crptest1@...) never reach the
+// review workbook. SYNC_EXCLUDE_EMAIL_PATTERN is a comma-separated list of
+// case-insensitive substrings matched against every email on the row; it
+// defaults to "+crptest", and an explicit empty value turns exclusion off.
+// Skipped changes still advance the cursor, so they are never retried.
+const EMAIL_FIELDS = ["email", "nominatorEmail", "nomineeEmail"];
+
+export function syncExcludePatterns(): string[] {
+  const raw = process.env.SYNC_EXCLUDE_EMAIL_PATTERN ?? "+crptest";
+  return raw.split(",").map((part) => part.trim().toLowerCase()).filter(Boolean);
+}
+
+export function excludedFromSync(payload: Record<string, unknown>, patterns = syncExcludePatterns()): boolean {
+  if (!patterns.length) return false;
+  return EMAIL_FIELDS.some((field) => {
+    const value = payload[field];
+    return typeof value === "string" && patterns.some((pattern) => value.toLowerCase().includes(pattern));
+  });
+}
+
 export type TableSnapshot = {
   headers: string[];
   rows: { index: number; values: Cell[] }[];
@@ -136,11 +156,12 @@ async function pullTable(db: Db, workbook: ReviewWorkbook, table: SyncTable) {
   }
 
   const writable = table === "applicants" ? APPLICANT_SYSTEM : null;
+  const patterns = syncExcludePatterns();
   let count = 0;
   for (const change of page.rows) {
     const payload = change.payload as Record<string, unknown>;
     const id = typeof payload.id === "string" ? payload.id : "";
-    if (!id) continue;
+    if (!id || excludedFromSync(payload, patterns)) continue;
     const existingIndex = byId.get(id);
     const existing = existingIndex === undefined ? null : sheet.rows.find((row) => row.index === existingIndex)?.values ?? null;
     let values = mergeRow(sheet.headers, existing, payload, writable);

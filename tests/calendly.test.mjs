@@ -7,9 +7,9 @@ const CALENDLY = ["CALENDLY_ENABLED", "CALENDLY_URL_EN", "CALENDLY_URL_FR", "CAL
 async function withEnv(values, fn) {
   const keys = Object.keys(values);
   const before = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
-  for (const k of keys) values[k] === undefined ? delete process.env[k] : (process.env[k] = values[k]);
+  for (const k of keys) { if (values[k] === undefined) delete process.env[k]; else process.env[k] = values[k]; }
   try { return await fn(); } finally {
-    for (const k of keys) before[k] === undefined ? delete process.env[k] : (process.env[k] = before[k]);
+    for (const k of keys) { if (before[k] === undefined) delete process.env[k]; else process.env[k] = before[k]; }
   }
 }
 const unset = Object.fromEntries(CALENDLY.map((k) => [k, undefined]));

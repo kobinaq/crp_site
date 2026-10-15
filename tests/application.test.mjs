@@ -244,6 +244,37 @@ test("an existing email grants no session and no email; a resume link is single-
   assert.match(replay.url, /resume=expired/);
 });
 
+test("email confirmation POSTs accept same-origin and null-origin-with-valid-token only", async () => {
+  const a = await h.apply();
+  const database = h.load("lib/db/index.ts").getDb();
+  const issue = async () => (await database.transaction((tx) => h.load("lib/access.ts").issueAccessToken(tx, a.id, "resume", 600))).raw;
+  const resume = h.load("app/api/apply/resume/route.ts");
+  const post = (token, headers) => resume.POST(h.req("/api/apply/resume", { headers, body: new URLSearchParams({ token }).toString() }));
+  const landed = (res) => res.url === "https://example.invalid/apply/continue";
+  h.state.ip = "198.51.100.77";
+
+  assert.equal(resume.GET(h.req("/api/apply/resume?token=x")).headers.get("referrer-policy"), "same-origin");
+  const first = await post(await issue(), { origin: "https://example.invalid" });
+  assert.ok(landed(first), "matching origin");
+  assert.ok(landed(await post(await issue(), { origin: "null" })), "null origin with a valid token");
+  assert.ok(landed(await post(await issue(), { origin: "null", "sec-fetch-site": "same-origin" })), "null origin, same-origin fetch metadata");
+  const bogus = await post("A".repeat(43), { origin: "null" });
+  assert.equal(bogus.status, 403);
+  assert.deepEqual(bogus.body, { error: "invalid origin" });
+  const crossToken = await issue();
+  assert.equal((await post(crossToken, { origin: "https://evil.invalid" })).status, 403);
+  assert.equal((await post(crossToken, { origin: "null", "sec-fetch-site": "cross-site" })).status, 403);
+  assert.equal((await post(crossToken, { origin: "https://example.invalid", "sec-fetch-site": "cross-site" })).status, 403);
+  assert.ok(landed(await post(crossToken, {})), "a rejected cross-site attempt does not burn the token");
+
+  const capture = h.load("app/api/capture/confirm/route.ts");
+  const confirm = (token, headers) => capture.POST(h.req("/api/capture/confirm", { headers, body: new URLSearchParams({ token }).toString() }));
+  assert.equal(capture.GET(h.req("/api/capture/confirm?token=x")).headers.get("referrer-policy"), "same-origin");
+  assert.equal((await confirm("A".repeat(43), { origin: "null" })).status, 403);
+  assert.equal((await confirm("A".repeat(43), { origin: "https://evil.invalid" })).status, 403);
+  assert.match((await confirm("A".repeat(43), { origin: "https://example.invalid" })).url, /result=expired/);
+});
+
 test("the verify hand-off trusts the signed session, never the echoed applicant id", async () => {
   const a = await h.apply();
   const { signSession } = h.load("lib/session.ts");
@@ -813,6 +844,26 @@ test("decision ids cannot be reused for another applicant, including concurrent 
   const decisionId = randomUUID();
   const results = await Promise.all([a, b].map((applicant) => h.decisions([{ applicantId: applicant.id, decisionId, version: 0, reviewDecision: "accept" }])));
   assert.deepEqual(results.map((result) => result.body.outcomes[0].result).sort(), ["applied", "conflict"]);
+});
+
+test("Excel sync skips test addresses, configurable via SYNC_EXCLUDE_EMAIL_PATTERN", () => {
+  const { excludedFromSync, syncExcludePatterns } = h.load("lib/excel-sync.ts");
+  const before = process.env.SYNC_EXCLUDE_EMAIL_PATTERN;
+  try {
+    delete process.env.SYNC_EXCLUDE_EMAIL_PATTERN;
+    assert.deepEqual(syncExcludePatterns(), ["+crptest"]);
+    assert.equal(excludedFromSync({ email: "CRP-QA+CrpTest3@mail.grokbot.com" }), true);
+    assert.equal(excludedFromSync({ nominatorEmail: "real@example.org", nomineeEmail: "x+crptest@example.org" }), true);
+    assert.equal(excludedFromSync({ email: "applicant@example.org" }), false);
+    process.env.SYNC_EXCLUDE_EMAIL_PATTERN = " @qa.invalid , +e2e ";
+    assert.equal(excludedFromSync({ email: "a@qa.invalid" }), true);
+    assert.equal(excludedFromSync({ email: "a+crptest@example.org" }), false);
+    process.env.SYNC_EXCLUDE_EMAIL_PATTERN = "";
+    assert.equal(excludedFromSync({ email: "a+crptest@example.org" }), false);
+  } finally {
+    if (before === undefined) delete process.env.SYNC_EXCLUDE_EMAIL_PATTERN;
+    else process.env.SYNC_EXCLUDE_EMAIL_PATTERN = before;
+  }
 });
 
 test("Excel rotates past 200 completed or invalid decisions to reach later applicants", async () => {
