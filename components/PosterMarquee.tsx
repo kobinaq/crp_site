@@ -119,9 +119,15 @@ function PosterList({
   orientation: Orientation;
 }) {
   const copy = useCopy();
+  // Desktop column opens on "I wish I knew" (Figma 2308:298); the mobile row keeps the list order.
+  const start =
+    orientation === "vertical"
+      ? Math.max(0, contentPosters.findIndex((p) => p.kind === "wish"))
+      : 0;
+  const posters = [...contentPosters.slice(start), ...contentPosters.slice(0, start)];
   return (
     <>
-      {contentPosters.map((poster) => (
+      {posters.map((poster) => (
         <ContentPoster
           key={`${copyIndex}-${poster.kind}`}
           image={poster.image}

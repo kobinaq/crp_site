@@ -22,7 +22,8 @@ const OPEN_EVENT = "get-involved:open";
 type PillMode = "docked" | "riding" | "immersed" | "leaving";
 
 function readMode(): PillMode {
-  const section = document.getElementById("join");
+  // Hands off to a docked tab (data-pill-handoff) when a page has one; Home no longer does (Figma 2308:547).
+  const section = document.querySelector<HTMLElement>("[data-pill-handoff]");
   if (!section) return "docked";
 
   const vh = window.innerHeight;

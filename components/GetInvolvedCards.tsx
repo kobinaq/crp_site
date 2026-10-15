@@ -24,7 +24,7 @@ const DESIGN = 536;
 const CARD = "group relative aspect-square overflow-hidden";
 const CARD_SHELL = "group relative aspect-square";
 const SECTION_SIZE =
-  "rounded-[88px] desk:rounded-blob-lg desk:mx-auto desk:max-h-[calc(100svh-11rem)] desk:w-full desk:max-w-[calc(100svh-11rem)]";
+  "rounded-[88px] desk:rounded-blob-lg desk:mx-auto desk:w-full";
 const POPUP_SHELL =
   "mx-auto w-full max-w-[536px] desk:mx-0 desk:h-full desk:max-h-[536px] desk:w-auto desk:max-w-[min(536px,50%)]";
 
@@ -150,7 +150,15 @@ function YouthContent({ onNavigate, compact = false }: { onNavigate?: () => void
           alt={copy.involved.youthAlt}
           fill
           sizes="(min-width: 900px) 536px, 90vw"
-          className="object-cover"
+          className="object-cover desk:hidden"
+        />
+        {/* Desktop (Figma 2308:444): close-up group selfie. */}
+        <Image
+          src="/images/d.jpg"
+          alt={copy.involved.youthAlt}
+          fill
+          sizes="536px"
+          className="hidden object-cover desk:block"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/45" />
       </div>

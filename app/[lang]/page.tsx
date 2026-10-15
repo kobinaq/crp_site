@@ -31,8 +31,8 @@ export default function Home() {
         <ContentGrid />
         <GetInvolved compactMobile />
         <Waitlist />
-        {/* Mobile: Figma slogan ticker (shared with About); partners band stays hidden. */}
-        <AboutTicker className="pt-16" />
+        {/* Figma slogan ticker (shared with About); partners band stays hidden. */}
+        <AboutTicker desktop className="pt-16 desk:pb-[160px] desk:pt-0" />
         <Sponsors />
       </main>
       <Footer />
