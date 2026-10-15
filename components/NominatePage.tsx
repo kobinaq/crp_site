@@ -36,6 +36,11 @@ function NominateCta({ onExpress, nominate }: { onExpress: () => void; nominate:
   const text = nominate ? tr("Nominate") : copy.apply.interest;
   const label =
     "text-[16px] font-semibold uppercase leading-[0.9] tracking-[0.64px] mix-blend-hard-light whitespace-nowrap desk:text-[20px] desk:tracking-[0.8px]";
+  // Long labels (fr "Proposer une candidature") would be clipped on one line in
+  // the pill: let them wrap onto two balanced lines, a touch smaller on mobile.
+  const longLabel =
+    "text-center text-[14px] font-semibold uppercase leading-[0.95] tracking-[0.56px] mix-blend-hard-light text-balance desk:text-[20px] desk:tracking-[0.8px]";
+  const long = text.length > 16;
 
   return (
     <div
@@ -49,7 +54,7 @@ function NominateCta({ onExpress, nominate }: { onExpress: () => void; nominate:
         style={{ backgroundImage: APPLY_GRADIENT }}
       >
         <span
-          className={`${label} px-4 text-white transition-opacity ${CTA_REVEAL} group-hover:opacity-0 group-focus-within:opacity-0`}
+          className={`${long ? `${longLabel} px-2 desk:px-4` : `${label} px-4`} text-white transition-opacity ${CTA_REVEAL} group-hover:opacity-0 group-focus-within:opacity-0`}
         >
           {text}
         </span>
