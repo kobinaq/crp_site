@@ -4,6 +4,8 @@ import Link from "@/components/LocaleLink";
 import { t } from "@/lib/messages";
 import { Logo } from "./Logo";
 import { useCopy } from "./LanguageProvider";
+import { useConsent } from "./cookies/ConsentProvider";
+import { useText } from "@/lib/ui-text";
 
 /**
  * Footer — Figma 71EZfqbpz5kmSX767kSuEV, section 2308:12927
@@ -11,6 +13,7 @@ import { useCopy } from "./LanguageProvider";
  */
 
 /** Routes for copy.footer.sections, by section then link. "#" = no page yet. */
+/** Legal (index 1) also gets a "Cookie preferences" button that reopens the consent panel. */
 const SECTION_HREFS = [
   ["/", "/about", "/programs"],
   ["/privacy", "#"],
@@ -45,6 +48,8 @@ export function Footer({
   pillSpace?: boolean;
 } = {}) {
   const copy = useCopy();
+  const tr = useText();
+  const { openPreferences } = useConsent();
   const year = new Date().getFullYear();
   const { sections, getInTouch } = copy.footer;
 
@@ -83,6 +88,13 @@ export function Footer({
                         </li>
                       );
                     })}
+                    {sectionIndex === 1 ? (
+                      <li className="min-w-0">
+                        <button type="button" onClick={openPreferences} className={`${LINK} text-left`}>
+                          {tr("Cookie preferences")}
+                        </button>
+                      </li>
+                    ) : null}
                   </ul>
                 </div>
               ))}
