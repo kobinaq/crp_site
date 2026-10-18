@@ -21,7 +21,7 @@ export function RedirectingStep({
 }) {
   return (
     <FormShell fill wide onBack={onBack} footer={<div aria-hidden className="h-4 desk:h-20" />}>
-      <div className="flex h-full min-h-[60dvh] flex-col items-center justify-center gap-6 px-2 text-center text-black desk:min-h-0 desk:gap-8">
+      <div className="flex h-full min-h-[60dvh] flex-col items-center justify-center gap-6 px-6 text-center text-black desk:min-h-0 desk:gap-8 desk:px-2">
         <p
           role="status"
           className="max-w-[632px] text-[32px] leading-[0.9] tracking-[-1.28px] desk:text-[48px] desk:tracking-[-1.92px]"

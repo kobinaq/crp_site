@@ -5,7 +5,8 @@ import { useText } from "@/lib/ui-text";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-// Step 1 of the application: Terms of application (Figma 2184:4820).
+// Step 1 of the application: Terms of application (Figma 2184:4820; mobile is
+// the bottom sheet 2308:10358: grab handle, 600px tall, 32px top corners).
 // Scrollable consent copy, an "Accept and continue" checkbox, and an APPLY
 // button that stays disabled (black/32) until the box is checked, then turns
 // into the brand gradient.
@@ -36,7 +37,7 @@ export function TermsStep({
   }, [onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center desk:items-center desk:p-4">
       <button
         type="button"
         aria-label={tr("Close")}
@@ -48,13 +49,16 @@ export function TermsStep({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[90dvh] w-full max-w-[590px] flex-col overflow-hidden rounded-[48px] bg-white shadow-[0_4px_27.6px_rgba(0,0,0,0.25)] desk:h-[805px] desk:rounded-[88px]"
+        className="relative z-10 flex h-[600px] max-h-[calc(100dvh-24px)] w-full flex-col overflow-hidden rounded-t-[32px] bg-white desk:max-h-[90dvh] desk:max-w-[590px] desk:h-[805px] desk:rounded-[88px] desk:shadow-[0_4px_27.6px_rgba(0,0,0,0.25)]"
       >
+        {/* Mobile grab handle (Figma 2308:10358). */}
+        <span aria-hidden className="absolute left-1/2 top-2 h-1 w-20 -translate-x-1/2 rounded-[8px] bg-black/8 desk:hidden" />
+
         {/* Header */}
-        <div className="relative flex shrink-0 items-center justify-end p-6 desk:p-8">
+        <div className="relative mt-2 flex h-[72px] shrink-0 items-center justify-end px-6 desk:mt-0 desk:h-auto desk:p-8">
           <h2
             id={titleId}
-            className="pointer-events-none absolute inset-x-16 text-center text-[24px] leading-[0.9] tracking-[-1.28px] text-black desk:inset-x-2 desk:text-[32px]"
+            className="pointer-events-none absolute inset-x-16 text-center text-[24px] leading-none tracking-[-0.96px] text-black desk:inset-x-2 desk:text-[32px] desk:leading-[0.9] desk:tracking-[-1.28px]"
           >
             {tr("Terms of application")}</h2>
           <button
@@ -62,7 +66,7 @@ export function TermsStep({
             type="button"
             onClick={onClose}
             aria-label={tr("Close")}
-            className="relative grid size-12 shrink-0 place-items-center rounded-full text-black outline-none focus-visible:ring-2 focus-visible:ring-black desk:size-[72px]"
+            className="relative grid size-12 shrink-0 place-items-center rounded-full text-black opacity-0 outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-black desk:size-[72px] desk:opacity-100"
           >
             <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
               <path
@@ -77,7 +81,7 @@ export function TermsStep({
 
         {/* Scrollable consent copy */}
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pb-[64px] desk:px-8 desk:pb-[104px]">
-          <div className="space-y-3 text-[16px] leading-[1.2] tracking-[-0.8px] text-black/72 desk:text-[20px]">
+          <div className="space-y-3 text-[15px] leading-[1.4] tracking-[-0.6px] text-black/84 desk:text-[20px] desk:leading-[1.2] desk:tracking-[-0.8px] desk:text-black/72">
             <p>
               {tr("By accepting, I consent to my personal data being processed to assess my application and contact me about the program.")}</p>
             <p>
@@ -88,19 +92,19 @@ export function TermsStep({
         </div>
 
         {/* Cream bottom bar overlaps the scroll area so copy shows behind its rounded corners (Figma 2308:6794). */}
-        <div className="relative z-10 -mt-[48px] flex shrink-0 flex-col items-center justify-center gap-6 rounded-t-[48px] bg-cream p-6 desk:-mt-[88px] desk:gap-8 desk:rounded-t-[88px] desk:p-8">
+        <div className="relative z-10 -mt-[44px] flex shrink-0 flex-col items-center justify-center gap-6 rounded-t-[44px] bg-cream px-2 pb-2 pt-6 desk:-mt-[88px] desk:gap-8 desk:rounded-t-[88px] desk:p-8">
           <button
             type="button"
             onClick={() => setAccepted((v) => !v)}
             aria-pressed={accepted}
-            className="flex items-center justify-center gap-3 px-8"
+            className="flex items-center justify-center gap-2 px-8 desk:gap-3"
           >
             <span
               aria-hidden
-              className={`grid size-6 shrink-0 place-items-center rounded-[8px] border-2 border-black ${accepted ? "bg-black" : "bg-transparent"}`}
+              className={`grid size-4 shrink-0 place-items-center rounded-[5.333px] border-[1.333px] border-black desk:size-6 desk:rounded-[8px] desk:border-2 ${accepted ? "bg-black" : "bg-transparent"}`}
             >
               {accepted ? (
-                <svg viewBox="0 0 18 13" className="size-3.5" fill="none" aria-hidden>
+                <svg viewBox="0 0 18 13" className="size-[10.667px] desk:size-3.5" fill="none" aria-hidden>
                   <path
                     d="M2 7l4.5 4L16 2"
                     stroke="#fff"
@@ -111,7 +115,7 @@ export function TermsStep({
                 </svg>
               ) : null}
             </span>
-            <span className="text-[16px] leading-[1.2] tracking-[-0.8px] text-black desk:text-[20px]">
+            <span className="text-[15px] leading-[1.2] tracking-[-0.6px] text-black desk:text-[20px] desk:tracking-[-0.8px]">
               {tr("Accept and continue")}</span>
           </button>
 
@@ -119,9 +123,9 @@ export function TermsStep({
             type="button"
             disabled={!accepted}
             onClick={() => accepted && onAccept()}
-            className={`flex h-[68px] w-full items-center justify-center rounded-full desk:h-20 ${accepted ? "gradient-brand" : "bg-black opacity-[0.32]"}`}
+            className={`flex h-16 w-full items-center justify-center rounded-full desk:h-20 ${accepted ? "gradient-brand" : "bg-black opacity-[0.32]"}`}
           >
-            <span className="text-[20px] font-semibold uppercase leading-[0.9] tracking-[0.8px] text-white mix-blend-hard-light">
+            <span className="text-[15px] font-semibold uppercase leading-[0.9] tracking-[0.6px] text-white mix-blend-hard-light desk:text-[20px] desk:tracking-[0.8px]">
               {tr("Apply")}</span>
           </button>
         </div>

@@ -20,7 +20,10 @@ export function FormShell({
   children: ReactNode;
   footer?: ReactNode;
   fill?: boolean;
-  /** Desktop layout from Figma 2308:2048 (Skills step): 88px header, 1072px panel, 154px radius. Mobile unchanged. */
+  /**
+   * Apply-flow layout. Desktop: Figma 2308:2048 (Skills step), 88px header, 1072px panel, 154px radius.
+   * Mobile: Figma 2308:10372, 88px panel radius with 32px vertical padding; children own horizontal padding.
+   */
   wide?: boolean;
   /**
    * Phones only (Figma 2308:9574, nomination flow): 68px header with 32px gutters, a
@@ -41,36 +44,68 @@ export function FormShell({
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex h-dvh flex-col overflow-hidden bg-cream">
-      <header className={`flex shrink-0 items-center justify-between px-4 py-2.5 ${mobileCard ? "max-desk:h-[68px] max-desk:px-8 max-desk:py-0" : ""} ${wide ? "desk:h-[88px] desk:px-16 desk:py-6" : "desk:px-12 desk:py-3"}`}>
+      <header
+        className={`flex shrink-0 items-center justify-between ${
+          mobileCard
+            ? "px-4 py-2.5 max-desk:h-[68px] max-desk:px-8 max-desk:py-0"
+            : "h-[68px] px-8"
+        } ${wide ? "desk:h-[88px] desk:px-16 desk:py-6" : "desk:h-auto desk:px-12 desk:py-3"}`}
+      >
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
             aria-label={tr("Back")}
-            className={`grid size-9 place-items-center rounded-full bg-white shadow-sm ${mobileCard ? "max-desk:size-8 max-desk:shadow-none" : ""} ${wide ? "desk:size-10" : ""} transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105 active:scale-95`}
+            className={`grid place-items-center rounded-full bg-white transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105 active:scale-95 ${
+              mobileCard
+                ? `size-9 shadow-sm max-desk:size-8 max-desk:shadow-none ${wide ? "desk:size-10" : ""}`
+                : `size-8 desk:shadow-sm ${wide ? "desk:size-10" : "desk:size-9"}`
+            }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/apply/arrow-left.svg" alt="" width={20} height={20} className={`size-5 ${mobileCard ? "max-desk:size-4" : ""} ${wide ? "desk:size-6" : ""}`} />
+            <img
+              src="/icons/apply/arrow-left.svg"
+              alt=""
+              width={20}
+              height={20}
+              className={
+                mobileCard
+                  ? `size-5 max-desk:size-4 ${wide ? "desk:size-6" : ""}`
+                  : `size-4 ${wide ? "desk:size-6" : "desk:size-5"}`
+              }
+            />
           </button>
         ) : (
           <span className={`size-9 ${mobileCard ? "max-desk:size-8" : ""}`} />
         )}
 
-        <div className={`flex items-center rounded-full bg-white p-1 ${mobileCard ? "max-desk:h-[27px] max-desk:p-[2px]" : ""}`}>
+        <div
+          className={
+            mobileCard
+              ? "flex items-center rounded-full bg-white p-1 max-desk:h-[27px] max-desk:p-[2px]"
+              : "flex h-[27px] items-center rounded-full bg-white p-0.5 desk:h-auto desk:p-1"
+          }
+        >
           {applicationLocales.map((code) => (
             <button
               key={code}
               type="button"
               onClick={() => setLocale(code)}
               aria-pressed={locale === code}
-              className={`h-7 rounded-full px-3.5 text-[12px] font-semibold uppercase tracking-[0.04em] transition-colors ${
+              className={`rounded-full text-[12px] font-semibold uppercase transition-colors ${
                 mobileCard
-                  ? `max-desk:h-full max-desk:leading-[0.9] max-desk:tracking-[0.48px] ${locale === code ? "max-desk:px-2" : "max-desk:w-8 max-desk:px-0 max-desk:text-black/48"}`
-                  : ""
+                  ? `h-7 px-3.5 tracking-[0.04em] max-desk:h-full max-desk:leading-[0.9] max-desk:tracking-[0.48px] ${
+                      locale === code ? "max-desk:px-2" : "max-desk:w-8 max-desk:px-0 max-desk:text-black/48"
+                    } ${wide ? "desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:tracking-[0.56px]" : ""}`
+                  : `h-full min-w-8 px-2 leading-[0.9] tracking-[0.48px] ${
+                      wide
+                        ? "desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:leading-normal desk:tracking-[0.56px]"
+                        : "desk:h-7 desk:min-w-0 desk:px-3.5 desk:leading-normal desk:tracking-[0.04em]"
+                    }`
               } ${
-                wide ? "desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:tracking-[0.56px]" : ""
-              } ${
-                locale === code ? "bg-black text-white" : "bg-transparent text-black/50 hover:bg-black/5 hover:text-black"
+                locale === code
+                  ? "bg-black text-white"
+                  : "bg-transparent text-black/48 hover:bg-black/5 hover:text-black desk:text-black/50"
               }`}
             >
               {code}
@@ -85,15 +120,15 @@ export function FormShell({
         }`}
       >
         <div
-          className={`w-full min-w-0 rounded-[36px] bg-white px-5 py-5 ${
-            mobileCard ? "max-desk:flex max-desk:flex-col max-desk:overflow-y-auto max-desk:overscroll-contain max-desk:rounded-[88px] max-desk:px-0 max-desk:py-8" : ""
+          className={`w-full min-w-0 bg-white ${
+            mobileCard
+              ? "rounded-[36px] px-5 py-5 max-desk:flex max-desk:flex-col max-desk:overflow-y-auto max-desk:overscroll-contain max-desk:rounded-[88px] max-desk:px-0 max-desk:py-8"
+              : ""
           } ${
             wide
-              ? "max-w-[1072px] desk:rounded-[154px] desk:px-10 desk:py-16"
-              : "max-w-[960px] desk:rounded-[64px] desk:px-0 desk:py-8"
-          } ${
-            fill ? "flex h-full min-h-0 flex-col" : ""
-          }`}
+              ? "max-w-[1072px] overflow-hidden rounded-[88px] py-8 desk:overflow-visible desk:rounded-[154px] desk:px-10 desk:py-16"
+              : "max-w-[960px] rounded-[36px] px-5 py-5 desk:rounded-[64px] desk:px-0 desk:py-8"
+          } ${fill ? "flex h-full min-h-0 flex-col" : ""}`}
         >
           <div
             className={`mx-auto flex w-full min-w-0 max-w-[632px] flex-col ${mobileCard ? "max-desk:flex-1" : ""} ${
@@ -106,7 +141,13 @@ export function FormShell({
       </main>
 
       {footer ? (
-        <footer className={`flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1 ${mobileCard ? "max-desk:p-2" : ""} ${wide ? "desk:p-[10px]" : ""}`}>
+        <footer
+          className={`flex shrink-0 flex-col items-center gap-1.5 ${
+            mobileCard
+              ? "px-2.5 pb-2.5 pt-1 max-desk:p-2"
+              : "px-2 pb-2 pt-0.5"
+          } ${wide ? "desk:p-[10px]" : "desk:px-2.5 desk:pb-2.5 desk:pt-1"}`}
+        >
           {footer}
         </footer>
       ) : null}
