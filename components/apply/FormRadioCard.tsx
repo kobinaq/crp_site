@@ -4,10 +4,13 @@ export function FormRadioCard({
   label,
   selected,
   onSelect,
+  mobileTall = false,
 }: {
   label: string;
   selected: boolean;
   onSelect: () => void;
+  /** Phones only (Figma 2308:9574): 102px card, 40px radius, 24px radio. */
+  mobileTall?: boolean;
 }) {
   return (
     <button
@@ -15,8 +18,10 @@ export function FormRadioCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-3 rounded-[32px] p-6 text-left ${
-        selected ? "bg-black text-white" : "bg-cream text-black"
-      }`}
+        mobileTall
+          ? "max-desk:h-[102px] max-desk:gap-4 max-desk:rounded-[40px] max-desk:px-6 max-desk:py-4 max-[380px]:px-4"
+          : ""
+      } ${selected ? "bg-black text-white" : "bg-cream text-black"}`}
     >
       <span
         aria-hidden

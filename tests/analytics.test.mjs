@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { loader } from './helpers.mjs';
 const load=loader();
-const {createAnalytics,posthogOptions,scrubUrl,scrubEvent,DEFAULT_POSTHOG_HOST}=load('lib/analytics.ts');
+const {createAnalytics,posthogOptions,scrubUrl,scrubEvent,stampEnvironment,analyticsEnvironment,DEFAULT_POSTHOG_HOST}=load('lib/analytics.ts');
 
 function fakeBrowser(){
  const jar=new Map();
@@ -17,14 +17,15 @@ function fakeBrowser(){
 }
 // Records calls; opt-in state behaves like posthog-js (reset() returns to the opted-out default).
 function fakePostHog(){
- const calls=[];let optedIn=false;
+ const calls=[];let optedIn=false;let props={};
  const ph={calls,
   init:(key,options)=>{calls.push(['init',key,options]);document.cookie=`ph_${key}_posthog=x; path=/`;window.localStorage.setItem(`ph_${key}_posthog`,'{}');},
   has_opted_in_capturing:()=>optedIn,
   opt_in_capturing:(o)=>{optedIn=true;calls.push(['opt_in',o]);},
   opt_out_capturing:()=>{optedIn=false;calls.push(['opt_out']);},
-  reset:()=>{optedIn=false;calls.push(['reset']);window.sessionStorage.setItem('ph_x_window_id','w');},
-  get optedIn(){return optedIn;}};
+  register:(p)=>{calls.push(['register',p,optedIn]);props={...props,...p};},
+  reset:()=>{optedIn=false;props={};calls.push(['reset']);window.sessionStorage.setItem('ph_x_window_id','w');},
+  get optedIn(){return optedIn;},get props(){return props;}};
  return ph;
 }
 const names=(ph)=>ph.calls.map(c=>c[0]);
@@ -40,7 +41,7 @@ test('grant: init once with the configured options, then opt in without an extra
  fakeBrowser();let loads=0;const ph=fakePostHog();
  const a=createAnalytics({key:'phc_dummy',host:'https://us.i.posthog.com',load:async()=>{loads++;return ph;}});
  await a.sync(true);await a.sync(true);
- assert.equal(loads,1);assert.deepEqual(names(ph),['init','opt_in']);
+ assert.equal(loads,1);assert.deepEqual(names(ph),['init','opt_in','register','register']);
  assert.equal(ph.calls[0][1],'phc_dummy');assert.equal(ph.calls[0][2].api_host,'https://us.i.posthog.com');
  assert.deepEqual(ph.calls[1][1],{captureEventName:false});assert.equal(ph.optedIn,true);
 });
@@ -51,11 +52,11 @@ test('withdrawal: opt out, reset, and delete ph_* cookies and storage',async()=>
  await a.sync(true);window.localStorage.setItem('keep','1');document.cookie='crp-consent=v2.functional-0.analytics-0.1; path=/';
  assert.ok(jar.has('ph_phc_dummy_posthog'));
  await a.sync(false);
- assert.deepEqual(names(ph),['init','opt_in','opt_out','reset']);assert.equal(ph.optedIn,false);
+ assert.deepEqual(names(ph),['init','opt_in','register','opt_out','reset']);assert.equal(ph.optedIn,false);
  assert.deepEqual([...jar.keys()],['crp-consent']);
  assert.equal(window.localStorage.getItem('ph_phc_dummy_posthog'),null);assert.equal(window.sessionStorage.length,0);
  assert.equal(window.localStorage.getItem('keep'),'1');
- await a.sync(true);assert.deepEqual(names(ph).slice(4),['opt_in'],'re-grant opts in again without a second init');
+ await a.sync(true);assert.deepEqual(names(ph).slice(5),['opt_in','register'],'re-grant opts in again without a second init');
 });
 
 test('a quick grant then withdrawal ends opted out',async()=>{
@@ -102,4 +103,37 @@ test('posthog-js is only ever imported lazily, and identify is never called',()=
  const provider=readFileSync('components/analytics/PostHogProvider.tsx','utf8');
  assert.match(provider,/import\("posthog-js"\)/);assert.match(provider,/hasConsent\("analytics"\)/);assert.match(provider,/if \(!KEY\) return;/);
  assert.match(readFileSync('.env.example','utf8'),/^NEXT_PUBLIC_POSTHOG_HOST=https:\/\/us\.i\.posthog\.com$/m);
+});
+
+test('environment super property: Vercel env, else development',()=>{
+ assert.equal(analyticsEnvironment('preview'),'preview');assert.equal(analyticsEnvironment('production'),'production');
+ assert.equal(analyticsEnvironment(undefined),'development');assert.equal(analyticsEnvironment(''),'development');
+});
+
+test('environment is registered after every opt-in, survives withdraw/re-grant, never while opted out',async()=>{
+ fakeBrowser();const ph=fakePostHog();
+ const a=createAnalytics({key:'k',host:DEFAULT_POSTHOG_HOST,load:async()=>ph,environment:'preview'});
+ await a.sync(false);assert.deepEqual(ph.calls,[],'nothing before consent');
+ await a.sync(true);assert.deepEqual(ph.props,{environment:'preview'});
+ await a.sync(false);assert.deepEqual(ph.props,{},'reset() cleared it');
+ await a.sync(false);
+ await a.sync(true);assert.deepEqual(ph.props,{environment:'preview'},'registered again after reset');
+ const registers=ph.calls.filter(c=>c[0]==='register');
+ assert.equal(registers.length,2);
+ for(const [, p, optedIn] of registers){assert.deepEqual(p,{environment:'preview'});assert.equal(optedIn,true,'only while opted in');}
+ // Withdrawn while loading: never opted in, so never registered.
+ const ph2=fakePostHog();let release;const b=createAnalytics({key:'k',host:DEFAULT_POSTHOG_HOST,load:()=>new Promise(r=>{release=()=>r(ph2);}),environment:'preview'});
+ const g=b.sync(true);await new Promise(r=>setTimeout(r,0));const w=b.sync(false);release();await g;await w;
+ assert.ok(!names(ph2).includes('register'));
+});
+
+test('before_send adds environment to events that lack it (the opt-in pageview) without overriding',()=>{
+ const stamp=stampEnvironment('preview');
+ assert.equal(stamp({event:'$pageview',properties:{}}).properties.environment,'preview');
+ assert.equal(stamp({event:'x',properties:{environment:'production'}}).properties.environment,'production');
+ assert.equal(stamp(null),null);
+ const o=posthogOptions(DEFAULT_POSTHOG_HOST,'preview');assert.ok(Array.isArray(o.before_send));
+ const out=o.before_send.reduce((e,f)=>f(e),{event:'$pageview',properties:{$current_url:'https://x.org/a?token=1'}});
+ assert.deepEqual(out.properties,{$current_url:'https://x.org/a',environment:'preview'});
+ assert.match(readFileSync('components/analytics/PostHogProvider.tsx','utf8'),/analyticsEnvironment\(process\.env\.NEXT_PUBLIC_VERCEL_ENV\)/);
 });

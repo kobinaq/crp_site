@@ -16,12 +16,12 @@ function Caret({ up = false }: { up?: boolean }) {
   );
 }
 
-function Flag({ code, lazy = false, compact = false }: { code: string; lazy?: boolean; compact?: boolean }) {
+function Flag({ code, lazy = false, compact = false, className = "" }: { code: string; lazy?: boolean; compact?: boolean; className?: string }) {
   return (
     <span
       className={`inline-flex shrink-0 overflow-hidden bg-black/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)] ${
         compact ? "size-5 rounded-[8px]" : "size-6 rounded-full"
-      }`}
+      } ${className}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -62,6 +62,7 @@ export function CountryDropdown({
   onChange,
   compact = false,
   size = "md",
+  mobileTall = false,
 }: {
   variant: "field" | "inline";
   label?: string;
@@ -69,8 +70,12 @@ export function CountryDropdown({
   onChange: (country: Country) => void;
   compact?: boolean;
   size?: "md" | "lg";
+  /** Phones only (Figma 2308:9574): 61px field, 48px radius, 12px label; inline code gets the 20px square flag. */
+  mobileTall?: boolean;
 }) {
   const lg = size === "lg";
+  const tallField = mobileTall ? "max-desk:h-[61px] max-desk:rounded-[48px] max-desk:pl-6 max-desk:pr-8" : "";
+  const tallLabel = mobileTall ? "max-desk:text-[12px] max-desk:tracking-[0.48px]" : "";
   const tr = useText();
   const { locale } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -259,12 +264,12 @@ export function CountryDropdown({
         aria-haspopup="listbox"
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open && ranked[safeActive] ? `${listId}-${ranked[safeActive].country.code}` : undefined}
-        aria-label={variant === "inline" ? tr("Country code") : undefined}
+        aria-label={variant === "inline" ? tr("Country code") : value && label ? `${label}: ${shownLabel}` : label}
         className={
           variant === "field"
             ? lg
-              ? `${FIELD} ${FIELD_LG} w-full gap-3 ${value && !(open && query) ? "pl-4" : "pl-6"} pr-8`
-              : `${FIELD} w-full gap-4 pl-5 pr-6`
+              ? `${FIELD} ${FIELD_LG} w-full gap-3 ${value && !(open && query) ? "pl-4" : "pl-5 desk:pl-6"} pr-6 desk:pr-8`
+              : `${FIELD} w-full gap-4 pl-5 pr-6 ${tallField}`
             : "flex h-11 items-center gap-2 border-r border-black/8 pr-2"
         }
       >
@@ -292,16 +297,15 @@ export function CountryDropdown({
           value ? (
             <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
               <Flag code={value.code} />
-              <span className="shrink-0 text-[14px] font-semibold text-black/60">{value.dial}</span>
               <span className="truncate text-[16px] text-black">{shownLabel}</span>
             </span>
           ) : (
-            <span className={`flex-1 text-left ${LABEL}`}>{label}</span>
+            <span className={`flex-1 text-left ${LABEL} ${tallLabel}`}>{label}</span>
           )
         ) : (
           <>
             {value ? (
-              <Flag code={value.code} compact={compact || lg} />
+              <Flag code={value.code} compact={compact || lg} className={mobileTall && !(compact || lg) ? "max-desk:size-5 max-desk:rounded-[8px]" : ""} />
             ) : (
               <span className={`inline-block bg-black/5 ${compact ? "size-5 rounded-[8px]" : "size-6 rounded-full"}`} />
             )}
@@ -311,7 +315,7 @@ export function CountryDropdown({
                   ? "text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px] text-black/48"
                   : lg
                     ? "text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] text-black"
-                    : "text-[14px] font-semibold text-black/60"
+                    : `text-[14px] font-semibold text-black/60 ${mobileTall ? "max-desk:leading-[0.9] max-desk:tracking-[0.56px] max-desk:text-black/48" : ""}`
               }
             >
               {value?.dial ?? "+"}

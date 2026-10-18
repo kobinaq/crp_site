@@ -22,11 +22,14 @@ export function DateField({
   className = "",
   size = "md",
   invalid = false,
+  mobileTall = false,
 }: {
   value: string; // YYYY-MM-DD
   onChange: (v: string) => void;
   className?: string;
   size?: "md" | "lg";
+  /** Phones only (Figma 2308:9574): 63px field, 48px radius, 12px label. */
+  mobileTall?: boolean;
   /** Highlight the field (e.g. the age check failed). */
   invalid?: boolean;
 }) {
@@ -130,12 +133,12 @@ export function DateField({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`${FIELD} w-full gap-2.5 px-4 transition-colors ${lg ? `${FIELD_LG} ${display ? "justify-start" : "justify-center"}` : "justify-center"} ${
+        className={`${FIELD} w-full gap-2.5 px-4 transition-colors ${mobileTall ? "max-desk:h-[63px] max-desk:rounded-[48px]" : ""} ${lg ? `${FIELD_LG} ${display ? "justify-start" : "justify-center"}` : "justify-center"} ${
           lg && open ? "bg-cream!" : ""
         } ${invalid ? "border-magenta!" : ""}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/calendar-blank.svg" alt="" width={20} height={20} className={`size-5 ${lg ? "opacity-[0.48] brightness-0" : "opacity-60"}`} />
+        <img src="/icons/calendar-blank.svg" alt="" width={20} height={20} className={`size-5 ${lg ? "opacity-[0.48] brightness-0" : "opacity-60"} ${mobileTall ? "max-desk:opacity-[0.48] max-desk:brightness-0" : ""}`} />
         {lg && display ? (
           <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
             <span className={MINI_LABEL}>{tr("*D.O.B")}</span>
@@ -144,7 +147,15 @@ export function DateField({
         ) : display ? (
           <span className="text-[16px] text-black">{display}</span>
         ) : (
-          <span className={lg ? LABEL_LG : LABEL}>{tr("*D.O.B")}</span>
+          <span
+            className={
+              lg
+                ? LABEL_LG
+                : `${LABEL} ${mobileTall ? "max-desk:text-[12px] max-desk:tracking-[0.48px]" : ""}`
+            }
+          >
+            {tr("*D.O.B")}
+          </span>
         )}
       </button>
 

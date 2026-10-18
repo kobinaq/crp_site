@@ -6,6 +6,11 @@ export const LABEL =
 export const PLACEHOLDER =
   "placeholder:text-[14px] placeholder:font-semibold placeholder:uppercase placeholder:tracking-[0.56px] placeholder:text-black/48";
 
+// Phones only, nomination flow (Figma 2308:9574): 61px pill, 48px radius, 12px label.
+export const FIELD_M = "max-desk:h-[61px] max-desk:rounded-[48px]";
+export const PLACEHOLDER_M =
+  "max-desk:placeholder:text-[12px] max-desk:placeholder:leading-[0.9] max-desk:placeholder:tracking-[0.48px]";
+
 // "lg" field for More about you. Desktop Figma 2308:2967: 64px pill, 48px radius.
 // Mobile Figma 2308:10638: 61px pill, 48px radius, 12px placeholder labels.
 export const FIELD_LG = "max-desk:h-[61px] max-desk:rounded-[48px] desk:h-16 desk:rounded-[48px]";
