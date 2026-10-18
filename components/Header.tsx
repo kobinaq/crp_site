@@ -46,8 +46,11 @@ function CloseIcon() {
 export function Header({
   overMedia = false,
   mobileLogoTone,
+  lightNav = false,
 }: {
   overMedia?: boolean;
+  /** Desktop: white nav links while the bar is transparent, for pages whose hero photo sits under the centred links (Partner). */
+  lightNav?: boolean;
   /** Mobile bar logo tone while the bar is transparent (e.g. Contact uses the colour lockup). */
   mobileLogoTone?: "color";
 }) {
@@ -198,18 +201,18 @@ export function Header({
         </div>
       </div>
 
-      {/* 88px bar from Figma: 24px padding around the 40px language pill. */}
+      {/* 88px bar from Figma: 24px padding around the 40px language pill; centred at the 1200px frame width on wide screens. */}
       <div className={`hidden desk:block ${showPill ? "px-[32px] py-[8px]" : ""}`}>
         <div
           className={`pointer-events-auto relative mx-auto flex items-center justify-between ${
             showPill
               ? `max-w-[1200px] rounded-[56px] p-[16px] ${PILL}`
-              : "px-[64px] py-[24px]"
+              : "max-w-[1200px] px-[64px] py-[24px]"
           } ${instant ? "" : PILL_TWEEN}`}
         >
           <nav
             className={`flex shrink-0 items-center gap-[32px] text-[14px] font-semibold uppercase tracking-[-0.28px] ${
-              showPill ? "pl-[16px] text-white" : "text-[#111]"
+              showPill ? "pl-[16px] text-white" : lightNav ? "text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.35)]" : "text-[#111]"
             }`}
           >
             {navLinks.map((link) => (

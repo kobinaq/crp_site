@@ -10,6 +10,7 @@ import { ExpressInterestPopup } from "./ExpressInterestPopup";
 import { NominateFlow } from "./nominate/NominateFlow";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useCopy } from "./LanguageProvider";
+import { useText } from "@/lib/ui-text";
 
 const CTA_REVEAL =
   "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
@@ -27,10 +28,19 @@ function CtaArrow({ className = "" }: { className?: string }) {
   );
 }
 
-function NominateCta({ onExpress }: { onExpress: () => void }) {
+// With the full flow enabled (dev / previews) the button opens NominateFlow,
+// so it says "Nominate"; production's interest gate keeps "Express interest".
+function NominateCta({ onExpress, nominate }: { onExpress: () => void; nominate: boolean }) {
   const copy = useCopy();
+  const tr = useText();
+  const text = nominate ? tr("Nominate") : copy.apply.interest;
   const label =
     "text-[16px] font-semibold uppercase leading-[0.9] tracking-[0.64px] mix-blend-hard-light whitespace-nowrap desk:text-[20px] desk:tracking-[0.8px]";
+  // Long labels (fr "Proposer une candidature") would be clipped on one line in
+  // the pill: let them wrap onto two balanced lines, a touch smaller on mobile.
+  const longLabel =
+    "text-center text-[14px] font-semibold uppercase leading-[0.95] tracking-[0.56px] mix-blend-hard-light text-balance desk:text-[20px] desk:tracking-[0.8px]";
+  const long = text.length > 16;
 
   return (
     <div
@@ -39,14 +49,14 @@ function NominateCta({ onExpress }: { onExpress: () => void }) {
       <button
         type="button"
         onClick={onExpress}
-        aria-label={copy.a11y.expressInterest}
+        aria-label={nominate ? text : copy.a11y.expressInterest}
         className="relative flex h-[64px] min-w-0 items-center justify-center overflow-hidden rounded-full desk:h-[80px]"
         style={{ backgroundImage: APPLY_GRADIENT }}
       >
         <span
-          className={`${label} px-4 text-white transition-opacity ${CTA_REVEAL} group-hover:opacity-0 group-focus-within:opacity-0`}
+          className={`${long ? `${longLabel} px-2 desk:px-4` : `${label} px-4`} text-white transition-opacity ${CTA_REVEAL} group-hover:opacity-0 group-focus-within:opacity-0`}
         >
-          {copy.apply.interest}
+          {text}
         </span>
         <CtaArrow
           className={`pointer-events-none absolute opacity-0 transition-opacity ${CTA_REVEAL} group-hover:opacity-100 group-focus-within:opacity-100`}
@@ -82,7 +92,7 @@ export function NominatePage() {
         subtitle={copy.apply.subtitle}
         headline={copy.nominateLanding.headline}
         body={copy.nominateLanding.body}
-        cta={<NominateCta onExpress={() => setInterestOpen(true)} />}
+        cta={<NominateCta nominate={applyFlow} onExpress={() => setInterestOpen(true)} />}
       />
       {applyFlow ? (
         // Gate on (dev / previews): the nomination flow. Production keeps the interest popup.

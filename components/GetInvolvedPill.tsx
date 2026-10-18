@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GetInvolvedPopup } from "./GetInvolvedPopup";
 import { useCopy } from "./LanguageProvider";
+import { useConsent } from "./cookies/ConsentProvider";
 
 const AVATARS = [
   "/images/involved-youth.png",
@@ -21,7 +22,11 @@ const OPEN_EVENT = "get-involved:open";
 type PillMode = "docked" | "riding" | "immersed" | "leaving";
 
 function readMode(): PillMode {
-  const section = document.getElementById("join");
+  // Desktop: stay hidden until the reader has scrolled past [data-pill-after] (Home hero) so the pill never covers its headlines.
+  const after = document.querySelector<HTMLElement>("[data-pill-after]");
+  if (after && window.matchMedia("(min-width: 900px)").matches && after.getBoundingClientRect().bottom > 0) return "riding";
+  // Hands off to a docked tab (data-pill-handoff) when a page has one; Home no longer does (Figma 2308:547).
+  const section = document.querySelector<HTMLElement>("[data-pill-handoff]");
   if (!section) return "docked";
 
   const vh = window.innerHeight;
@@ -104,6 +109,8 @@ export function GetInvolvedPill() {
   const [rise, setRise] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const closePopup = useCallback(() => setPopupOpen(false), []);
+  // The cookie banner sits where the pill docks; hide the pill until a choice is made.
+  const { bannerVisible } = useConsent();
 
   useEffect(() => {
     const onOpen = () => setPopupOpen(true);
@@ -154,7 +161,8 @@ export function GetInvolvedPill() {
     <>
       <div
         ref={ref}
-        className="fixed bottom-0 left-1/2 z-40 flex"
+        data-testid="get-involved-pill"
+        className={`fixed bottom-0 left-1/2 z-40 ${bannerVisible ? "hidden" : "flex"}`}
         style={{
           transform: `translate(-50%, ${rise ? 100 : 0}%)`,
           transition: rise ? "none" : `transform ${RISE_MS}ms ${RISE_EASE}`,

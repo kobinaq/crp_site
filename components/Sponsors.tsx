@@ -6,7 +6,7 @@ export function Sponsors() {
     <section
       id="sponsors"
       data-nav-tone="dark"
-      className="relative isolate overflow-hidden bg-ink pb-[160px] pt-16 text-white desk:pb-[192px] desk:pt-24"
+      className="relative isolate overflow-hidden bg-ink pb-[160px] pt-16 text-white desk:hidden"
       aria-hidden
     >
       <div

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   motion,
   useReducedMotion,
@@ -53,11 +53,69 @@ function BringingTogether() {
     return () => cancelAnimationFrame(id);
   }, [sliding]);
 
+  // Desktop pill: rows keep their natural height (labels can wrap to two lines) with a
+  // 16px gap, so the offset that centres the active row is measured, not computed.
+  const pillListRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const list = pillListRef.current;
+    if (!list) return;
+    const place = () => {
+      const row = list.children[index] as HTMLElement | undefined;
+      if (!row) return;
+      const centre = row.offsetTop + row.offsetHeight / 2;
+      list.style.transform = `translateY(${48 - centre}px)`;
+    };
+    place();
+    // The pill is display:none on phones; re-place once it shows (resize, font load).
+    const observer = new ResizeObserver(place);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [index, groups]);
+
   const label = `${copy.pavilion.bringing} ${groups.join(", ")} ${copy.pavilion.together}`;
   const motionOn = sliding && reduceMotion !== true;
 
+  const pauseHandlers = {
+    onPointerEnter: () => setPaused(true),
+    onPointerLeave: () => setPaused(false),
+    onFocusCapture: () => setPaused(true),
+    onBlurCapture: () => setPaused(false),
+  };
+  const listMotion = motionOn
+    ? "transition-transform duration-[520ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+    : "";
+
   return (
-    <div className="flex items-center gap-[8px] text-center leading-[0.9]">
+    <>
+    {/* Desktop (Figma 2308:204): the active group sits in a black pill, neighbours clipped at its edges. */}
+    <div className="hidden items-center gap-[8px] text-center leading-[0.9] desk:flex">
+      <p className="whitespace-nowrap text-[32px] tracking-[-1.28px] text-black/72">{copy.pavilion.bringing}</p>
+      <span className="sr-only">{label}</span>
+      <div
+        aria-hidden
+        {...pauseHandlers}
+        className="relative h-[96px] w-[272px] shrink-0 overflow-hidden rounded-full bg-black"
+      >
+        <div
+          ref={pillListRef}
+          className={`absolute inset-x-0 top-0 flex flex-col items-center gap-[16px] ${listMotion}`}
+        >
+          {[...groups, ...groups].map((group, row) => (
+            <button
+              key={`${group}-${row}`}
+              type="button"
+              tabIndex={-1}
+              onClick={() => setIndex(row)}
+              className="flex min-h-[36px] w-full items-center justify-center px-[24px] text-center text-[20px] font-semibold uppercase leading-[1.2] tracking-[0.8px] text-white mix-blend-hard-light"
+            >
+              {group}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="whitespace-nowrap text-[32px] tracking-[-1.28px] text-black/72">{copy.pavilion.together}</p>
+    </div>
+    <div className="flex items-center gap-[8px] text-center leading-[0.9] desk:hidden">
       <p className={`${ACTIVE_TEXT} text-black/72`}>{copy.pavilion.bringing}</p>
 
       <span className="sr-only">{label}</span>
@@ -110,6 +168,7 @@ function BringingTogether() {
 
       <p className={`${ACTIVE_TEXT} text-black/72`}>{copy.pavilion.together}</p>
     </div>
+    </>
   );
 }
 
@@ -159,40 +218,43 @@ export function PavilionPanel() {
             }`}
             style={style}
           >
-            <Image
-              src="/images/pavilion-expo.jpg"
-              alt={copy.pavilion.photoAlt}
-              fill
-              sizes="(min-width: 900px) 1200px, 100vw"
-              className="object-cover object-bottom"
-            />
+            {/* Desktop: Figma (2308:180) crops the photo 1.6x in on the dome. */}
+            <div className="absolute inset-0 desk:inset-auto desk:left-[-60%] desk:top-[-16.6%] desk:aspect-[1600/831] desk:w-[160%]">
+              <Image
+                src="/images/pavilion-expo.jpg"
+                alt={copy.pavilion.photoAlt}
+                fill
+                sizes="(min-width: 900px) 1920px, 100vw"
+                className="object-cover object-bottom desk:object-center"
+              />
+            </div>
             <div
               aria-hidden
               className="absolute inset-0 bg-black/45 mix-blend-multiply"
             />
 
-            <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[63px] pt-[96px] desk:pb-[88px] desk:pt-[48px]">
+            <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[63px] pt-[96px] desk:pb-[97px] desk:pt-[96px]">
               <div className="flex flex-col items-center">
                 <DisplayWordmark
                   word="Pavilion"
                   size="xl"
                   className="gap-[15.641px]"
                 />
+                {/* Desktop (Figma 2308:196): flag + location in a 202x104 blurred panel. */}
+                <div className="contents desk:relative desk:z-10 desk:-mt-[50px] desk:flex desk:h-[104px] desk:w-[202px] desk:flex-col desk:items-center desk:gap-2 desk:rounded-[12px] desk:backdrop-blur-[12px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/turkey-flag.svg"
                   alt=""
                   width={72}
                   height={48}
-                  className="relative z-10 -mt-[36px] h-8 w-12 overflow-clip desk:-mt-[52px] desk:h-[48px] desk:w-[72px]"
+                  className="relative z-10 -mt-[36px] h-8 w-12 overflow-clip desk:mt-0 desk:h-[48px] desk:w-[72px]"
                 />
-                <div className="relative z-10 mt-2 flex flex-col items-center gap-1 whitespace-nowrap font-semibold uppercase leading-[0.9] mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:hidden">
-                  <p className="text-[18px] tracking-[0.72px] text-white">{copy.pavilion.locationPlace}</p>
-                  <p className="text-[14px] tracking-[0.56px] text-white/72">{copy.pavilion.locationOnline}</p>
+                <div className="relative z-10 mt-2 flex flex-col items-center gap-1 whitespace-nowrap font-semibold uppercase leading-[0.9] mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] desk:mt-0 desk:gap-2">
+                  <p className="text-[18px] tracking-[0.72px] text-white desk:text-[24px] desk:tracking-[0.96px]">{copy.pavilion.locationPlace}</p>
+                  <p className="text-[14px] tracking-[0.56px] text-white/72 desk:text-[20px] desk:tracking-[0.8px]">{copy.pavilion.locationOnline}</p>
                 </div>
-                <p className="relative z-10 mt-[10px] hidden whitespace-nowrap font-semibold uppercase leading-[0.9] tracking-[0.72px] text-white mix-blend-hard-light [text-shadow:0_0_4px_rgba(0,0,0,0.25)] text-[18px] desk:mt-[12px] desk:block desk:text-[24px] desk:tracking-[0.96px]">
-                  {copy.pavilion.location}
-                </p>
+                </div>
               </div>
 
               <h2 className="mt-auto w-[342px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:w-[92%] desk:max-w-[859px] desk:text-[48px] desk:tracking-[-1.92px]">

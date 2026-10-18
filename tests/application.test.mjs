@@ -276,6 +276,32 @@ test("an existing email grants no session and no email; the email link confirms 
   assert.match((await h.openLink("A".repeat(43))).url, /resume=expired/);
 });
 
+test("resume sets crp-locale only with functional consent and always redirects the same way", async () => {
+  const a = await h.apply({ language: "fr" });
+  const database = h.load("lib/db/index.ts").getDb();
+  const { serializeConsent, CONSENT_COOKIE } = h.load("lib/consent.ts");
+  const issue = async () => (await database.transaction((tx) => h.load("lib/access.ts").issueAccessToken(tx, a.id, "resume", 600))).raw;
+  h.state.ip = "198.51.100.88";
+  const cases = [
+    ["no consent", {}, false],
+    ["functional accepted", { [CONSENT_COOKIE]: serializeConsent({ functional: true }) }, true],
+    ["functional declined", { [CONSENT_COOKIE]: serializeConsent({ functional: false }) }, false],
+    ["malformed consent", { [CONSENT_COOKIE]: "v1.functional-yes.0" }, false],
+  ];
+  const targets = new Set();
+  for (const [label, cookies, expectLocale] of cases) {
+    const res = await h.openLink(await issue(), cookies);
+    const target = new URL(res.url);
+    assert.equal(`${target.origin}${target.pathname}`, "https://videoask.invalid/form", label);
+    targets.add(`${target.origin}${target.pathname}`);
+    const names = res.setCookies.map(([name]) => name);
+    assert.ok(names.includes("crp_session"), `${label}: session cookie`);
+    assert.equal(names.includes("crp-locale"), expectLocale, `${label}: crp-locale`);
+    if (expectLocale) assert.equal(res.setCookies.find(([name]) => name === "crp-locale")[1], "fr");
+  }
+  assert.equal(targets.size, 1);
+});
+
 test("email confirmation POSTs accept same-origin and null-origin-with-valid-token only", async () => {
   const a = await h.apply();
   const database = h.load("lib/db/index.ts").getDb();
@@ -1202,7 +1228,9 @@ test("Spanish applicants confirm ownership before the form advances", async () =
   const link = new URL(sent.payload.html.match(/href="([^"]+\/api\/apply\/resume[^"]+)"/)[1]);
   assert.equal(link.searchParams.get("lang"), "es");
   const confirmed = await h.resume(link.searchParams.get("token"));
-  assert.equal(confirmed.setCookies.find(([name]) => name === "crp-locale")[1], "es");
+  // No crp-consent on this request, so the functional crp-locale cookie is not set.
+  assert.ok(confirmed.setCookies.some(([name]) => name === "crp_session"));
+  assert.equal(confirmed.setCookies.some(([name]) => name === "crp-locale"), false);
   const { videoaskReference, videoaskLink } = h.load("lib/videoask.ts");
   assert.match(videoaskLink(a.id), /form#application_ref=/);
   const send = (formId, reference = videoaskReference(a.id)) => h.load("app/api/webhooks/videoask/route.ts").POST(h.req("/api/webhooks/videoask", {

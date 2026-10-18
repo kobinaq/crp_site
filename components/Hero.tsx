@@ -34,21 +34,23 @@ function stackMask(squares: number) {
 }
 
 const COPY_CLASS =
-  "text-[28px] font-normal leading-[0.9] tracking-[-1.12px] desk:text-[clamp(26px,7.2vw,48px)] desk:tracking-[-0.04em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]";
+  "text-[28px] font-normal leading-[0.9] tracking-[-1.12px] desk:text-[clamp(32px,4vw,48px)] desk:tracking-[-0.04em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]";
 
 function HeroCopy({
   square,
   children,
   heading,
+  className = "",
 }: {
   square: number;
   children: ReactNode;
   heading: "h1" | "h2";
+  className?: string;
 }) {
   const Heading = heading;
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-3 text-center desk:px-8"
+      className={`pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-3 text-center desk:px-[7.95%] ${className}`}
       style={{
         top: `calc(var(--hero-peek-t) + ${square} * var(--hero-h))`,
         height: "var(--hero-h)",
@@ -66,7 +68,8 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative overflow-hidden pt-8 desk:pt-6 [--hero-w:var(--column-w)] [--hero-peek-t:calc(var(--hero-h)*0.14)] [--hero-img-zoom:7.3] desk:[--hero-img-zoom:3.6]"
+      data-pill-after
+      className="relative overflow-hidden pt-8 desk:pt-0 [--hero-w:var(--column-w)] [--hero-peek-t:calc(var(--hero-h)*0.14)] desk:[--hero-peek-t:calc(var(--hero-h)*0.0784)] [--hero-img-zoom:7.3] desk:[--hero-img-zoom:3.6]"
       style={
         {
           ["--hero-h" as string]: `calc(var(--hero-w) * ${HERO_RATIO})`,
@@ -119,7 +122,8 @@ export function Hero() {
           />
         </div>
 
-        <HeroCopy heading="h1" square={0}>
+        {/* Figma sets the headline below the square's centre, clear of his face. */}
+        <HeroCopy heading="h1" square={0} className="desk:pt-[35%]">
           {copy.hero.line1Before}
           <span className="text-lime">{copy.hero.line1Accent}</span>
           {copy.hero.line1After}

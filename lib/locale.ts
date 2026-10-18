@@ -1,3 +1,4 @@
+import { hasConsent } from "@/lib/consent";
 export const locales = ["en", "fr", "es", "pt"] as const;
 export type Locale = (typeof locales)[number];
 export const applicationLocales = ["en", "fr", "es"] as const;
@@ -21,7 +22,8 @@ export function localePath(href: string, locale: Locale): string {
   if (!(publicPaths as readonly string[]).includes(path)) return href;
   return `/${locale}${path === "/" ? "" : path}${match[2]}`;
 }
+/** Remembering the language is a functional cookie: only stored with consent. The URL still carries the locale. */
 export function persistLocale(locale: Locale) {
+  if (!hasConsent("functional")) return;
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; SameSite=Lax`;
-  try { window.localStorage.setItem(LOCALE_COOKIE, locale); } catch { /* Cookie is sufficient. */ }
 }
