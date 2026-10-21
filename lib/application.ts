@@ -5,6 +5,7 @@ import {
   consentLog,
   type Applicant,
   type Db,
+  type Store,
 } from "@/lib/db";
 import { appUrl } from "@/lib/config";
 import {
@@ -14,11 +15,12 @@ import {
   CONSENT_VERSION,
   type ApplicationInput,
 } from "@/lib/capture";
-import { applicationEmail, identityEmail, identityRetryEmail } from "@/lib/emails";
+import { applicationEmail, identityRetryEmail, receivedEmail } from "@/lib/emails";
 import { getIdentityProvider } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
 import { videoaskLink } from "@/lib/videoask";
-import { recordCreation, updateApplicant } from "@/lib/lifecycle";
+import { lockApplicant, recordCreation, transition, updateApplicant } from "@/lib/lifecycle";
+import { reconcileIdentity } from "@/lib/application-status";
 
 // The applicant journey as database operations. Each function is one unit of
 // work: everything that must be true together is written in one transaction,
@@ -106,9 +108,93 @@ export function nextStepUrl(applicant: Applicant): string {
   }
 }
 
-// Creates (or reuses) the hosted identity session, stores it, and queues the
-// email carrying the link. Idempotent: an existing link is returned as is, so
-// a refresh, a double webhook, or a worker retry never opens a second session.
+// Advances the pipeline the same way the VideoAsk webhook does. Safe to call
+// from the thank-you redirect (when the webhook is still in flight) and from
+// the webhook itself: transitions are idempotent and identity is only queued
+// when a Didit link is still missing.
+export async function applyVideoaskCompletion(tx: Store, applicantId: string): Promise<{
+  outcome: string;
+  advanced: boolean;
+  status?: Applicant["status"];
+  applicant?: Applicant;
+}> {
+  const current = await lockApplicant(tx, applicantId);
+  if (!current) return { outcome: "unknown applicant", advanced: false };
+  if (!current.emailVerifiedAt) return { outcome: "email unverified", advanced: false };
+
+  let applicant = current;
+  let advanced = false;
+
+  if (applicant.status === "submitted") {
+    const moved = await transition(tx, {
+      applicantId: applicant.id,
+      to: "round1_complete",
+      actor: "videoask",
+      reason: "application form completed",
+      allowFrom: ["submitted"],
+      patch: { round1CompletedAt: new Date() },
+    });
+    if (!moved.ok) {
+      return {
+        outcome: `ignored:${moved.code}`,
+        advanced: false,
+        status: moved.applicant?.status,
+        applicant: moved.applicant,
+      };
+    }
+    applicant = moved.applicant;
+    advanced = true;
+  }
+
+  if (applicant.track === "online") {
+    if (applicant.status === "round1_complete") {
+      const review = await transition(tx, {
+        applicantId: applicant.id,
+        to: "under_review",
+        actor: "videoask",
+        reason: "online application ready for review",
+        allowFrom: ["round1_complete"],
+      });
+      if (review.ok) {
+        await enqueueEmail(tx, `email:received:${applicant.id}:${review.applicant.reviewCycle}`, {
+          to: review.applicant.email,
+          ...receivedEmail(review.applicant.fullName, review.applicant.language),
+        }, "received", applicant.id);
+        return { outcome: "advanced", advanced: true, status: review.to, applicant: review.applicant };
+      }
+    }
+    return {
+      outcome: advanced ? "advanced" : "already complete",
+      advanced,
+      status: applicant.status,
+      applicant,
+    };
+  }
+
+  const reconciled = await reconcileIdentity(tx, applicant.id);
+  const [after] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
+  if (!after) return { outcome: "unknown applicant", advanced: false };
+  if (reconciled && after.status === "under_review") {
+    await enqueueEmail(tx, `email:received:${after.id}:${after.reviewCycle}`, {
+      to: after.email,
+      ...receivedEmail(after.fullName, after.language),
+    }, "received", after.id);
+    return { outcome: "advanced", advanced: true, status: after.status, applicant: after };
+  }
+  if (after.status === "id_failed" || (after.status === "round1_complete" && !after.identityLink)) {
+    await scheduleIdentitySession(tx, after.id, after.version);
+  }
+  return {
+    outcome: advanced || reconciled ? "advanced" : "already complete",
+    advanced: advanced || reconciled,
+    status: after.status,
+    applicant: after,
+  };
+}
+
+// Creates (or reuses) the hosted identity session and stores it. Idempotent: an
+// existing link is returned as is. The first Didit hand-off is the VideoAsk
+// thank-you redirect (`/api/apply/verify?ref=…`); only identity retries email.
 export async function provisionIdentitySession(db: Db, applicantId: string): Promise<{ url: string | null; created: boolean }> {
   const [existing] = await db.select().from(applicants).where(eq(applicants.id, applicantId));
   if (!existing?.emailVerifiedAt || existing.track === "online" || !["round1_complete", "id_failed"].includes(existing.status)) return { url: null, created: false };
@@ -127,11 +213,15 @@ export async function provisionIdentitySession(db: Db, applicantId: string): Pro
       identityStatus: "pending",
     });
     if (!updated) return { url: null, created: false };
-    const retry = existing.status === "id_failed";
-    const mail = retry
-      ? identityRetryEmail(updated.fullName, session.url, updated.language)
-      : identityEmail(updated.fullName, session.url, updated.language);
-    await enqueueEmail(tx, `email:identity:${applicantId}:${session.sessionId}`, { to: updated.email, ...mail }, retry ? "identity_retry" : "identity", applicantId);
+    if (existing.status === "id_failed") {
+      await enqueueEmail(
+        tx,
+        `email:identity:${applicantId}:${session.sessionId}`,
+        { to: updated.email, ...identityRetryEmail(updated.fullName, session.url, updated.language) },
+        "identity_retry",
+        applicantId,
+      );
+    }
     return { url: session.url, created: true };
   });
 }

@@ -83,7 +83,7 @@ test('inventory covers every cookie the code sets, with translated copy',()=>{
  for(const locale of ['en','fr','es','pt']){
   const ui=JSON.parse(readFileSync(`lib/translations/ui-${locale}.json`,'utf8'));
   for(const item of COOKIE_INVENTORY)for(const text of [item.purpose,item.duration])assert.ok(ui[text],`${locale}: ${text}`);
-  for(const text of ['Analytics','Anonymous usage statistics with PostHog that help us improve the site. Sets the ph_<project_key>_posthog cookie (about 1 year).','About 1 year'])assert.ok(ui[text],`${locale}: ${text}`);
+  for(const text of ['Analytics','Helps us see how people use the site so we can improve it','About 1 year'])assert.ok(ui[text],`${locale}: ${text}`);
  }
 });
 

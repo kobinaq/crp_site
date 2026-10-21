@@ -17,7 +17,7 @@ const CATEGORY_COPY: Record<"necessary" | OptionalCategory, { name: string; desc
   },
   analytics: {
     name: "Analytics",
-    description: "Anonymous usage statistics with PostHog that help us improve the site. Sets the ph_<project_key>_posthog cookie (about 1 year).",
+    description: "Helps us see how people use the site so we can improve it",
   },
 };
 

@@ -18,6 +18,13 @@ applications continue through Didit; approved identity images are copied into
 private Vercel Blob storage and can only be streamed through the authenticated
 operations document route.
 
+In VideoAsk, set the final-step Logic redirect to
+`https://www.climaterefugeepavilion.org/api/apply/verify?ref=@application_ref`
+(use `@` to insert the custom `application_ref` variable). That site URL marks
+the form complete if the webhook is still in flight, then sends in-person
+applicants to Didit. Online applicants land on `/apply/complete`. Preview
+deployments use their own origin in place of the production host.
+
 Configure Didit's webhook destination separately in its console, pointing to
 `https://<your-domain>/api/webhooks/identity`, and set `DIDIT_WEBHOOK_SECRET`.
 The session `callback` is a browser redirect to `/apply/complete`; it is not

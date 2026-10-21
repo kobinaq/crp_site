@@ -332,17 +332,29 @@ test("email confirmation POSTs accept same-origin and null-origin-with-valid-tok
 test("the verify hand-off trusts the signed session, never the echoed applicant id", async () => {
   const a = await h.apply();
   const { signSession } = h.load("lib/session.ts");
+  const { videoaskReference } = h.load("lib/videoask.ts");
   const noSession = await h.verify({}, `?applicant_id=${a.id}`);
   assert.equal(noSession.url, "https://example.invalid/apply");
   const forged = await h.verify({ crp_session: `${a.id}.9999999999.forged` });
   assert.equal(forged.url, "https://example.invalid/apply");
 
+  // Without the VideoAsk thank-you ref, verify still waits for the webhook.
   const premature = await h.verify({ crp_session: signSession(a.id, 1) });
   assert.equal(premature.url, "https://example.invalid/apply/complete");
   assert.equal((await row("applicants", a.id)).status, "submitted");
+
+  // Thank-you redirect carries application_ref and can beat the webhook to Didit.
+  const fromThankYou = await h.verify(
+    { crp_session: signSession(a.id, 1) },
+    `?ref=${encodeURIComponent(videoaskReference(a.id))}`,
+  );
+  assert.match(fromThankYou.url, /^https:\/\/identity\.invalid\/session-/);
+  assert.equal((await row("applicants", a.id)).status, "round1_complete");
+  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
+
   await h.videoask(a.id);
   const first = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.match(first.url, /^https:\/\/identity\.invalid\/session-/);
+  assert.equal(first.url, fromThankYou.url);
   const second = await h.verify({ crp_session: signSession(a.id, 1) });
   assert.equal(second.url, first.url);
   const applicant = await row("applicants", a.id);
@@ -350,7 +362,7 @@ test("the verify hand-off trusts the signed session, never the echoed applicant 
   assert.ok(applicant.round1_completed_at);
   assert.equal(applicant.identity_link, first.url);
   assert.equal(applicant.identity_status, "pending");
-  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 1);
+  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
 });
 
 test("the worker delivers queued email with an idempotency key, backs off on failure, and parks bad requests", async () => {
