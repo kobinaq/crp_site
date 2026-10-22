@@ -252,6 +252,57 @@ export const identityDocuments = pgTable(
 export type IdentityDocument = typeof identityDocuments.$inferSelect;
 export type NewIdentityDocument = typeof identityDocuments.$inferInsert;
 
+export const videoaskAnswers = pgTable(
+  "videoask_answers",
+  {
+    applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+    questionId: text("question_id").notNull(),
+    answerId: text("answer_id").notNull(),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    medium: text("medium").notNull(),
+    textBody: text("text_body"),
+    transcript: text("transcript"),
+    sourceUrl: text("source_url"),
+    pathname: text("pathname"),
+    contentType: text("content_type"),
+    byteSize: integer("byte_size"),
+    copiedAt: timestamp("copied_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.applicantId, t.questionId] }),
+    uniqueIndex("videoask_answers_pathname_key").on(t.pathname).where(sql`${t.pathname} is not null`),
+    check("videoask_answers_medium", sql`${t.medium} in ('text', 'poll', 'video', 'audio')`),
+    check("videoask_answers_position", sql`${t.position} >= 0`),
+    check("videoask_answers_title", sql`char_length(${t.title}) between 1 and 500`),
+    check("videoask_answers_question", sql`${t.questionId} ~ '^[A-Za-z0-9_-]{1,128}$'`),
+    check("videoask_answers_words", sql`
+      (${t.medium} in ('text', 'poll') and ${t.textBody} is not null and ${t.transcript} is null)
+      or (${t.medium} in ('video', 'audio') and ${t.textBody} is null)
+    `),
+    check("videoask_answers_no_file_on_text", sql`
+      ${t.medium} in ('video', 'audio')
+      or (${t.sourceUrl} is null and ${t.pathname} is null and ${t.contentType} is null and ${t.byteSize} is null and ${t.copiedAt} is null)
+    `),
+    check("videoask_answers_file_phase", sql`
+      ${t.medium} in ('text', 'poll')
+      or (${t.pathname} is null and ${t.contentType} is null and ${t.byteSize} is null and ${t.copiedAt} is null)
+      or (${t.sourceUrl} is null and ${t.pathname} is not null and ${t.contentType} is not null and ${t.byteSize} is not null and ${t.byteSize} >= 0 and ${t.copiedAt} is not null)
+    `),
+    check("videoask_answers_answer_len", sql`char_length(${t.answerId}) between 1 and 200`),
+    check("videoask_answers_text_len", sql`${t.textBody} is null or char_length(${t.textBody}) <= 20000`),
+    check("videoask_answers_transcript_len", sql`${t.transcript} is null or char_length(${t.transcript}) <= 20000`),
+    check("videoask_answers_source_len", sql`${t.sourceUrl} is null or char_length(${t.sourceUrl}) between 1 and 2000`),
+    check("videoask_answers_pathname_prefix", sql`
+      ${t.pathname} is null
+      or ${t.pathname} ~ '^videoask/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[A-Za-z0-9_-]{1,128}\\.[a-z0-9]{1,8}$'
+    `),
+  ],
+);
+
+export type VideoaskAnswer = typeof videoaskAnswers.$inferSelect;
+export type NewVideoaskAnswer = typeof videoaskAnswers.$inferInsert;
+
 export const applicationEvents = pgTable("application_events", {
   id: id(), createdAt: createdAt(),
   applicantId: uuid("applicant_id").references(() => applicants.id, { onDelete: "cascade" }),

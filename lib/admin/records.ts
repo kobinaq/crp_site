@@ -23,6 +23,8 @@ import type { StaffGrant } from "@/lib/staff/auth";
 import { can } from "@/lib/staff/roles";
 import { isUserId } from "@/lib/staff/users";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
+import { parseApplicantId, type AnswerView, type DocumentView } from "@/lib/holdings";
+import { loadAnswerViews, loadDocumentViews } from "@/lib/media";
 import { deskColumns, deskOfList, deskWhere, statusOptions as deskStatusOptions } from "@/lib/desk/case";
 import { offeredMoves, type ConfirmMove } from "@/lib/sync";
 import { NEEDS_DECISION_STATUSES, parseQueue, type QueueName } from "@/lib/review/queue";
@@ -132,6 +134,8 @@ export type ApplicantReview = {
   readonly prevHref: string | null;
   readonly nextHref: string | null;
   readonly events: readonly { readonly at: string; readonly actor: string; readonly from: string; readonly to: string; readonly reason: string }[];
+  readonly answers: readonly AnswerView[];
+  readonly documents: readonly DocumentView[];
 };
 
 export type ReviewerOption = { readonly id: string; readonly name: string; readonly email: string };
@@ -277,7 +281,7 @@ export async function exportList(
 export async function loadApplicant(
   db: Db,
   id: string,
-  viewer: { readonly id: string },
+  viewer: { readonly id: string; readonly role?: string },
   queue: "" | QueueName,
 ): Promise<ApplicantReview | null> {
   const [row] = await db
@@ -371,6 +375,11 @@ export async function loadApplicant(
     neighborId(db, row, viewer, queue, "prev"),
     neighborId(db, row, viewer, queue, "next"),
   ]);
+  const applicantId = parseApplicantId(row.id);
+  const answers = applicantId ? await loadAnswerViews(db, applicantId) : [];
+  const documents = applicantId && viewer.role && can(viewer.role, "identity.view")
+    ? await loadDocumentViews(db, applicantId)
+    : [];
   return {
     id: row.id,
     fullName: row.fullName,
@@ -430,6 +439,8 @@ export async function loadApplicant(
       to: textOf(event.toStatus),
       reason: event.reason,
     })),
+    answers,
+    documents,
   };
 }
 

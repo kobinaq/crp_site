@@ -18,7 +18,9 @@ export type AdminEvent =
   | { readonly kind: "nomination.assigned"; readonly subject: string | null; readonly nominationId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
   | { readonly kind: "partner.noted"; readonly partnerId: string; readonly noteId: string }
   | { readonly kind: "partner.status"; readonly partnerId: string; readonly from: PartnerStatus; readonly to: PartnerStatus }
-  | { readonly kind: "partner.assigned"; readonly subject: string | null; readonly partnerId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null };
+  | { readonly kind: "partner.assigned"; readonly subject: string | null; readonly partnerId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
+  | { readonly kind: "answer.media_opened"; readonly applicantId: string; readonly questionId: string }
+  | { readonly kind: "identity.document_opened"; readonly applicantId: string; readonly documentId: string };
 
 export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEvent): Promise<void> {
   const subjectId = "subject" in event ? event.subject : null;
@@ -34,6 +36,8 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
     detail.filters = event.filters;
   }
   if ("applicantId" in event) detail.applicantId = event.applicantId;
+  if ("questionId" in event) detail.questionId = event.questionId;
+  if ("documentId" in event) detail.documentId = event.documentId;
   if ("nominationId" in event) detail.nominationId = event.nominationId;
   if ("partnerId" in event) detail.partnerId = event.partnerId;
   if ("reviewCycle" in event) detail.reviewCycle = event.reviewCycle;

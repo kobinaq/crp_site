@@ -22,7 +22,9 @@ import {
   type WebhookJobPayload,
 } from "@/lib/jobs";
 import { processWebhookEvent, requeueUnprocessedWebhooks } from "@/lib/webhooks";
+import { identityPathname, parseApplicantId, readMediaEnv, readVideoaskMediaJob } from "@/lib/holdings";
 import { fetchDiditDocuments } from "@/lib/identity";
+import { copyVideoaskMedia, retainPrivateMedia, type RetentionReport } from "@/lib/media";
 import { recordChange } from "@/lib/sync-log";
 import { applicantSyncRowWithDocuments } from "@/lib/sync";
 
@@ -81,7 +83,10 @@ export const handlers: Record<JobKind, JobHandler> = {
       const body = Buffer.from(await response.arrayBuffer());
       const contentType = response.headers.get("content-type")?.split(";")[0] || "application/octet-stream";
       const extension = contentType.split("/")[1]?.replace(/[^a-z0-9]+/gi, "") || "bin";
-      const pathname = `identity/${applicantId}/${source.kind}-${index}.${extension}`;
+      const parsedId = parseApplicantId(applicantId);
+      const pathname = parsedId
+        ? identityPathname(parsedId, source.kind, index, contentType)
+        : `identity/${applicantId}/${source.kind}-${index}.${extension}`;
       await put(pathname, body, { access: "private", contentType, allowOverwrite: true });
       await db.insert(identityDocuments).values({
         applicantId,
@@ -108,6 +113,12 @@ export const handlers: Record<JobKind, JobHandler> = {
     const result = await processWebhookEvent(db, eventId);
     return { status: "done", deliveryStatus: result.outcome };
   },
+
+  async videoask_media(job, db) {
+    const ids = readVideoaskMediaJob(job.payload);
+    if (!ids) return { status: "failed", error: "videoask media job is missing ids" };
+    return copyVideoaskMedia(db, ids.applicantId, ids.questionId);
+  },
 };
 
 // One cron tick: retry anything due, sweep for orphaned webhook events, and
@@ -124,5 +135,11 @@ export async function tick(limit = 25) {
   } catch (err) {
     console.error("[worker] staff purge skipped", err instanceof Error ? err.message : err);
   }
-  return { ...jobs, requeuedWebhooks: requeued };
+  let mediaRetention: RetentionReport = { mode: "error", answers: 0, documents: 0 };
+  try {
+    mediaRetention = await retainPrivateMedia(db, new Date(), readMediaEnv(process.env));
+  } catch {
+    mediaRetention = { mode: "error", answers: 0, documents: 0 };
+  }
+  return { ...jobs, requeuedWebhooks: requeued, mediaRetention };
 }

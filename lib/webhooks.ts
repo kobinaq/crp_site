@@ -11,6 +11,8 @@ import { applyVideoaskCompletion, scheduleIdentitySession } from "@/lib/applicat
 import { reconcileIdentity } from "@/lib/application-status";
 import { issueAccessToken } from "@/lib/access";
 import { calendlyLink, parseCalendlyReference } from "@/lib/calendly";
+import { parseApplicantId, readStoredAnswers } from "@/lib/holdings";
+import { saveAnswers } from "@/lib/media";
 import { isAllowedVideoaskForm } from "@/lib/videoask";
 
 // Every verified webhook is written down before anything acts on it. The
@@ -56,7 +58,8 @@ export async function processWebhookEvent(db: Db, eventId: string): Promise<Proc
     if (event.processedAt) return { outcome: event.outcome ?? "processed" };
 
     const result = await dispatch(tx, event, sources);
-    await tx.update(webhookEvents).set({ processedAt: new Date(), outcome: result.outcome }).where(eq(webhookEvents.id, eventId));
+    const payload = event.provider === "videoask" ? scrubbedVideoaskPayload(event.payload) : event.payload;
+    await tx.update(webhookEvents).set({ processedAt: new Date(), outcome: result.outcome, payload }).where(eq(webhookEvents.id, eventId));
     return result;
   });
 }
@@ -118,11 +121,27 @@ async function dispatch(tx: Tx, event: WebhookEvent, sources: EmailSources): Pro
 
 // --- VideoAsk -----------------------------------------------------------------
 
-export type VideoaskPayload = { applicantId: string; formId: string; eventId: string };
+export type VideoaskPayload = { applicantId: string; formId: string; eventId: string; answers?: unknown };
+
+function scrubbedVideoaskPayload(payload: JobPayload): JobPayload {
+  return {
+    applicantId: payload.applicantId,
+    eventId: payload.eventId,
+    formId: payload.formId,
+    answerCount: Array.isArray(payload.answers) ? payload.answers.length : 0,
+  };
+}
 
 async function processVideoask(tx: Tx, payload: VideoaskPayload, sources: EmailSources): Promise<ProcessOutcome> {
   if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
-  return applyVideoaskCompletion(tx, payload.applicantId, sources);
+  const completion = await applyVideoaskCompletion(tx, payload.applicantId, sources);
+  // An unverified applicant still has a row. Store the answers before the webhook body is reduced to ids.
+  if (completion.outcome !== "unknown applicant") {
+    const applicantId = parseApplicantId(payload.applicantId);
+    const incoming = readStoredAnswers(payload.answers);
+    if (applicantId && incoming.length > 0) await saveAnswers(tx, applicantId, incoming);
+  }
+  return completion;
 }
 
 // --- Identity provider --------------------------------------------------------

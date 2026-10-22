@@ -629,8 +629,12 @@ test("identity events for another session or from the past are ignored", async (
   assert.equal(orphaned.body.outcome, "no active session");
   assert.equal((await row("applicants", a.id)).status, "id_failed");
 
-  await h.cron();
-  const retried = await row("applicants", a.id);
+  // Other tests share this queue, so one tick can be spent on their jobs.
+  let retried = await row("applicants", a.id);
+  for (let attempt = 0; retried.identity_link == null && attempt < 8; attempt++) {
+    await h.cron();
+    retried = await row("applicants", a.id);
+  }
   assert.match(retried.identity_link, /^https:\/\/identity\.invalid\//);
   assert.ok(retried.identity_session_id);
   assert.notEqual(retried.identity_session_id, session);
