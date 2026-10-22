@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { DecisionPanel } from "@/components/admin/DecisionPanel";
+import { DocumentReveal, PrivateMedia } from "@/components/admin/PrivateMedia";
 import { ReviewEditor } from "@/components/admin/ReviewEditor";
 import { ReviewKeys } from "@/components/admin/ReviewKeys";
 import { card } from "@/components/admin/marks";
 import { STATUS_LABEL } from "@/lib/admin/dashboard";
 import { queueListHref, type ApplicantReview, type ReviewerOption } from "@/lib/admin/records";
+import type { AnswerView } from "@/lib/holdings";
 import type { QueueName } from "@/lib/review/queue";
 
 export function ApplicantReviewView({
@@ -58,11 +60,19 @@ export function ApplicantReviewView({
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Identity</h2>
               <p className="mt-2 text-2xl font-semibold">{review.identity}</p>
               <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt || "Not checked"}</p>
+              {review.documents.map((document) => (
+                <DocumentReveal key={document.documentId} applicantId={review.id} view={document} />
+              ))}
             </article>
           </section>
           <ReviewEditor review={review} canWrite={canWrite} canAssign={canAssign} reviewers={reviewers} viewerId={viewerId} noteId={noteId} />
           <section className={card}>
             <h2 className="text-lg font-semibold">Answers</h2>
+            {review.answers.length > 0 ? (
+              <div className="mt-4 grid gap-4">
+                {review.answers.map((answer) => <AnswerBlock key={answer.questionId} applicantId={review.id} view={answer} />)}
+              </div>
+            ) : null}
             <dl className="mt-4 grid gap-4 desk:grid-cols-2">
               <Fact term="Date of birth" value={review.dob} />
               <Fact term="Age" value={String(review.age)} />
@@ -102,6 +112,36 @@ export function ApplicantReviewView({
 
 function Pill({ label }: { label: string }) {
   return <span className="rounded-full bg-lime px-3 py-1 text-sm font-semibold">{label}</span>;
+}
+
+function AnswerBlock({ applicantId, view }: { applicantId: string; view: AnswerView }) {
+  if (view.kind === "text") {
+    return (
+      <div>
+        <h3 className="text-sm font-semibold">{view.title}</h3>
+        <p className="mt-1 text-sm">{view.text || "Not given"}</p>
+      </div>
+    );
+  }
+  if (view.kind === "poll") {
+    return (
+      <div>
+        <h3 className="text-sm font-semibold">{view.title}</h3>
+        <p className="mt-1 text-sm">{view.label || "Not given"}</p>
+      </div>
+    );
+  }
+  const copying = view.medium === "video" ? "Video is still copying" : "Audio is still copying";
+  const gone = view.medium === "video" ? "Video file is no longer available" : "Audio file is no longer available";
+  return (
+    <div>
+      <h3 className="text-sm font-semibold">{view.title}</h3>
+      <p className="mt-1 text-sm">{view.transcript || "No transcript yet"}</p>
+      {view.playback === "copying" ? <p className="mt-2 text-sm text-black/70">{copying}</p> : null}
+      {view.playback === "unavailable" ? <p className="mt-2 text-sm text-black/70">{gone}</p> : null}
+      {view.playback === "ready" ? <PrivateMedia applicantId={applicantId} view={view} /> : null}
+    </div>
+  );
 }
 
 function Fact({ term, value }: { term: string; value: string }) {

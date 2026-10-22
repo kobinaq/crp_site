@@ -1,23 +1,39 @@
-import { and, eq, isNull } from "drizzle-orm";
-import { put } from "@vercel/blob";
-import { videoaskAnswers, type Db, type Store, type VideoaskAnswer } from "@/lib/db";
+import { createHmac, timingSafeEqual } from "crypto";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { get, put } from "@vercel/blob";
+import { recordEvent } from "@/lib/admin/events";
+import { identityDocuments, videoaskAnswers, type Db, type IdentityDocument, type Store, type VideoaskAnswer } from "@/lib/db";
 import {
   MEDIA_BYTE_CAP,
   answerInsert,
   clipStorage,
+  isStaffStreamPath,
   mergeAnswer,
   parseApplicantId,
+  parseDocumentId,
   parseQuestionId,
   parseVideoAskMediaUrl,
+  presentAnswer,
+  presentDocument,
+  readRangeHeader,
+  storedObject,
+  streamHeaders,
   videoaskPathname,
   type AnswerHolding,
+  type AnswerView,
   type ApplicantId,
+  type DocumentHolding,
+  type DocumentView,
+  type Holding,
   type IncomingAnswer,
+  type MediaEnv,
   type PrivatePathname,
   type QuestionId,
+  type StaffStreamPath,
 } from "@/lib/holdings";
 import { enqueue, type JobOutcome } from "@/lib/jobs";
 import { lockApplicant } from "@/lib/lifecycle";
+import { can } from "@/lib/staff/roles";
 
 const REDIRECT_HOPS = 2;
 
@@ -201,5 +217,247 @@ export async function copyVideoaskMedia(db: Db, applicantId: ApplicantId, questi
     return { status: "done", deliveryStatus: "stored" };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function holdingFromDocumentRow(row: IdentityDocument): DocumentHolding | null {
+  const applicantId = parseApplicantId(row.applicantId);
+  const documentId = parseDocumentId(row.id);
+  if (!applicantId || !documentId || row.size < 0) return null;
+  return {
+    slot: "document",
+    applicantId,
+    documentId,
+    kind: row.kind,
+    object: { pathname: row.pathname as PrivatePathname, contentType: row.contentType, byteSize: row.size },
+  };
+}
+
+async function loadHolding(db: Store, applicantId: ApplicantId, slot: "answer" | "document", holdingId: string): Promise<Holding | null> {
+  if (slot === "answer") {
+    const questionId = parseQuestionId(holdingId);
+    if (!questionId) return null;
+    const [row] = await db
+      .select()
+      .from(videoaskAnswers)
+      .where(and(eq(videoaskAnswers.applicantId, applicantId), eq(videoaskAnswers.questionId, questionId)));
+    return row ? holdingFromAnswerRow(row) : null;
+  }
+  const documentId = parseDocumentId(holdingId);
+  if (!documentId) return null;
+  const [row] = await db
+    .select()
+    .from(identityDocuments)
+    .where(and(eq(identityDocuments.applicantId, applicantId), eq(identityDocuments.id, documentId)));
+  return row ? holdingFromDocumentRow(row) : null;
+}
+
+export async function loadAnswerViews(db: Store, applicantId: ApplicantId): Promise<readonly AnswerView[]> {
+  const rows = await db
+    .select()
+    .from(videoaskAnswers)
+    .where(eq(videoaskAnswers.applicantId, applicantId))
+    .orderBy(asc(videoaskAnswers.position), asc(videoaskAnswers.questionId));
+  return rows.flatMap((row) => {
+    const holding = holdingFromAnswerRow(row);
+    return holding ? [presentAnswer(holding)] : [];
+  });
+}
+
+export async function loadDocumentViews(db: Store, applicantId: ApplicantId): Promise<readonly DocumentView[]> {
+  const rows = await db
+    .select()
+    .from(identityDocuments)
+    .where(eq(identityDocuments.applicantId, applicantId))
+    .orderBy(asc(identityDocuments.kind), asc(identityDocuments.id));
+  return rows.flatMap((row) => {
+    const holding = holdingFromDocumentRow(row);
+    return holding ? [presentDocument(holding)] : [];
+  });
+}
+
+export type StreamGrant = {
+  readonly actorId: string;
+  readonly applicantId: ApplicantId;
+  readonly slot: "answer" | "document";
+  readonly holdingId: string;
+  readonly exp: number;
+};
+
+function signStream(segment: string, secret: string): string {
+  return createHmac("sha256", secret).update(`staff-stream:${segment}`).digest("base64url");
+}
+
+export function mintStreamToken(grant: StreamGrant, secret: string): string {
+  const segment = Buffer.from(JSON.stringify({
+    v: 1,
+    aud: "staff-stream",
+    sub: grant.actorId,
+    applicantId: grant.applicantId,
+    slot: grant.slot,
+    holdingId: grant.holdingId,
+    exp: grant.exp,
+  })).toString("base64url");
+  return `${segment}.${signStream(segment, secret)}`;
+}
+
+export function readStreamToken(token: string, nowSeconds: number, ttlSeconds: number, secret: string): StreamGrant | null {
+  const dot = token.indexOf(".");
+  if (dot <= 0 || token.indexOf(".", dot + 1) !== -1) return null;
+  const segment = token.slice(0, dot);
+  const mac = token.slice(dot + 1);
+  const expected = Buffer.from(signStream(segment, secret));
+  const given = Buffer.from(mac);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(segment, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const row = parsed as Record<string, unknown>;
+  if (row.v !== 1 || row.aud !== "staff-stream") return null;
+  if (row.slot !== "answer" && row.slot !== "document") return null;
+  if (typeof row.sub !== "string" || typeof row.holdingId !== "string" || typeof row.applicantId !== "string") return null;
+  if (typeof row.exp !== "number" || !Number.isFinite(row.exp)) return null;
+  const applicantId = parseApplicantId(row.applicantId);
+  if (!applicantId) return null;
+  if (row.exp <= nowSeconds || row.exp > nowSeconds + ttlSeconds) return null;
+  return { actorId: row.sub, applicantId, slot: row.slot, holdingId: row.holdingId, exp: row.exp };
+}
+
+export type OpenInput = {
+  readonly actorId: string;
+  readonly role: string;
+  readonly applicantId: ApplicantId;
+  readonly slot: "answer" | "document";
+  readonly holdingId: string;
+};
+
+export type OpenResult =
+  | { readonly ok: true; readonly url: StaffStreamPath }
+  | { readonly ok: false; readonly error: "forbidden" | "not_found" | "not_ready" };
+
+export async function openHolding(db: Db, input: OpenInput, now: Date, env: MediaEnv, secret: string): Promise<OpenResult> {
+  const capability = input.slot === "document" ? "identity.view" : "dashboard.read";
+  if (!can(input.role, capability)) return { ok: false, error: "forbidden" };
+  const holding = await loadHolding(db, input.applicantId, input.slot, input.holdingId);
+  if (!holding) return { ok: false, error: "not_found" };
+  if (!storedObject(holding)) return { ok: false, error: "not_ready" };
+  const token = mintStreamToken({
+    actorId: input.actorId,
+    applicantId: input.applicantId,
+    slot: input.slot,
+    holdingId: input.holdingId,
+    exp: Math.floor(now.getTime() / 1000) + env.ttlSeconds,
+  }, secret);
+  const url = `/admin/records/applicants/${input.applicantId}/stream/${token}`;
+  if (!isStaffStreamPath(input.applicantId, url)) return { ok: false, error: "not_found" };
+  await db.transaction(async (tx) => {
+    await recordEvent(tx, input.actorId, input.slot === "answer"
+      ? { kind: "answer.media_opened", applicantId: input.applicantId, questionId: input.holdingId }
+      : { kind: "identity.document_opened", applicantId: input.applicantId, documentId: input.holdingId });
+  });
+  return { ok: true, url };
+}
+
+export type StreamInput = {
+  readonly actorId: string;
+  readonly role: string;
+  readonly applicantId: ApplicantId;
+  readonly token: string;
+  readonly rangeHeader: string | null;
+  readonly method: "GET" | "HEAD";
+  readonly signal: AbortSignal;
+};
+
+export type StaffBytes = {
+  readonly status: 200 | 206 | 416;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: ReadableStream<Uint8Array> | null;
+};
+
+export type StreamResult =
+  | { readonly ok: true; readonly bytes: StaffBytes }
+  | { readonly ok: false; readonly status: 401 | 403 | 404 | 502 };
+
+function disposition(slot: "answer" | "document", contentType: string): string {
+  const known = clipStorage(contentType);
+  const subtype = contentType.split(";")[0]?.split("/")[1]?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  const ext = known.ext !== "bin" ? known.ext : subtype.length > 0 && subtype.length <= 8 ? subtype : "bin";
+  return `inline; filename="${slot === "document" ? "document" : "answer"}.${ext}"`;
+}
+
+function sliceStream(source: ReadableStream<Uint8Array>, skip: number, take: number): ReadableStream<Uint8Array> {
+  const reader = source.getReader();
+  let skipped = 0;
+  let sent = 0;
+  return new ReadableStream({
+    async pull(controller) {
+      while (sent < take) {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        let chunk = value;
+        if (skipped < skip) {
+          const need = skip - skipped;
+          if (chunk.byteLength <= need) {
+            skipped += chunk.byteLength;
+            continue;
+          }
+          chunk = chunk.subarray(need);
+          skipped = skip;
+        }
+        const room = take - sent;
+        if (chunk.byteLength <= room) {
+          controller.enqueue(chunk);
+          sent += chunk.byteLength;
+          continue;
+        }
+        controller.enqueue(chunk.subarray(0, room));
+        sent = take;
+        break;
+      }
+      await reader.cancel();
+      controller.close();
+    },
+    cancel() {
+      return reader.cancel();
+    },
+  });
+}
+
+export async function streamHolding(db: Db, input: StreamInput, now: Date, env: MediaEnv, secret: string): Promise<StreamResult> {
+  const grant = readStreamToken(input.token, Math.floor(now.getTime() / 1000), env.ttlSeconds, secret);
+  if (!grant || grant.applicantId !== input.applicantId) return { ok: false, status: 404 };
+  if (grant.actorId !== input.actorId) return { ok: false, status: 403 };
+  if (!can(input.role, grant.slot === "document" ? "identity.view" : "dashboard.read")) return { ok: false, status: 403 };
+  const holding = await loadHolding(db, input.applicantId, grant.slot, grant.holdingId);
+  const object = holding ? storedObject(holding) : null;
+  if (!holding || !object) return { ok: false, status: 404 };
+  const read = readRangeHeader(input.rangeHeader, object.byteSize);
+  const header = streamHeaders(object.contentType, object.byteSize, read);
+  const headers = { ...header.headers, "Content-Disposition": disposition(holding.slot, object.contentType) };
+  if (read.kind === "unsatisfiable" || input.method === "HEAD") {
+    return { ok: true, bytes: { status: header.status, headers, body: null } };
+  }
+  try {
+    const result = await get(object.pathname, {
+      access: "private",
+      useCache: false,
+      abortSignal: input.signal,
+      ...(read.kind === "partial" ? { headers: { Range: `bytes=${read.range.start}-${read.range.end}` } } : {}),
+    });
+    if (!result?.stream) return { ok: false, status: 502 };
+    if (read.kind === "partial" && !result.headers.get("content-range")) {
+      const length = read.range.end - read.range.start + 1;
+      return { ok: true, bytes: { status: 206, headers, body: sliceStream(result.stream, read.range.start, length) } };
+    }
+    return { ok: true, bytes: { status: read.kind === "partial" ? 206 : 200, headers, body: result.stream } };
+  } catch {
+    return { ok: false, status: 502 };
   }
 }

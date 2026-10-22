@@ -52,6 +52,9 @@ test("roles keep reviewers off copy and leave an unknown role with nothing", () 
   assert.equal(can("admin", "users.manage"), true);
   assert.equal(can("admin", "records.export"), true);
   assert.equal(can("admin", "activity.read"), true);
+  assert.equal(can("admin", "identity.view"), true);
+  assert.equal(can("editor", "identity.view"), false);
+  assert.equal(can("reviewer", "identity.view"), false);
   assert.equal(can("member", "dashboard.read"), false);
   for (const role of USER_ROLES) assert.ok(ROLE_CAPABILITIES[role].includes("dashboard.read"));
 });
@@ -217,6 +220,12 @@ async function applicantReview() {
   `);
   const id = inserted.rows[0].id;
   await sql.query(`insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', 'secret.example/doc', 'image/jpeg', 12)`, [id]);
+  await sql.query(
+    `insert into videoask_answers (
+      applicant_id, question_id, answer_id, position, title, medium, transcript, pathname, content_type, byte_size, copied_at
+    ) values ($1, 'secret', 'a-story', 0, 'Story', 'video', 'the spoken answer', $2, 'video/mp4', 8, now())`,
+    [id, `videoask/${id}/secret.example`],
+  );
   await sql.query(`insert into application_events (applicant_id, from_status, to_status, actor, reason) values ($1, 'submitted', 'round1_complete', 'videoask', 'round 1 finished')`, [id]);
   await sql.query(`insert into nominations (nominator_name, nominator_email, nominee_name, nominee_email, videoask_link) values ('Ivy', 'ivy@example.org', 'Nia', 'nia-nom@example.org', 'https://secret.example/ask')`);
   const viewer = { id: "00000000-0000-4000-8000-000000000000" };
@@ -227,7 +236,19 @@ async function applicantReview() {
   assert.equal(detail.events.some((event) => event.reason === "round 1 finished"), true);
   assert.equal(Object.hasOwn(detail, "round1Link"), false);
   assert.equal(JSON.stringify(detail).includes("secret.example"), false);
+  assert.equal(JSON.stringify(detail).includes("media.videoask.com"), false);
+  assert.equal(JSON.stringify(detail).includes("vercel-storage.com"), false);
+  assert.equal(JSON.stringify(detail).includes("the spoken answer"), true);
+  assert.deepEqual(detail.documents, []);
   assert.equal(JSON.stringify(detail).includes("session-secret"), false);
+  const editorDetail = await loadApplicant(database, id, { id: viewer.id, role: "editor" }, "");
+  assert.deepEqual(editorDetail.documents, []);
+  assert.equal(JSON.stringify(editorDetail).includes("secret.example"), false);
+  assert.equal(JSON.stringify(editorDetail).includes("the spoken answer"), true);
+  const adminDetail = await loadApplicant(database, id, { id: viewer.id, role: "admin" }, "");
+  assert.equal(adminDetail.documents.length, 1);
+  assert.equal(adminDetail.documents[0].kind, "passport");
+  assert.equal(JSON.stringify(adminDetail).includes("secret.example"), false);
   assert.equal(await loadApplicant(database, parseUserId("00000000-0000-4000-8000-000000000000")), null);
   const query = parseRecordQuery({ list: "applicants", q: "nia", status: "submitted", track: "in_person", language: "fr", cycle: "2" });
   const listed = await loadRecords(database, query, viewer);
@@ -309,6 +330,8 @@ async function applicantReview() {
   assert.equal(activityLabel("partner.noted", {}), "Added a partner note");
   assert.equal(activityLabel("partner.status", { from: "new", to: "declined" }), "Moved a partner inquiry from new to declined");
   assert.equal(activityLabel("partner.assigned", { assigneeId: "" }), "Cleared a partner assignee");
+  assert.equal(activityLabel("answer.media_opened", { pathname: "videoask/secret.example", transcript: "private words" }), "Played a VideoAsk recording");
+  assert.equal(activityLabel("identity.document_opened", { url: "https://store.example.vercel-storage.com/doc" }), "Showed an identity document");
 }
 
 test("an admin invites an editor and cannot remove the last admin", async () => {
