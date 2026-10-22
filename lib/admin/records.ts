@@ -75,10 +75,10 @@ const TITLES: Record<RecordList, string> = {
 
 const SCREEN: Record<RecordList, readonly string[]> = {
   applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Cycle", "Created"],
-  nominations: ["Nominator", "Nominee", "Email", "Track", "Status", "Assignee", "Created"],
+  nominations: ["Nominator", "Nominee", "Email", "Track", "Staff status", "Assignee", "Created"],
   interest: ["Name", "Email", "Age", "Track", "Created"],
   waitlist: ["Name", "Email", "Status", "Created"],
-  partners: ["Name", "Email", "Organization", "Support", "Status", "Assignee", "Created"],
+  partners: ["Name", "Email", "Organization", "Support", "Staff status", "Assignee", "Created"],
 };
 
 export type ApplicantReview = {

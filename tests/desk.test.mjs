@@ -24,9 +24,9 @@ before(async () => {
 });
 
 after(async () => {
-  try { await load("lib/db/index.ts").closeDb(); } catch { /* pool may already be closed */ }
-  try { await sql.end(); } catch { /* ignore */ }
-  try { await db.stop(); } catch { /* ignore */ }
+  try { await load("lib/db/index.ts").closeDb(); } catch { }
+  try { await sql.end(); } catch { }
+  try { await db.stop(); } catch { }
 });
 
 function mod(path) {

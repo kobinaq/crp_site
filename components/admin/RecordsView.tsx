@@ -36,7 +36,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
         <input type="hidden" name="list" value={data.list} />
         <Filter label="Search" name="q" value={data.filters.q} />
         {data.list === "applicants" ? <Choice label="Status" name="status" value={data.filters.status} options={PIPELINE_ORDER.map((status) => [status, STATUS_LABEL[status]])} /> : null}
-        {data.statusOptions.length > 0 ? <Choice label="Status" name="status" value={data.filters.status} options={data.statusOptions} /> : null}
+        {data.statusOptions.length > 0 ? <Choice label="Staff status" name="status" value={data.filters.status} options={data.statusOptions} /> : null}
         {data.statusOptions.length > 0 ? <Choice label="Attention" name="attention" value={data.filters.attention} options={[["needs", "Needs attention"]]} /> : null}
         {data.list === "waitlist" ? <Choice label="Status" name="status" value={data.filters.status} options={waitlistStatus.enumValues.map((status) => [status, status])} /> : null}
         {data.list === "applicants" || data.list === "nominations" || data.list === "interest" ? <Choice label="Track" name="track" value={data.filters.track} options={track.enumValues.map((item) => [item, item])} /> : null}

@@ -1,7 +1,6 @@
 export const USER_ROLES = ["admin", "editor", "reviewer"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-// The only capability matrix. ROLE_CAPABILITIES and CAPABILITIES are derived.
 const GRANTS = [
   ["dashboard.read", "admin", "editor", "reviewer"],
   ["copy.edit", "admin", "editor"],

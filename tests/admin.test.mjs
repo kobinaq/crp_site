@@ -262,6 +262,7 @@ async function applicantReview() {
   const editorViewer = { id: user.rows[0].id, role: "editor" };
   const reviewerViewer = { id: user.rows[0].id, role: "reviewer" };
   const nominationList = await loadRecords(database, parseRecordQuery({ list: "nominations", q: "ivy" }), adminViewer);
+  assert.equal(nominationList.headers.at(-3), "Staff status");
   assert.equal(nominationList.headers.at(-2), "Assignee");
   assert.match(nominationList.rows[0].href, /^\/admin\/records\/nominations\//);
   assert.equal(nominationList.rows[0].cells.includes("New"), true);
@@ -275,6 +276,7 @@ async function applicantReview() {
   const editorPartners = await loadRecords(database, parseRecordQuery({ list: "partners" }), editorViewer);
   assert.equal(editorPartners.rows.every((row) => row.href === null), true);
   const adminPartners = await loadRecords(database, parseRecordQuery({ list: "partners" }), adminViewer);
+  assert.equal(adminPartners.headers.at(-3), "Staff status");
   assert.match(adminPartners.rows[0].href, /^\/admin\/records\/partners\//);
   const needs = await loadRecords(database, parseRecordQuery({ list: "nominations", q: "ivy", attention: "needs" }), adminViewer);
   assert.equal(needs.total, 1);

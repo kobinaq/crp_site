@@ -48,7 +48,7 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
         <AttentionCard title="Nominations needing attention" summary={data.nominationDesk} />
         <AttentionCard title="Partners needing attention" summary={data.partnerWorkflow} />
       </section>
-      <Table title="Recent nominations" empty="No nominations yet." headers={["When", "Nominator", "Nominee", "Status"]} rows={data.nominations.recent.map((row) => [when(row.createdAt), row.nominatorName, row.nomineeName, row.status])} />
+      <Table title="Recent nominations" empty="No nominations yet." headers={["When", "Nominator", "Nominee", "Staff status"]} rows={data.nominations.recent.map((row) => [when(row.createdAt), row.nominatorName, row.nomineeName, row.status])} />
       <Table title="Recent interest" empty="No interest sign-ups yet." headers={["When", "Name", "Email", "Age", "Track"]} rows={data.interest.recent.map((row) => [when(row.createdAt), row.name ?? "", row.email, row.ageGroup, row.track ?? ""])} />
       <Table title="Recent waitlist" empty="No waitlist sign-ups yet." headers={["When", "Name", "Email", "Status"]} rows={data.waitlist.recent.map((row) => [when(row.createdAt), row.name ?? "", row.email, row.status])} />
       <Table title="Recent partner inquiries" empty="No partner inquiries yet." headers={["When", "Name", "Organization", "Support"]} rows={data.partners.recent.map((row) => [when(row.createdAt), row.name, row.organization, row.support])} />

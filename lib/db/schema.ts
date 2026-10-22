@@ -443,7 +443,6 @@ export const sheetConflicts = pgTable("sheet_conflicts", {
   primaryKey({ columns: [t.applicantId, t.reviewCycle, t.decisionId] }),
 ]);
 
-// No row means status new and no assignee. Public inserts do not write one.
 export const deskCases = pgTable("desk_cases", {
   desk: text("desk").notNull(),
   recordId: uuid("record_id").notNull(),
