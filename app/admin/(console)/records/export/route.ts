@@ -18,6 +18,7 @@ export async function POST(request: Request): Promise<Response> {
     language: field(form, "language"),
     cycle: field(form, "cycle"),
     age: field(form, "age"),
+    queue: field(form, "queue"),
   }));
   if (!file) return new Response("Forbidden", { status: 403 });
   return new Response(file.body, {

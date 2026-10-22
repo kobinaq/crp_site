@@ -14,7 +14,7 @@ export type Status = Applicant["status"];
 export const STATUSES = applicantStatus.enumValues;
 
 // Who caused a change. Recorded on every event so the history reads as a story.
-export type Actor = "applicant" | "videoask" | "identity" | "excel" | "ops" | "system";
+export type Actor = "applicant" | "videoask" | "identity" | "excel" | "ops" | "system" | "staff";
 
 // The one place the pipeline is defined. A status may only move to a status
 // listed here; everything else (webhooks, the review sheet, ops tools) asks
@@ -51,17 +51,19 @@ export function requiresVerifiedIdentity(applicant: Pick<Applicant, "track" | "i
 }
 
 export type TransitionInput = {
-  applicantId: string;
-  to: Status;
-  actor: Actor;
-  reason: string;
+  readonly applicantId: string;
+  readonly to: Status;
+  readonly reason: string;
   // Narrow the allowed sources further than TRANSITIONS (e.g. review-sheet rules).
-  allowFrom?: readonly Status[];
+  readonly allowFrom?: readonly Status[];
   // Columns written in the same statement as the status change.
-  patch?: Partial<NewApplicant>;
+  readonly patch?: Partial<NewApplicant>;
   // Optimistic guard: refuse when the caller's view is older than the row.
-  expectedVersion?: number;
-};
+  readonly expectedVersion?: number;
+} & (
+  | { readonly actor: Exclude<Actor, "staff"> }
+  | { readonly actor: "staff"; readonly staffUserId: string }
+);
 
 export type TransitionFailure = "not_found" | "not_allowed" | "stale" | "identity_required" | "noop";
 
@@ -103,6 +105,7 @@ export async function transition(tx: Store, input: TransitionInput): Promise<Tra
     fromStatus: current.status,
     toStatus: input.to,
     actor: input.actor,
+    actorStaffId: input.actor === "staff" ? input.staffUserId : null,
     reason: input.reason,
     version: updated.version,
   });

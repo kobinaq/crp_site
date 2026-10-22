@@ -1,8 +1,13 @@
 import { z } from "zod";
 import type { Applicant } from "@/lib/db";
 import { appUrl } from "@/lib/config";
+import { TRANSITIONS } from "@/lib/lifecycle";
 
 type Status = Applicant["status"];
+
+export type ConfirmMove =
+  | { readonly field: "reviewDecision"; readonly value: "accept" | "reject"; readonly to: Status }
+  | { readonly field: "interviewOutcome"; readonly value: "yes" | "no"; readonly to: Status };
 
 // One decision row as the Excel poll sends it. Blank cells arrive as "" and are
 // normalized to undefined before parsing. `version` is the applicant version the
@@ -65,6 +70,36 @@ export function decisionSourceStatuses(
   const review: Status[] = ["under_review", "accepted", "rejected", "online_offered"];
   if (target === "accepted" || target === "rejected" || target === "online_offered") return review;
   return [];
+}
+
+const MOVE_CANDIDATES = [
+  { field: "reviewDecision", value: "accept" },
+  { field: "reviewDecision", value: "reject" },
+  { field: "interviewOutcome", value: "yes" },
+  { field: "interviewOutcome", value: "no" },
+] as const;
+
+export function offeredMoves(applicant: Pick<Applicant, "status" | "track">): readonly ConfirmMove[] {
+  const moves: ConfirmMove[] = [];
+  for (const candidate of MOVE_CANDIDATES) {
+    // targetStatus reads the decision field. The id only satisfies DecisionRow.
+    const probe = {
+      applicantId: "00000000-0000-4000-8000-000000000000",
+      reviewCycle: 0,
+      ...(candidate.field === "reviewDecision"
+        ? { reviewDecision: candidate.value }
+        : { interviewOutcome: candidate.value }),
+    } satisfies DecisionRow;
+    const target = targetStatus(probe, applicant.track);
+    if (!target || target === applicant.status) continue;
+    if (!decisionSourceStatuses(target, {
+      interviewOutcome: candidate.field === "interviewOutcome" ? candidate.value : undefined,
+    }).includes(applicant.status)) continue;
+    if (!TRANSITIONS[applicant.status].includes(target)) continue;
+    if (candidate.field === "reviewDecision") moves.push({ field: "reviewDecision", value: candidate.value, to: target });
+    else moves.push({ field: "interviewOutcome", value: candidate.value, to: target });
+  }
+  return moves;
 }
 
 // A real Date or undefined; an unparseable cell is dropped, not stored as junk.

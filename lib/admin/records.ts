@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { weeklyIntake, type WeekCount } from "@/lib/admin/weeks";
 import { recordEvent } from "@/lib/admin/events";
 import {
@@ -10,7 +10,11 @@ import {
   nominationStatus,
   nominations,
   partnerInquiries,
+  reviewNotes,
+  reviewPositions,
+  sheetConflicts,
   track,
+  users,
   waitlist,
   waitlistStatus,
   type Db,
@@ -18,7 +22,10 @@ import {
 } from "@/lib/db";
 import type { StaffGrant } from "@/lib/staff/auth";
 import { can } from "@/lib/staff/roles";
+import { isUserId } from "@/lib/staff/users";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
+import { offeredMoves, type ConfirmMove } from "@/lib/sync";
+import { NEEDS_DECISION_STATUSES, parseQueue, type QueueName } from "@/lib/review/queue";
 
 export const RECORD_LISTS = ["applicants", "nominations", "interest", "waitlist", "partners"] as const;
 export type RecordList = (typeof RECORD_LISTS)[number];
@@ -32,6 +39,7 @@ export type RecordQuery = {
   readonly language: string;
   readonly cycle: string;
   readonly age: string;
+  readonly queue: "" | QueueName;
   readonly page: number;
 };
 
@@ -39,6 +47,8 @@ export type RecordRow = {
   readonly id: string;
   readonly href: string | null;
   readonly cells: readonly string[];
+  readonly version?: number;
+  readonly reviewCycle?: number;
 };
 
 export type RecordPage = {
@@ -62,7 +72,7 @@ const TITLES: Record<RecordList, string> = {
 };
 
 const SCREEN: Record<RecordList, readonly string[]> = {
-  applicants: ["Name", "Email", "Track", "Language", "Status", "Cycle", "Created"],
+  applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Cycle", "Created"],
   nominations: ["Nominator", "Nominee", "Email", "Track", "Status", "Created"],
   interest: ["Name", "Email", "Age", "Track", "Created"],
   waitlist: ["Name", "Email", "Status", "Created"],
@@ -100,8 +110,40 @@ export type ApplicantReview = {
   readonly interviewDate: string;
   readonly docsStatus: string;
   readonly onlineOfferedAt: string;
+  readonly version: number;
+  readonly assignedStaff: { readonly id: string; readonly name: string; readonly email: string } | null;
+  readonly positions: readonly {
+    readonly authorId: string;
+    readonly authorName: string;
+    readonly scores: Readonly<Record<string, number>>;
+    readonly recommendation: string;
+    readonly updatedAt: string;
+  }[];
+  readonly notes: readonly {
+    readonly id: string;
+    readonly authorName: string;
+    readonly body: string;
+    readonly createdAt: string;
+  }[];
+  readonly conflicts: readonly { readonly decisionId: string; readonly sheetTarget: string; readonly heldStatus: string }[];
+  readonly offeredMoves: readonly ConfirmMove[];
+  readonly prevHref: string | null;
+  readonly nextHref: string | null;
   readonly events: readonly { readonly at: string; readonly actor: string; readonly from: string; readonly to: string; readonly reason: string }[];
 };
+
+export type ReviewerOption = { readonly id: string; readonly name: string; readonly email: string };
+
+export function applicantHref(id: string, queue: "" | QueueName): string {
+  if (!queue) return `/admin/records/applicants/${id}`;
+  return `/admin/records/applicants/${id}?queue=${encodeURIComponent(queue)}`;
+}
+
+export function queueListHref(queue: "" | QueueName): string {
+  const params = new URLSearchParams({ list: "applicants" });
+  if (queue) params.set("queue", queue);
+  return `/admin/records?${params.toString()}`;
+}
 
 type Sheet = { readonly headers: readonly string[]; readonly rows: readonly (readonly string[])[] };
 
@@ -162,6 +204,7 @@ export function parseRecordQuery(raw: Readonly<Record<string, unknown>>): Record
     language: clip(raw.language),
     cycle: clip(raw.cycle),
     age: clip(raw.age),
+    queue: parseQueue(clip(raw.queue)),
     page: pageOf(clip(raw.page)),
   };
 }
@@ -174,6 +217,7 @@ function auditOf(query: RecordQuery): Record<string, string> {
     ["language", query.language],
     ["cycle", query.cycle],
     ["age", query.age],
+    ["queue", query.queue],
   ];
   return Object.fromEntries(pairs.filter(([, value]) => value.length > 0));
 }
@@ -184,9 +228,9 @@ function whereOf(parts: readonly (SQL | undefined)[]): SQL | undefined {
   return and(...present);
 }
 
-export async function loadRecords(db: Db, query: RecordQuery): Promise<RecordPage> {
+export async function loadRecords(db: Db, query: RecordQuery, viewer: { readonly id: string }): Promise<RecordPage> {
   const [listed, weeks] = await Promise.all([
-    listRows(db, query, PAGE_SIZE, (query.page - 1) * PAGE_SIZE),
+    listRows(db, query, viewer, PAGE_SIZE, (query.page - 1) * PAGE_SIZE),
     weeklyIntake(db, query.list),
   ]);
   return {
@@ -209,7 +253,7 @@ export async function exportList(
 ): Promise<{ readonly filename: string; readonly body: string } | null> {
   if (!can(actor.role, "records.export")) return null;
   return db.transaction(async (tx) => {
-    const sheet = await sheetOf(tx, query);
+    const sheet = await sheetOf(tx, query, actor);
     await recordEvent(tx, actor.id, {
       kind: "records.exported",
       list: query.list,
@@ -220,7 +264,12 @@ export async function exportList(
   });
 }
 
-export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview | null> {
+export async function loadApplicant(
+  db: Db,
+  id: string,
+  viewer: { readonly id: string },
+  queue: "" | QueueName,
+): Promise<ApplicantReview | null> {
   const [row] = await db
     .select({
       id: applicants.id,
@@ -238,6 +287,7 @@ export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview
       language: applicants.language,
       status: applicants.status,
       reviewCycle: applicants.reviewCycle,
+      version: applicants.version,
       createdAt: applicants.createdAt,
       round1CompletedAt: applicants.round1CompletedAt,
       identityStatus: applicants.identityStatus,
@@ -251,22 +301,66 @@ export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview
       interviewDate: applicants.interviewDate,
       docsStatus: applicants.docsStatus,
       onlineOfferedAt: applicants.onlineOfferedAt,
+      assigneeId: users.id,
+      assigneeName: users.name,
+      assigneeEmail: users.email,
     })
     .from(applicants)
+    .leftJoin(users, eq(users.id, applicants.assignedStaffId))
     .where(eq(applicants.id, id));
   if (!row) return null;
-  const events = await db
-    .select({
-      createdAt: applicationEvents.createdAt,
-      actor: applicationEvents.actor,
-      fromStatus: applicationEvents.fromStatus,
-      toStatus: applicationEvents.toStatus,
-      reason: applicationEvents.reason,
-    })
-    .from(applicationEvents)
-    .where(eq(applicationEvents.applicantId, id))
-    .orderBy(asc(applicationEvents.createdAt));
-  const statusLabel = STATUS_LABEL[row.status];
+  const [events, positions, notes, conflictRows, previous, next] = await Promise.all([
+    db
+      .select({
+        createdAt: applicationEvents.createdAt,
+        actor: applicationEvents.actor,
+        fromStatus: applicationEvents.fromStatus,
+        toStatus: applicationEvents.toStatus,
+        reason: applicationEvents.reason,
+        staffName: users.name,
+        staffEmail: users.email,
+      })
+      .from(applicationEvents)
+      .leftJoin(users, eq(users.id, applicationEvents.actorStaffId))
+      .where(eq(applicationEvents.applicantId, id))
+      .orderBy(asc(applicationEvents.createdAt)),
+    db
+      .select({
+        authorId: reviewPositions.authorId,
+        authorName: users.name,
+        authorEmail: users.email,
+        scores: reviewPositions.scores,
+        recommendation: reviewPositions.recommendation,
+        updatedAt: reviewPositions.updatedAt,
+      })
+      .from(reviewPositions)
+      .innerJoin(users, eq(users.id, reviewPositions.authorId))
+      .where(and(eq(reviewPositions.applicantId, id), eq(reviewPositions.reviewCycle, row.reviewCycle)))
+      .orderBy(asc(reviewPositions.updatedAt)),
+    db
+      .select({
+        id: reviewNotes.id,
+        authorName: users.name,
+        authorEmail: users.email,
+        body: reviewNotes.body,
+        createdAt: reviewNotes.createdAt,
+      })
+      .from(reviewNotes)
+      .innerJoin(users, eq(users.id, reviewNotes.authorId))
+      .where(and(eq(reviewNotes.applicantId, id), eq(reviewNotes.reviewCycle, row.reviewCycle)))
+      .orderBy(asc(reviewNotes.createdAt)),
+    db
+      .select({
+        decisionId: sheetConflicts.decisionId,
+        sheetTarget: sheetConflicts.sheetTarget,
+        heldStatus: sheetConflicts.heldStatus,
+      })
+      .from(sheetConflicts)
+      .where(and(eq(sheetConflicts.applicantId, id), eq(sheetConflicts.reviewCycle, row.reviewCycle)))
+      .orderBy(desc(sheetConflicts.updatedAt)),
+    neighborId(db, row, viewer, queue, "prev"),
+    neighborId(db, row, viewer, queue, "next"),
+  ]);
   return {
     id: row.id,
     fullName: row.fullName,
@@ -282,7 +376,7 @@ export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview
     hasValidPassport: flag(row.hasValidPassport),
     language: row.language,
     status: row.status,
-    statusLabel,
+    statusLabel: STATUS_LABEL[row.status],
     reviewCycle: row.reviewCycle,
     createdAt: stamp(row.createdAt),
     videoAsk: row.round1CompletedAt ? "complete" : "not complete",
@@ -298,9 +392,30 @@ export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview
     interviewDate: stamp(row.interviewDate),
     docsStatus: textOf(row.docsStatus),
     onlineOfferedAt: stamp(row.onlineOfferedAt),
+    version: row.version,
+    assignedStaff: row.assigneeId && row.assigneeEmail
+      ? { id: row.assigneeId, name: row.assigneeName || row.assigneeEmail, email: row.assigneeEmail }
+      : null,
+    positions: positions.map((position) => ({
+      authorId: position.authorId,
+      authorName: position.authorName || position.authorEmail,
+      scores: scoreRecord(position.scores),
+      recommendation: textOf(position.recommendation),
+      updatedAt: stamp(position.updatedAt),
+    })),
+    notes: notes.map((note) => ({
+      id: note.id,
+      authorName: note.authorName || note.authorEmail,
+      body: note.body,
+      createdAt: stamp(note.createdAt),
+    })),
+    conflicts: conflictRows,
+    offeredMoves: offeredMoves(row),
+    prevHref: previous ? applicantHref(previous, queue) : null,
+    nextHref: next ? applicantHref(next, queue) : null,
     events: events.map((event) => ({
       at: stamp(event.createdAt),
-      actor: event.actor,
+      actor: event.staffName || event.staffEmail || event.actor,
       from: textOf(event.fromStatus),
       to: textOf(event.toStatus),
       reason: event.reason,
@@ -308,23 +423,34 @@ export async function loadApplicant(db: Db, id: string): Promise<ApplicantReview
   };
 }
 
-async function listRows(db: Store, query: RecordQuery, limit: number, offset: number): Promise<{ rows: readonly RecordRow[]; total: number }> {
-  if (query.list === "applicants") return applicantRows(db, query, limit, offset);
+export async function loadReviewers(db: Db): Promise<readonly ReviewerOption[]> {
+  const rows = await db
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, disabledAt: users.disabledAt })
+    .from(users)
+    .orderBy(asc(users.email));
+  return rows.flatMap((row) => {
+    if (row.disabledAt || !can(row.role, "reviews.write") || !isUserId(row.id)) return [];
+    return [{ id: row.id, name: row.name || row.email, email: row.email }];
+  });
+}
+
+async function listRows(db: Store, query: RecordQuery, viewer: { readonly id: string }, limit: number, offset: number): Promise<{ rows: readonly RecordRow[]; total: number }> {
+  if (query.list === "applicants") return applicantRows(db, query, viewer, limit, offset);
   if (query.list === "nominations") return nominationRows(db, query, limit, offset);
   if (query.list === "interest") return interestRows(db, query, limit, offset);
   if (query.list === "waitlist") return waitlistRows(db, query, limit, offset);
   return partnerRows(db, query, limit, offset);
 }
 
-async function sheetOf(db: Store, query: RecordQuery): Promise<Sheet> {
-  if (query.list === "applicants") return applicantSheet(db, query);
+async function sheetOf(db: Store, query: RecordQuery, viewer: { readonly id: string }): Promise<Sheet> {
+  if (query.list === "applicants") return applicantSheet(db, query, viewer);
   if (query.list === "nominations") return nominationSheet(db, query);
   if (query.list === "interest") return interestSheet(db, query);
   if (query.list === "waitlist") return waitlistSheet(db, query);
   return partnerSheet(db, query);
 }
 
-function applicantWhere(query: RecordQuery): SQL | "empty" {
+function applicantWhere(query: RecordQuery, viewer: { readonly id: string }): SQL | "empty" {
   const status = token(query.status, PIPELINE_ORDER);
   const chosenTrack = token(query.track, track.enumValues);
   const language = token(query.language, appLanguage.enumValues);
@@ -338,7 +464,46 @@ function applicantWhere(query: RecordQuery): SQL | "empty" {
     query.q
       ? or(matches(applicants.fullName, query.q), matches(applicants.email, query.q), matches(applicants.nationality, query.q), matches(applicants.basedIn, query.q))
       : undefined,
+    queueFilter(query, viewer),
   ]) ?? sql`true`;
+}
+
+function queueFilter(query: RecordQuery, viewer: { readonly id: string }): SQL | undefined {
+  if (!query.queue) return undefined;
+  const needs = inArray(applicants.status, [...NEEDS_DECISION_STATUSES]);
+  if (query.queue === "needs") return needs;
+  if (query.queue === "unassigned") return and(isNull(applicants.assignedStaffId), needs);
+  return and(eq(applicants.assignedStaffId, viewer.id), needs);
+}
+
+async function neighborId(
+  db: Db,
+  current: { id: string; createdAt: Date },
+  viewer: { readonly id: string },
+  queue: "" | QueueName,
+  direction: "prev" | "next",
+): Promise<string | null> {
+  const where = applicantWhere({
+    list: "applicants", q: "", status: "", track: "", language: "", cycle: "", age: "", page: 1, queue,
+  }, viewer);
+  if (where === "empty") return null;
+  const closer = direction === "prev"
+    ? or(sql`${applicants.createdAt} > ${current.createdAt}`, and(eq(applicants.createdAt, current.createdAt), sql`${applicants.id} > ${current.id}`))
+    : or(sql`${applicants.createdAt} < ${current.createdAt}`, and(eq(applicants.createdAt, current.createdAt), sql`${applicants.id} < ${current.id}`));
+  const order = direction === "prev"
+    ? [asc(applicants.createdAt), asc(applicants.id)]
+    : [desc(applicants.createdAt), desc(applicants.id)];
+  const [row] = await db.select({ id: applicants.id }).from(applicants).where(and(where, closer)).orderBy(...order).limit(1);
+  return row?.id ?? null;
+}
+
+function scoreRecord(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const scores: Record<string, number> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "number" && Number.isInteger(item)) scores[key] = item;
+  }
+  return scores;
 }
 
 function token<T extends string>(value: string, allowed: readonly T[]): T | "reject" | null {
@@ -375,32 +540,40 @@ function applicantSelect() {
     interviewDate: applicants.interviewDate,
     docsStatus: applicants.docsStatus,
     onlineOfferedAt: applicants.onlineOfferedAt,
+    version: applicants.version,
   };
 }
 
 type ApplicantSafe = Awaited<ReturnType<typeof selectApplicants>>[number];
 
-async function selectApplicants(db: Store, query: RecordQuery, limit: number | null, offset: number) {
-  const where = applicantWhere(query);
+async function selectApplicants(db: Store, query: RecordQuery, viewer: { readonly id: string }, limit: number | null, offset: number) {
+  const where = applicantWhere(query, viewer);
   if (where === "empty") return [];
-  const base = db.select(applicantSelect()).from(applicants).where(where).orderBy(desc(applicants.createdAt), desc(applicants.id));
+  const base = db
+    .select({ ...applicantSelect(), assigneeName: users.name, assigneeEmail: users.email })
+    .from(applicants)
+    .leftJoin(users, eq(users.id, applicants.assignedStaffId))
+    .where(where)
+    .orderBy(desc(applicants.createdAt), desc(applicants.id));
   if (limit === null) return await base;
   return await base.limit(limit).offset(offset);
 }
 
-async function applicantRows(db: Store, query: RecordQuery, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
-  const where = applicantWhere(query);
+async function applicantRows(db: Store, query: RecordQuery, viewer: { readonly id: string }, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
+  const where = applicantWhere(query, viewer);
   if (where === "empty") return { rows: [], total: 0 };
   const [rows, totals] = await Promise.all([
-    selectApplicants(db, query, limit, offset),
+    selectApplicants(db, query, viewer, limit, offset),
     db.select({ count: count() }).from(applicants).where(where),
   ]);
   return {
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: `/admin/records/applicants/${row.id}`,
-      cells: [row.fullName, row.email, row.track, row.language, STATUS_LABEL[row.status], String(row.reviewCycle), stamp(row.createdAt)],
+      href: applicantHref(row.id, query.queue),
+      version: row.version,
+      reviewCycle: row.reviewCycle,
+      cells: [row.fullName, row.email, row.track, row.language, STATUS_LABEL[row.status], row.assigneeName || row.assigneeEmail || "", String(row.reviewCycle), stamp(row.createdAt)],
     })),
   };
 }
@@ -409,7 +582,7 @@ const APPLICANT_CSV = [
   "full_name", "email", "age", "track", "phone", "nationality", "based_in", "skills", "can_travel", "has_valid_passport",
   "language", "status", "review_cycle", "created_at", "round1_completed_at", "identity_status", "identity_checked_at",
   "review_decision", "review_notes", "reviewer", "review_date", "interview_outcome", "interview_notes", "interview_date",
-  "docs_status", "online_offered_at",
+  "docs_status", "online_offered_at", "assigned_staff_email",
 ] as const;
 
 function applicantCsv(row: ApplicantSafe): readonly string[] {
@@ -419,11 +592,12 @@ function applicantCsv(row: ApplicantSafe): readonly string[] {
     stamp(row.createdAt), stamp(row.round1CompletedAt), textOf(row.identityStatus), stamp(row.identityCheckedAt),
     textOf(row.reviewDecision), textOf(row.reviewNotes), textOf(row.reviewer), stamp(row.reviewDate),
     textOf(row.interviewOutcome), textOf(row.interviewNotes), stamp(row.interviewDate), textOf(row.docsStatus), stamp(row.onlineOfferedAt),
+    textOf(row.assigneeEmail),
   ];
 }
 
-async function applicantSheet(db: Store, query: RecordQuery): Promise<Sheet> {
-  const rows = await selectApplicants(db, query, null, 0);
+async function applicantSheet(db: Store, query: RecordQuery, viewer: { readonly id: string }): Promise<Sheet> {
+  const rows = await selectApplicants(db, query, viewer, null, 0);
   return { headers: APPLICANT_CSV, rows: rows.map(applicantCsv) };
 }
 

@@ -48,6 +48,12 @@ export function activityLabel(kind: string, detail: Record<string, unknown>): st
     return filters ? `${summary} (${filters})` : summary;
   }
   if (kind === "copy.published") return `Published ${textOf(detail, "catalog")} ${textOf(detail, "locale")} ${textOf(detail, "key")}`;
+  if (kind === "review.saved") {
+    const recommendation = textOf(detail, "recommendation");
+    return recommendation ? `Saved a review, recommendation ${recommendation}` : "Saved a review";
+  }
+  if (kind === "review.assigned") return textOf(detail, "assigneeId") ? "Assigned a reviewer" : "Cleared the reviewer";
+  if (kind === "decision.confirmed") return `Confirmed ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
   return "Unknown event";
 }
 

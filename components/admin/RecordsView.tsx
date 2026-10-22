@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BulkQueue } from "@/components/admin/BulkQueue";
 import { card } from "@/components/admin/marks";
 import { WeekBars } from "@/components/admin/WeekBars";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
@@ -14,7 +15,7 @@ const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
   partners: "Partners",
 };
 
-export function RecordsView({ data, exportable }: { data: RecordPage; exportable: boolean }) {
+export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage; exportable: boolean; canConfirm: boolean }) {
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   return (
     <div className="grid gap-6">
@@ -26,7 +27,7 @@ export function RecordsView({ data, exportable }: { data: RecordPage; exportable
       </div>
       <nav className="flex flex-wrap gap-2" aria-label="Record lists">
         {RECORD_LISTS.map((list) => (
-          <Link key={list} className={list === data.list ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "" })}>
+          <Link key={list} className={list === data.list ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "" })}>
             {LABELS[list]}
           </Link>
         ))}
@@ -41,14 +42,23 @@ export function RecordsView({ data, exportable }: { data: RecordPage; exportable
         {data.list === "applicants" ? <Choice label="Language" name="language" value={data.filters.language} options={appLanguage.enumValues.map((item) => [item, item])} /> : null}
         {data.list === "applicants" ? <Filter label="Cycle" name="cycle" value={data.filters.cycle} /> : null}
         {data.list === "interest" ? <Choice label="Age" name="age" value={data.filters.age} options={ageGroup.enumValues.map((item) => [item, item])} /> : null}
+        <input type="hidden" name="queue" value={data.filters.queue} />
         <button className="inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold" type="submit">Apply</button>
       </form>
+      {data.list === "applicants" ? (
+        <nav className="flex flex-wrap gap-2" aria-label="Queues">
+          <QueueLink current={data.filters.queue} queue="" filters={data.filters}>All</QueueLink>
+          <QueueLink current={data.filters.queue} queue="mine" filters={data.filters}>Mine</QueueLink>
+          <QueueLink current={data.filters.queue} queue="unassigned" filters={data.filters}>Unassigned</QueueLink>
+          <QueueLink current={data.filters.queue} queue="needs" filters={data.filters}>Needs decision</QueueLink>
+        </nav>
+      ) : null}
       <section className={card}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{data.title}</h2>
           <p className="text-sm text-black/60">{data.total} rows</p>
         </div>
-        {data.rows.length === 0 ? <p className="mt-3 text-sm text-black/60">Nothing matches these filters.</p> : (
+        {data.list === "applicants" && canConfirm ? <BulkQueue headers={data.headers} rows={data.rows} /> : data.rows.length === 0 ? <p className="mt-3 text-sm text-black/60">Nothing matches these filters.</p> : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">
               <thead>
@@ -83,6 +93,7 @@ export function RecordsView({ data, exportable }: { data: RecordPage; exportable
             <input type="hidden" name="language" value={data.filters.language} />
             <input type="hidden" name="cycle" value={data.filters.cycle} />
             <input type="hidden" name="age" value={data.filters.age} />
+            <input type="hidden" name="queue" value={data.filters.queue} />
             <button className="inline-flex h-12 items-center justify-center rounded-full gradient-brand px-6 text-sm font-semibold uppercase tracking-wide text-white" type="submit">Download CSV</button>
           </form>
         ) : <p className="mt-4 text-sm text-black/60">CSV download is limited to admins.</p>}
@@ -117,6 +128,15 @@ function Filter({ label, name, value }: { label: string; name: string; value: st
   );
 }
 
+function QueueLink({ current, queue, filters, children }: { current: string; queue: RecordPage["filters"]["queue"]; filters: RecordPage["filters"]; children: string }) {
+  const active = current === queue;
+  return (
+    <Link className={active ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...filters, queue, page: 1 })}>
+      {children}
+    </Link>
+  );
+}
+
 function hrefFor(filters: RecordPage["filters"]): string {
   const params = new URLSearchParams();
   params.set("list", filters.list);
@@ -126,6 +146,7 @@ function hrefFor(filters: RecordPage["filters"]): string {
   if (filters.language) params.set("language", filters.language);
   if (filters.cycle) params.set("cycle", filters.cycle);
   if (filters.age) params.set("age", filters.age);
+  if (filters.queue) params.set("queue", filters.queue);
   if (filters.page > 1) params.set("page", String(filters.page));
   return `/admin/records?${params.toString()}`;
 }
