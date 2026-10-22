@@ -192,9 +192,18 @@ export async function applyVideoaskCompletion(tx: Store, applicantId: string): P
   };
 }
 
+// Delay before the "Verify your identity" fallback email. The first Didit
+// hand-off is the VideoAsk thank-you redirect (`/api/apply/verify?ref=…`); if
+// the applicant never got there (closed the tab), this email carries the link.
+export const IDENTITY_FALLBACK_DELAY_MS = 12 * 60 * 1000;
+
+export function identityFallbackKey(applicantId: string, reviewCycle: number): string {
+  return `identity-link-fallback:${applicantId}:${reviewCycle}`;
+}
+
 // Creates (or reuses) the hosted identity session and stores it. Idempotent: an
-// existing link is returned as is. The first Didit hand-off is the VideoAsk
-// thank-you redirect (`/api/apply/verify?ref=…`); only identity retries email.
+// existing link is returned as is. A first session (round1_complete) schedules
+// the delayed fallback email; identity retries (id_failed) email at once.
 export async function provisionIdentitySession(db: Db, applicantId: string): Promise<{ url: string | null; created: boolean }> {
   const [existing] = await db.select().from(applicants).where(eq(applicants.id, applicantId));
   if (!existing?.emailVerifiedAt || existing.track === "online" || !["round1_complete", "id_failed"].includes(existing.status)) return { url: null, created: false };
@@ -210,9 +219,20 @@ export async function provisionIdentitySession(db: Db, applicantId: string): Pro
     const updated = await updateApplicant(tx, applicantId, {
       identitySessionId: session.sessionId,
       identityLink: session.url,
+      identityLinkOpenedAt: null,
       identityStatus: "pending",
     });
     if (!updated) return { url: null, created: false };
+    if (existing.status === "round1_complete") {
+      // At most once per review cycle; the worker re-checks before sending.
+      await enqueue(tx, {
+        kind: "email",
+        dedupeKey: identityFallbackKey(applicantId, updated.reviewCycle),
+        applicantId,
+        availableAt: new Date(Date.now() + IDENTITY_FALLBACK_DELAY_MS),
+        payload: { template: "identity_fallback", applicantId, to: updated.email },
+      });
+    }
     if (existing.status === "id_failed") {
       await enqueueEmail(
         tx,

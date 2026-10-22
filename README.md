@@ -31,6 +31,13 @@ re-checks automatically; once Round 1 is recorded, in-person applicants go on
 to Didit. Online applicants land on `/apply/complete`. Preview deployments use
 their own origin in place of the production host.
 
+If an in-person applicant never reaches Didit through that redirect (for
+example they closed the tab), a "Verify your identity" email with the Didit link
+is sent about 12 minutes after the session is created. It is skipped if the
+redirect already sent them to the link (`identity_link_opened_at`) or their
+status has moved on, and is keyed `identity-link-fallback:<applicantId>:<reviewCycle>`
+so it goes out at most once per review cycle.
+
 Configure Didit's webhook destination separately in its console, pointing to
 `https://<your-domain>/api/webhooks/identity`, and set `DIDIT_WEBHOOK_SECRET`.
 The session `callback` is a browser redirect to `/apply/complete`; it is not
