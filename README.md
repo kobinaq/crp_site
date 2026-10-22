@@ -23,10 +23,13 @@ operations document route.
 
 In every VideoAsk form, set the final-step Logic redirect to
 `https://www.climaterefugeepavilion.org/api/apply/verify?ref=@application_ref`
-(use `@` to insert the custom `application_ref` variable). That site URL marks
-the form complete if the webhook is still in flight, then sends in-person
-applicants to Didit. Online applicants land on `/apply/complete`. Preview
-deployments use their own origin in place of the production host.
+(use `@` to insert the custom `application_ref` variable). The redirect only
+identifies the returning applicant; it never completes Round 1. Only the
+authenticated VideoAsk webhook does that. If the webhook has not landed yet,
+the page waits a few seconds and then shows a short "finishing up" page that
+re-checks automatically; once Round 1 is recorded, in-person applicants go on
+to Didit. Online applicants land on `/apply/complete`. Preview deployments use
+their own origin in place of the production host.
 
 Configure Didit's webhook destination separately in its console, pointing to
 `https://<your-domain>/api/webhooks/identity`, and set `DIDIT_WEBHOOK_SECRET`.

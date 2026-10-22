@@ -108,10 +108,10 @@ export function nextStepUrl(applicant: Applicant): string {
   }
 }
 
-// Advances the pipeline the same way the VideoAsk webhook does. Safe to call
-// from the thank-you redirect (when the webhook is still in flight) and from
-// the webhook itself: transitions are idempotent and identity is only queued
-// when a Didit link is still missing.
+// Completes Round 1. Call ONLY from the authenticated VideoAsk webhook
+// (x-webhook-secret + isAllowedVideoaskForm): a browser redirect or a signed
+// application_ref is not proof the form was completed. Transitions are
+// idempotent and identity is only queued when a Didit link is still missing.
 export async function applyVideoaskCompletion(tx: Store, applicantId: string): Promise<{
   outcome: string;
   advanced: boolean;
