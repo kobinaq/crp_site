@@ -127,6 +127,43 @@ test("switching a copy entry shows that entry and keeps an unsaved edit on it", 
   }
 });
 
+test("a saved draft matches the server and does not warn on leaving", async () => {
+  load("lib/copy/draftState.ts").clearCopyDrafts();
+  const { CopyDesk } = load("components/admin/CopyDesk.tsx");
+  const programs = copyRow("nav.programs", "Programs", "Programmes");
+  const link = document.createElement("a");
+  link.href = "/admin";
+  link.textContent = "Desk";
+  document.body.appendChild(link);
+  const view = await render(React.createElement(CopyDesk, copyProps(programs, "")));
+  const original = window.confirm;
+  let asked = 0;
+  window.confirm = () => {
+    asked += 1;
+    return false;
+  };
+  try {
+    await act(async () => {
+      setControlValue(document.getElementById("page-nav.programs-en"), "Programs draft");
+    });
+    link.click();
+    assert.equal(asked, 1);
+    const saved = {
+      ...programs,
+      cells: programs.cells.map((item) => item.locale === "en" ? { ...item, draft: "Programs draft" } : item),
+    };
+    await view.rerender(React.createElement(CopyDesk, copyProps(saved, "")));
+    assert.equal(text("page-nav.programs-en"), "Programs draft");
+    asked = 0;
+    link.click();
+    assert.equal(asked, 0);
+  } finally {
+    window.confirm = original;
+    link.remove();
+    await view.unmount();
+  }
+});
+
 test("the copy filter shows the query from the page address", async () => {
   const { CopyDesk } = load("components/admin/CopyDesk.tsx");
   const about = copyRow("nav.about", "About", "À propos");
@@ -149,6 +186,36 @@ async function settle() {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
+
+test("a play started for one applicant does not block or fill the next applicant", async () => {
+  const { PrivateMedia } = load("components/admin/PrivateMedia.tsx");
+  const original = global.fetch;
+  const pending = [];
+  global.fetch = (url) => new Promise((resolve) => {
+    const id = String(url).match(/applicants\/([^/]+)\/open/)[1];
+    pending.push(() => resolve({
+      ok: true,
+      json: async () => ({ url: `/admin/records/applicants/${id}/stream/tok.en` }),
+    }));
+  });
+  const media = await render(React.createElement(PrivateMedia, { applicantId: "applicant-a", view: clip("intro") }));
+  try {
+    await act(async () => { document.querySelector("button").click(); });
+    await media.rerender(React.createElement(PrivateMedia, { applicantId: "applicant-b", view: clip("intro") }));
+    await act(async () => { document.querySelector("button").click(); });
+    assert.equal(pending.length, 2);
+    await act(async () => { pending[0](); });
+    await settle();
+    assert.equal(document.querySelector("video"), null);
+    await act(async () => { pending[1](); });
+    await settle();
+    assert.match(document.querySelector("video").src, /applicant-b/);
+    assert.doesNotMatch(document.querySelector("video").src, /applicant-a/);
+  } finally {
+    global.fetch = original;
+    await media.unmount();
+  }
+});
 
 test("the media player and document card drop the previous applicant", async () => {
   const { PrivateMedia, DocumentReveal } = load("components/admin/PrivateMedia.tsx");
@@ -380,6 +447,22 @@ test("record filters show the address, and a select follows a new value from the
     });
     assert.equal(document.querySelector("input[name=role]").value, "editor");
     assert.equal(document.querySelector("[role=listbox]"), null);
+    await act(async () => { document.getElementById("role-select").click(); });
+    const openList = document.querySelector("[role=listbox]");
+    openList.focus();
+    await act(async () => {
+      openList.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    assert.equal(document.querySelector("[role=listbox]"), null);
+    assert.equal(document.activeElement, document.getElementById("role-select"));
+    await act(async () => { document.getElementById("role-select").click(); });
+    const tabList = document.querySelector("[role=listbox]");
+    tabList.focus();
+    await act(async () => {
+      tabList.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    });
+    assert.equal(document.querySelector("[role=listbox]"), null);
+    assert.equal(document.activeElement, document.getElementById("role-select"));
   } finally {
     await records.unmount();
     await select.unmount();

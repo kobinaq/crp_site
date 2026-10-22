@@ -40,17 +40,19 @@ export function PrivateMedia({ applicantId, view }: { applicantId: string; view:
   if (player.identity !== identity) setPlayer(blankPlayer(identity));
   const shown = player.identity === identity ? player : blankPlayer(identity);
   const opening = useRef(false);
+  const openingFor = useRef("");
 
   async function open() {
-    if (opening.current) return;
+    if (opening.current && openingFor.current === identity) return;
     opening.current = true;
+    openingFor.current = identity;
     const requested = identity;
     try {
       const url = await openHolding(applicantId, "answer", view.questionId);
       if (!url) return;
       setPlayer((current) => current.identity === requested ? { ...current, src: url, failed: false } : current);
     } finally {
-      opening.current = false;
+      if (openingFor.current === requested) opening.current = false;
     }
   }
 
@@ -99,17 +101,19 @@ export function DocumentReveal({ applicantId, view }: { applicantId: string; vie
   if (documentState.identity !== identity) setDocumentState(blankDocument(identity));
   const shown = documentState.identity === identity ? documentState : blankDocument(identity);
   const opening = useRef(false);
+  const openingFor = useRef("");
 
   async function open() {
-    if (opening.current) return;
+    if (opening.current && openingFor.current === identity) return;
     opening.current = true;
+    openingFor.current = identity;
     const requested = identity;
     try {
       const url = await openHolding(applicantId, "document", view.documentId);
       if (!url) return;
       setDocumentState((current) => current.identity === requested ? { ...current, src: url } : current);
     } finally {
-      opening.current = false;
+      if (openingFor.current === requested) opening.current = false;
     }
   }
 

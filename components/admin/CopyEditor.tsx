@@ -7,8 +7,9 @@ import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { previewPath } from "@/lib/copy/preview";
 import {
   copyCellId,
-  dropStaleCopyDrafts,
+  clearCopyDrafts,
   readCopyDrafts,
+  settleCopyDrafts,
   rememberCopyDraft,
   shownCopyText,
   writeCopyDrafts,
@@ -31,9 +32,13 @@ export function CopyEditor({
   children?: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<CopyDraftMap>(readCopyDrafts);
-  const live = dropStaleCopyDrafts(
+  const live = settleCopyDrafts(
     drafts,
-    row.cells.map((cell) => ({ id: copyCellId(row.catalog, row.key, cell.locale), revision: cell.revision })),
+    row.cells.map((cell) => ({
+      id: copyCellId(row.catalog, row.key, cell.locale),
+      revision: cell.revision,
+      serverText: cell.draft ?? cell.value,
+    })),
   );
   if (live !== drafts) {
     writeCopyDrafts(live);
@@ -54,7 +59,10 @@ export function CopyEditor({
       const href = anchor.getAttribute("href") ?? "";
       if (href.startsWith("/admin/copy") || href.startsWith("?") || href.startsWith("#")) return;
       if (typeof window.confirm !== "function") return;
-      if (window.confirm("You have unsaved copy edits. Leave without saving?")) return;
+      if (window.confirm("You have unsaved copy edits. Leave without saving?")) {
+        clearCopyDrafts();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
     }

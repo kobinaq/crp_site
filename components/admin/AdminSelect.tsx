@@ -44,6 +44,7 @@ export function AdminSelect({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const activeRef = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
@@ -104,7 +105,12 @@ export function AdminSelect({
       event.preventDefault();
       const option = options[activeRef.current];
       if (option) choose(option.value);
-    } else if (event.key === "Escape" || event.key === "Tab") {
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (event.key === "Tab") {
+      triggerRef.current?.focus();
       setOpen(false);
     }
   }
@@ -113,6 +119,7 @@ export function AdminSelect({
     <div ref={rootRef} data-admin-select="" className={`relative ${className ?? "w-full"}`}>
       {name ? <input type="hidden" name={name} value={current} /> : null}
       <button
+        ref={triggerRef}
         id={id}
         type="button"
         className={`${field} flex items-center justify-between gap-3 text-left`}

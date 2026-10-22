@@ -45,6 +45,21 @@ export function rememberCopyDraft(
   return { ...drafts, [id]: { revision, text } };
 }
 
+export function settleCopyDrafts(
+  drafts: CopyDraftMap,
+  cells: readonly { readonly id: string; readonly revision: number; readonly serverText: string }[],
+): CopyDraftMap {
+  let next = dropStaleCopyDrafts(drafts, cells);
+  for (const cell of cells) {
+    const draft = next[cell.id];
+    if (!draft || draft.text !== cell.serverText) continue;
+    const editable: Record<string, CopyDraft> = { ...next };
+    delete editable[cell.id];
+    next = editable;
+  }
+  return next;
+}
+
 export function dropStaleCopyDrafts(
   drafts: CopyDraftMap,
   cells: readonly { readonly id: string; readonly revision: number }[],
