@@ -3,14 +3,13 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { applicants, jobs, webhookEvents, type Db, type JobPayload } from "@/lib/db";
 import { loadEmailSources } from "@/lib/copy/read";
 import type { EmailSources } from "@/lib/copy/sources";
-import { decisionEmail, receivedEmail } from "@/lib/emails";
+import { decisionEmail, decisionLink, receivedEmail } from "@/lib/emails";
 import { getIdentityProvider, type IdentityDecision } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
 import { lockApplicant, transition, updateApplicant } from "@/lib/lifecycle";
 import { applyVideoaskCompletion, scheduleIdentitySession } from "@/lib/application";
 import { reconcileIdentity } from "@/lib/application-status";
 import { issueAccessToken } from "@/lib/access";
-import { appUrl } from "@/lib/config";
 import { calendlyLink, parseCalendlyReference } from "@/lib/calendly";
 import { isAllowedVideoaskForm } from "@/lib/videoask";
 
@@ -275,26 +274,17 @@ export async function queueDecisionEmail(
   version: number,
   sources: EmailSources,
 ): Promise<void> {
-  let mail = null;
-  switch (status) {
-    case "rejected":
-      mail = decisionEmail(status, null, applicant.language, sources);
-      break;
-    case "online_offered": {
-      const token = await issueAccessToken(tx, applicant.id, "switch_online", 7 * 24 * 3600);
-      mail = decisionEmail(status, `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(token.raw)}&lang=${applicant.language}`, applicant.language, sources);
-      break;
-    }
-    case "accepted": {
-      const [full] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
-      mail = decisionEmail(status, full ? calendlyLink(full) : null, applicant.language, sources);
-      break;
-    }
-    case "interview_yes": {
-      mail = decisionEmail(status, null, applicant.language, sources);
-      break;
-    }
+  if (status !== "rejected" && status !== "online_offered" && status !== "accepted" && status !== "interview_yes") return;
+  let link: string | null = null;
+  if (status === "online_offered") {
+    const token = await issueAccessToken(tx, applicant.id, "switch_online", 7 * 24 * 3600);
+    link = decisionLink(status, { language: applicant.language, switchToken: token.raw, calendly: null });
+  } else if (status === "accepted") {
+    const [full] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
+    link = decisionLink(status, { language: applicant.language, switchToken: null, calendly: full ? calendlyLink(full) : null });
+  } else {
+    link = decisionLink(status, { language: applicant.language, switchToken: null, calendly: null });
   }
-  if (!mail) return;
+  const mail = decisionEmail(status, link, applicant.language, sources);
   await enqueueEmail(tx, `email:decision:${applicant.id}:${status}:${version}`, { to: applicant.email, ...mail }, `decision:${status}`, applicant.id);
 }

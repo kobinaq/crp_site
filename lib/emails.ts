@@ -1,7 +1,37 @@
 import emailCopy from "@/lib/translations/application-emails.json";
 import ackCopy from "@/lib/translations/acknowledgement-emails.json";
 import { JSON_EMAILS, type EmailSources } from "@/lib/copy/sources";
+import { appUrl } from "@/lib/config";
 import { parseLocale, type ApplicationLocale, type Locale } from "@/lib/locale";
+
+export const DECISION_PREVIEW_TOKEN = "00000000-0000-4000-8000-000000000000";
+
+type DecisionStatus = "rejected" | "online_offered" | "accepted" | "interview_yes";
+
+export function decisionLink(
+  status: DecisionStatus,
+  choice: { language: "en" | "fr" | "es"; switchToken: string | null; calendly: string | null },
+): string | null {
+  if (status === "online_offered" && choice.switchToken) {
+    return `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(choice.switchToken)}&lang=${choice.language}`;
+  }
+  if (status === "accepted") return choice.calendly;
+  return null;
+}
+
+export function previewDecisionEmail(
+  status: DecisionStatus,
+  applicant: { language: "en" | "fr" | "es" },
+  sources: EmailSources,
+  calendly: string | null,
+): Email {
+  const link = decisionLink(status, {
+    language: applicant.language,
+    switchToken: status === "online_offered" ? DECISION_PREVIEW_TOKEN : null,
+    calendly,
+  });
+  return decisionEmail(status, link, applicant.language, sources);
+}
 
 // Branded transactional email shell, matching the Figma email frames
 // (2308:7356 desktop, 2308:7383 mobile): scalloped photo header, cream body,

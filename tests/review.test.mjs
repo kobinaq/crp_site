@@ -515,3 +515,128 @@ test("assignment does not change applicants.version and does not block a later s
 function grant(user, role = user.role) {
   return { id: user.id, email: user.email, role, name: user.name };
 }
+
+async function tokenCount(id) {
+  const result = await sql.query("select count(*)::int as n from access_tokens where applicant_id = $1", [id]);
+  return result.rows[0].n;
+}
+
+test("preview html matches the queued online_offered email after the token is substituted, and preview inserts no access token", async () => {
+  const admin = await insertUser("admin", "Ada Admin");
+  const applicant = await insertApplicant({ track: "in_person" });
+  const database = mod("lib/db/index.ts").getDb();
+  const { previewDecision, confirmDecision } = mod("lib/review/decide.ts");
+  const { DECISION_PREVIEW_TOKEN } = mod("lib/emails.ts");
+  const move = { field: "reviewDecision", value: "reject", to: "online_offered" };
+  const preview = await previewDecision(database, grant(admin, "admin"), { applicantId: applicant.id, move });
+  assert.equal(preview.ok, true);
+  assert.equal(preview.toStatus, "online_offered");
+  assert.equal(preview.html.includes(DECISION_PREVIEW_TOKEN), true);
+  assert.equal(await tokenCount(applicant.id), 0);
+  assert.equal((await jobs(applicant.id)).length, 0);
+  const confirmed = await confirmDecision(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    version: applicant.version,
+    reviewCycle: 0,
+    decisionId: randomUUID(),
+    move,
+  });
+  assert.equal(confirmed.result, "applied");
+  const queued = await jobs(applicant.id);
+  assert.equal(queued.length, 1);
+  const token = decodeURIComponent(queued[0].payload.html.match(/switch-online\?token=([^"&]+)/)[1]);
+  assert.notEqual(token, DECISION_PREVIEW_TOKEN);
+  assert.equal(preview.html.replaceAll(DECISION_PREVIEW_TOKEN, token), queued[0].payload.html);
+  assert.equal(preview.subject, queued[0].payload.subject);
+  assert.equal(await tokenCount(applicant.id), 1);
+  const history = await sql.query(
+    "select actor, actor_staff_id from application_events where applicant_id = $1 and actor = 'staff'",
+    [applicant.id],
+  );
+  assert.equal(history.rows[0].actor, "staff");
+  assert.equal(history.rows[0].actor_staff_id, admin.id);
+});
+
+test("a stale confirm writes nothing and queues no email", async () => {
+  const admin = await insertUser("admin", "Ada Admin");
+  const applicant = await insertApplicant({ track: "in_person" });
+  const { confirmDecision } = mod("lib/review/decide.ts");
+  const database = mod("lib/db/index.ts").getDb();
+  const first = await confirmDecision(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    version: applicant.version,
+    reviewCycle: 0,
+    decisionId: randomUUID(),
+    move: { field: "reviewDecision", value: "reject", to: "online_offered" },
+  });
+  assert.equal(first.result, "applied");
+  const standing = await applicantRow(applicant.id);
+  assert.equal(standing.status, "online_offered");
+  const beforeJobs = (await jobs(applicant.id)).length;
+  const stale = await confirmDecision(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    version: applicant.version,
+    reviewCycle: 0,
+    decisionId: randomUUID(),
+    move: { field: "reviewDecision", value: "accept", to: "accepted" },
+  });
+  assert.equal(stale.result, "stale");
+  const after = await applicantRow(applicant.id);
+  assert.equal(after.status, "online_offered");
+  assert.equal(after.version, standing.version);
+  assert.equal((await jobs(applicant.id)).length, beforeJobs);
+});
+
+test("bulk confirm returns applied, stale, and not_allowed, and only the applied row changes", async () => {
+  const admin = await insertUser("admin", "Ada Admin");
+  const applyRow = await insertApplicant();
+  const staleRow = await insertApplicant();
+  await sql.query("update applicants set version = version + 1 where id = $1", [staleRow.id]);
+  const blocked = await insertApplicant({ status: "interview_yes" });
+  const move = { field: "reviewDecision", value: "accept", to: "accepted" };
+  const database = mod("lib/db/index.ts").getDb();
+  const { previewBulk, confirmBulk } = mod("lib/review/decide.ts");
+  const rows = [
+    { applicantId: applyRow.id, version: applyRow.version, reviewCycle: 0 },
+    { applicantId: staleRow.id, version: staleRow.version, reviewCycle: 0 },
+    { applicantId: blocked.id, version: blocked.version, reviewCycle: 0 },
+  ];
+  const previewed = await previewBulk(database, grant(admin, "admin"), { move, rows });
+  assert.deepEqual(previewed.counts, { apply: 1, stale: 1, notAllowed: 1, notFound: 0 });
+  assert.deepEqual(previewed.byLanguage, [{ language: "en", apply: 1 }]);
+  assert.equal((await jobs(applyRow.id)).length, 0);
+  assert.equal((await applicantRow(blocked.id)).version, blocked.version);
+  const bulk = await confirmBulk(database, grant(admin, "admin"), {
+    move,
+    rows: rows.map((row) => ({ ...row, decisionId: randomUUID() })),
+  });
+  assert.equal(bulk.rows[0].result, "applied");
+  assert.equal(bulk.rows[1].result, "stale");
+  assert.equal(bulk.rows[2].result, "not_allowed");
+  assert.equal((await applicantRow(applyRow.id)).status, "accepted");
+  assert.equal((await jobs(applyRow.id)).length, 1);
+  const staleAfter = await applicantRow(staleRow.id);
+  assert.equal(staleAfter.status, "under_review");
+  assert.equal(staleAfter.version, staleRow.version + 1);
+  assert.equal((await jobs(staleRow.id)).length, 0);
+  const blockedAfter = await applicantRow(blocked.id);
+  assert.equal(blockedAfter.status, "interview_yes");
+  assert.equal(blockedAfter.version, blocked.version);
+  assert.equal((await receipts(blocked.id)).length, 0);
+  assert.equal((await jobs(blocked.id)).length, 0);
+
+  const mismatch = await insertApplicant({ track: "in_person" });
+  const wrong = await confirmBulk(database, grant(admin, "admin"), {
+    move: { field: "reviewDecision", value: "reject", to: "rejected" },
+    rows: [{ applicantId: mismatch.id, version: mismatch.version, reviewCycle: 0, decisionId: randomUUID() }],
+  });
+  assert.equal(wrong.rows[0].result, "not_allowed");
+  assert.equal((await applicantRow(mismatch.id)).status, "under_review");
+  assert.equal((await applicantRow(mismatch.id)).version, mismatch.version);
+  assert.equal((await jobs(mismatch.id)).length, 0);
+  const tooMany = await previewBulk(database, grant(admin, "admin"), {
+    move,
+    rows: Array.from({ length: 51 }, () => ({ applicantId: applyRow.id, version: 0, reviewCycle: 0 })),
+  });
+  assert.deepEqual(tooMany, { ok: false, reason: "invalid" });
+});
