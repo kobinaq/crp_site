@@ -215,7 +215,8 @@ async function applicantReview() {
   await sql.query(`insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', 'secret.example/doc', 'image/jpeg', 12)`, [id]);
   await sql.query(`insert into application_events (applicant_id, from_status, to_status, actor, reason) values ($1, 'submitted', 'round1_complete', 'videoask', 'round 1 finished')`, [id]);
   await sql.query(`insert into nominations (nominator_name, nominator_email, nominee_name, nominee_email, videoask_link) values ('Ivy', 'ivy@example.org', 'Nia', 'nia-nom@example.org', 'https://secret.example/ask')`);
-  const detail = await loadApplicant(database, id);
+  const viewer = { id: "00000000-0000-4000-8000-000000000000" };
+  const detail = await loadApplicant(database, id, viewer, "");
   assert.equal(detail.dob, "1990-01-02");
   assert.equal(detail.videoAsk, "complete");
   assert.equal(detail.identity, "verified");
@@ -225,14 +226,14 @@ async function applicantReview() {
   assert.equal(JSON.stringify(detail).includes("session-secret"), false);
   assert.equal(await loadApplicant(database, parseUserId("00000000-0000-4000-8000-000000000000")), null);
   const query = parseRecordQuery({ list: "applicants", q: "nia", status: "submitted", track: "in_person", language: "fr", cycle: "2" });
-  const listed = await loadRecords(database, query);
+  const listed = await loadRecords(database, query, viewer);
   assert.equal(listed.total, 1);
   assert.equal(listed.rows[0].href, `/admin/records/applicants/${id}`);
   assert.equal(JSON.stringify(listed.rows).includes("secret.example"), false);
   assert.equal(JSON.stringify(listed.rows).includes("1990-01-02"), false);
-  const missed = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "accepted" }));
+  const missed = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "accepted" }), viewer);
   assert.equal(missed.rows.some((row) => row.id === id), false);
-  const labeled = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "Accepted" }));
+  const labeled = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "Accepted" }), viewer);
   assert.equal(labeled.total, 0);
   assert.equal(JSON.stringify(listed.rows).includes("session-secret"), false);
   const user = await sql.query(`select id, email from users where email = 'admin@example.org'`);

@@ -8,6 +8,7 @@ import { startDatabase } from "./db.mjs";
 let db;
 let sql;
 let load;
+const session = { raw: "" };
 
 before(async () => {
   db = await startDatabase();
@@ -24,7 +25,11 @@ before(async () => {
     "next/cache": { unstable_cache: (fn) => fn, updateTag: () => {}, revalidatePath: () => {} },
     "next/headers": {
       headers: async () => new Headers({ origin: "http://localhost:3000", host: "localhost:3000" }),
-      cookies: async () => ({ get: () => undefined, set() {}, delete() {} }),
+      cookies: async () => ({
+        get: (name) => (name === "crp_staff" && session.raw ? { value: session.raw } : undefined),
+        set() {},
+        delete() {},
+      }),
     },
     "next/navigation": { redirect: (url) => { throw new Error(`redirect ${url}`); } },
     "next/server": {
@@ -639,4 +644,82 @@ test("bulk confirm returns applied, stale, and not_allowed, and only the applied
     rows: Array.from({ length: 51 }, () => ({ applicantId: applyRow.id, version: 0, reviewCycle: 0 })),
   });
   assert.deepEqual(tooMany, { ok: false, reason: "invalid" });
+});
+
+test("a reviewer can save scores, a note, and a recommendation, and confirm is forbidden", async () => {
+  const reviewer = await insertUser("reviewer", "Rae Reviewer");
+  const editor = await insertUser("editor", "Ed Editor");
+  const applicant = await insertApplicant();
+  const database = mod("lib/db/index.ts").getDb();
+  const noteId = randomUUID();
+  const saved = await mod("lib/review/write.ts").saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: 4, context: 5, contribution: 3 },
+    recommendation: "advance",
+    note: { id: noteId, body: "Fieldwork in the delta is specific and recent." },
+  });
+  assert.equal(saved.ok, true);
+  const before = await applicantRow(applicant.id);
+  assert.equal(before.version, applicant.version);
+  assert.equal(before.status, "under_review");
+  assert.equal((await jobs(applicant.id)).length, 0);
+  const { loadApplicant, loadRecords, parseRecordQuery } = mod("lib/admin/records.ts");
+  const { needsDecision } = mod("lib/review/queue.ts");
+  const { STATUSES, can } = { ...mod("lib/lifecycle.ts"), ...mod("lib/staff/roles.ts") };
+  for (const status of STATUSES) assert.equal(needsDecision(status), status === "under_review" || status === "accepted");
+  assert.equal(can("reviewer", "reviews.write"), true);
+  assert.equal(can("reviewer", "decisions.confirm"), false);
+  assert.equal(can("editor", "reviews.write"), false);
+  assert.equal(can("editor", "reviews.assign"), false);
+  assert.equal(can("editor", "decisions.confirm"), false);
+  assert.equal(can("admin", "reviews.write"), true);
+  assert.equal(can("admin", "reviews.assign"), true);
+  assert.equal(can("admin", "decisions.confirm"), true);
+  const read = await loadApplicant(database, applicant.id, { id: editor.id }, "");
+  assert.equal(read.positions[0].scores.commitment, 4);
+  assert.equal(read.positions[0].recommendation, "advance");
+  assert.equal(read.notes[0].body, "Fieldwork in the delta is specific and recent.");
+  assert.equal(read.notes[0].authorName, "Rae Reviewer");
+  assert.equal(JSON.stringify(read).includes("round1_link"), false);
+  const unassigned = await loadRecords(database, parseRecordQuery({ list: "applicants", queue: "unassigned" }), { id: editor.id });
+  assert.equal(unassigned.rows.some((row) => row.id === applicant.id), true);
+  assert.equal(JSON.stringify(unassigned.filters).includes(editor.id), false);
+  const admin = await insertUser("admin", "Ada Admin");
+  await mod("lib/review/write.ts").assignReviewer(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    assigneeId: reviewer.id,
+    expectedAssigneeId: null,
+  });
+  const mine = await loadRecords(database, parseRecordQuery({ list: "applicants", queue: "mine" }), { id: reviewer.id });
+  assert.equal(mine.rows.some((row) => row.id === applicant.id), true);
+  assert.equal(mine.rows.find((row) => row.id === applicant.id).href.includes("queue=mine"), true);
+  assert.equal(JSON.stringify(mine.filters).includes(reviewer.id), false);
+  const notMine = await loadRecords(database, parseRecordQuery({ list: "applicants", queue: "mine" }), { id: editor.id });
+  assert.equal(notMine.rows.some((row) => row.id === applicant.id), false);
+  const needs = await loadRecords(database, parseRecordQuery({ list: "applicants", queue: "needs" }), { id: editor.id });
+  assert.equal(needs.rows.some((row) => row.id === applicant.id), true);
+  const { hashToken } = mod("lib/access.ts");
+  const raw = `session-${randomUUID()}`;
+  await sql.query(
+    "insert into user_sessions (hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')",
+    [hashToken(raw), reviewer.id],
+  );
+  session.raw = raw;
+  const form = new FormData();
+  form.set("applicantId", applicant.id);
+  form.set("version", String(before.version));
+  form.set("reviewCycle", "0");
+  form.set("decisionId", randomUUID());
+  form.set("queue", "mine");
+  form.set("field", "reviewDecision");
+  form.set("value", "accept");
+  form.set("to", "accepted");
+  const refused = await mod("app/admin/(console)/records/applicants/[id]/actions.ts").confirmDecisionAction(null, form);
+  assert.deepEqual(refused, { result: "forbidden" });
+  session.raw = "";
+  const after = await applicantRow(applicant.id);
+  assert.equal(after.status, "under_review");
+  assert.equal(after.version, before.version);
+  assert.equal((await jobs(applicant.id)).length, 0);
 });
