@@ -19,6 +19,28 @@ export function parseVideoaskReference(raw: unknown): { applicantId: string } | 
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
   return { applicantId };
 }
+
+// Forms whose completion webhooks we accept. Single-form deploys use
+// VIDEOASK_FORM_ID; language-split deploys add VIDEOASK_FORM_ID_EN/FR/ES (and
+// optionally a comma list in VIDEOASK_FORM_IDS). VIDEOASK_FORM_URL stays the
+// language-picker entry applicants open from the site.
+export function videoaskFormIds(): string[] {
+  const ids: string[] = [];
+  for (const key of ["VIDEOASK_FORM_ID", "VIDEOASK_FORM_ID_EN", "VIDEOASK_FORM_ID_FR", "VIDEOASK_FORM_ID_ES"] as const) {
+    const value = process.env[key]?.trim();
+    if (value) ids.push(value);
+  }
+  for (const part of (process.env.VIDEOASK_FORM_IDS ?? "").split(",")) {
+    const value = part.trim();
+    if (value) ids.push(value);
+  }
+  return [...new Set(ids)];
+}
+
+export function isAllowedVideoaskForm(formId: string): boolean {
+  return videoaskFormIds().includes(formId);
+}
+
 export function videoaskLink(applicantId: string): string | null {
   const base = videoAskBase();
   if (!base) return null;
@@ -42,9 +64,8 @@ export function readVideoaskCompletion(body: unknown): VideoaskCompletion | { ig
   const contact = b.contact as Record<string, unknown> | undefined;
   const form = b.form as Record<string, unknown> | undefined;
   if (!contact || !form) return null;
-  const expectedForm = process.env.VIDEOASK_FORM_ID;
-  if (!expectedForm) return null;
-  if (form.form_id !== expectedForm) return { ignored: "other form" };
+  const formId = typeof form.form_id === "string" ? form.form_id.trim() : "";
+  if (!formId || !isAllowedVideoaskForm(formId)) return { ignored: "other form" };
   if (contact.status !== "completed") return { ignored: "not completed" };
   const variables = contact.variables as Record<string, unknown> | { key?: string; name?: string; value?: unknown }[] | undefined;
   const raw = Array.isArray(variables)
@@ -52,5 +73,5 @@ export function readVideoaskCompletion(body: unknown): VideoaskCompletion | { ig
     : variables?.application_ref;
   const reference = parseVideoaskReference(raw);
   if (!reference) return null;
-  return { ...reference, eventId: b.event_id, formId: expectedForm };
+  return { ...reference, eventId: b.event_id, formId };
 }

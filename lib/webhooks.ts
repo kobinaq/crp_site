@@ -5,11 +5,12 @@ import { decisionEmail, receivedEmail } from "@/lib/emails";
 import { getIdentityProvider, type IdentityDecision } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
 import { lockApplicant, transition, updateApplicant } from "@/lib/lifecycle";
+import { applyVideoaskCompletion, scheduleIdentitySession } from "@/lib/application";
 import { reconcileIdentity } from "@/lib/application-status";
-import { scheduleIdentitySession } from "@/lib/application";
 import { issueAccessToken } from "@/lib/access";
 import { appUrl } from "@/lib/config";
 import { calendlyLink, parseCalendlyReference } from "@/lib/calendly";
+import { isAllowedVideoaskForm } from "@/lib/videoask";
 
 // Every verified webhook is written down before anything acts on it. The
 // (provider, event key) pair is unique, so a redelivery is recognised and
@@ -118,54 +119,8 @@ async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
 export type VideoaskPayload = { applicantId: string; formId: string; eventId: string };
 
 async function processVideoask(tx: Tx, payload: VideoaskPayload): Promise<ProcessOutcome> {
-  const current = await lockApplicant(tx, payload.applicantId);
-  if (!current) return { outcome: "unknown applicant" };
-  if (!current.emailVerifiedAt) return { outcome: "email unverified" };
-  const expected = process.env.VIDEOASK_FORM_ID;
-  if (!expected || payload.formId !== expected) return { outcome: "invalid form" };
-
-  const moved = await transition(tx, {
-    applicantId: current.id,
-    to: "round1_complete",
-    actor: "videoask",
-    reason: "application form completed",
-    allowFrom: ["submitted"],
-    patch: { round1CompletedAt: new Date() },
-  });
-  if (!moved.ok) return { outcome: `ignored:${moved.code}`, advanced: false, status: moved.applicant?.status };
-  if (moved.applicant.track === "online") {
-    const review = await transition(tx, {
-      applicantId: current.id,
-      to: "under_review",
-      actor: "videoask",
-      reason: "online application ready for review",
-      allowFrom: ["round1_complete"],
-    });
-    if (review.ok) {
-      await enqueueEmail(tx, `email:received:${current.id}:${review.applicant.reviewCycle}`, {
-        to: review.applicant.email,
-        ...receivedEmail(review.applicant.fullName, review.applicant.language),
-      }, "received", current.id);
-      return { outcome: "advanced", advanced: true, status: review.to };
-    }
-    return { outcome: "advanced", advanced: true, status: "round1_complete" };
-  }
-
-  // Identity may already have landed before Round 1; reconcile now that the
-  // gate is open so the applicant does not wait on another provider delivery.
-  const advanced = await reconcileIdentity(tx, current.id);
-  const [after] = await tx.select().from(applicants).where(eq(applicants.id, current.id));
-  if (advanced && after.status === "under_review") {
-    await enqueueEmail(tx, `email:received:${after.id}:${after.reviewCycle}`, {
-      to: after.email,
-      ...receivedEmail(after.fullName, after.language),
-    }, "received", after.id);
-    return { outcome: "advanced", advanced: true, status: after.status };
-  }
-  if (after.status === "id_failed" || (after.status === "round1_complete" && !after.identityLink)) {
-    await scheduleIdentitySession(tx, after.id, after.version);
-  }
-  return { outcome: "advanced", advanced: true, status: after.status };
+  if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
+  return applyVideoaskCompletion(tx, payload.applicantId);
 }
 
 // --- Identity provider --------------------------------------------------------

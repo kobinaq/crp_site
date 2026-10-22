@@ -24,7 +24,9 @@ before(async () => {
   process.env.OPERATIONS_TOKENS = JSON.stringify([{ id: "tester", tokenHash: createHash("sha256").update("test-operator-token-at-least-32-characters").digest("hex") }]);
   for (const lang of ["EN", "FR", "ES"]) {
     process.env[`VIDEOASK_${lang}`] = undefined;
+    process.env[`VIDEOASK_FORM_ID_${lang}`] = undefined;
   }
+  process.env.VIDEOASK_FORM_IDS = undefined;
   process.env.VIDEOASK_FORM_ID = "FORM-fixture";
   process.env.VIDEOASK_FORM_URL = "https://videoask.invalid/form";
   process.env.CRON_SECRET = "cron";
@@ -332,25 +334,77 @@ test("email confirmation POSTs accept same-origin and null-origin-with-valid-tok
 test("the verify hand-off trusts the signed session, never the echoed applicant id", async () => {
   const a = await h.apply();
   const { signSession } = h.load("lib/session.ts");
+  const { videoaskReference } = h.load("lib/videoask.ts");
   const noSession = await h.verify({}, `?applicant_id=${a.id}`);
   assert.equal(noSession.url, "https://example.invalid/apply");
   const forged = await h.verify({ crp_session: `${a.id}.9999999999.forged` });
   assert.equal(forged.url, "https://example.invalid/apply");
 
-  const premature = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.equal(premature.url, "https://example.invalid/apply/complete");
+  const timings = { ...h.load("lib/verify-wait.ts").verifyWait };
+  const wait = h.load("lib/verify-wait.ts").verifyWait;
+  Object.assign(wait, { budgetMs: 60, intervalMs: 20 });
+  try {
+    // Neither the session nor the signed thank-you ref advances the applicant.
+    const premature = await h.verify({ crp_session: signSession(a.id, 1) });
+    assert.equal(premature.url, "https://example.invalid/apply/complete");
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+    const ref = encodeURIComponent(videoaskReference(a.id));
+    const fromThankYou = await h.verify({}, `?ref=${ref}`);
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+    assert.equal((await row("applicants", a.id)).round1_completed_at, null);
+    assert.match(await fromThankYou.text(), /url=https:\/\/example\.invalid\/api\/apply\/verify\?ref=[^"&]+&amp;attempt=1/);
+    // A ref for someone else while signed in is refused outright.
+    const b = await h.apply();
+    assert.equal((await h.verify({ crp_session: signSession(a.id, 1) }, `?ref=${encodeURIComponent(videoaskReference(b.id))}`)).url, "https://example.invalid/apply");
+
+    // Timeout path: after the last re-check the applicant lands on /apply/complete.
+    const last = await h.verify({}, `?ref=${ref}&attempt=${wait.maxAttempts}`);
+    assert.equal(last.url, "https://example.invalid/apply/complete");
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+
+    // Only the authenticated webhook completes Round 1; then verify hands off to Didit.
+    await h.videoask(a.id);
+    assert.equal((await row("applicants", a.id)).status, "round1_complete");
+    const first = await h.verify({}, `?ref=${ref}`);
+    assert.match(first.url, /^https:\/\/identity\.invalid\/session-/);
+    const second = await h.verify({ crp_session: signSession(a.id, 1) });
+    assert.equal(second.url, first.url);
+    const applicant = await row("applicants", a.id);
+    assert.ok(applicant.round1_completed_at);
+    assert.equal(applicant.identity_link, first.url);
+    assert.equal(applicant.identity_status, "pending");
+  } finally {
+    Object.assign(wait, timings);
+  }
+});
+
+test("verify waits for an in-flight webhook, then sends in-person applicants to Didit", async () => {
+  const a = await h.apply({ track: "in_person" });
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const wait = h.load("lib/verify-wait.ts").verifyWait;
+  const timings = { ...wait };
+  let polls = 0;
+  Object.assign(wait, {
+    budgetMs: 5000, intervalMs: 10,
+    // The webhook lands while verify is polling.
+    sleep: async () => { if (++polls === 2) await h.videoask(a.id); },
+  });
+  try {
+    const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+    assert.match(res.url, /^https:\/\/identity\.invalid\/session-/);
+    assert.ok(polls >= 2 && polls < 5, `polled ${polls} times`);
+    assert.equal((await row("applicants", a.id)).status, "round1_complete");
+  } finally {
+    Object.assign(wait, timings);
+  }
+});
+
+test("verify sends online applicants to /apply/complete without advancing them", async () => {
+  const a = await h.apply({ track: "online" });
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+  assert.equal(res.url, "https://example.invalid/apply/complete");
   assert.equal((await row("applicants", a.id)).status, "submitted");
-  await h.videoask(a.id);
-  const first = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.match(first.url, /^https:\/\/identity\.invalid\/session-/);
-  const second = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.equal(second.url, first.url);
-  const applicant = await row("applicants", a.id);
-  assert.equal(applicant.status, "round1_complete");
-  assert.ok(applicant.round1_completed_at);
-  assert.equal(applicant.identity_link, first.url);
-  assert.equal(applicant.identity_status, "pending");
-  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 1);
 });
 
 test("the worker delivers queued email with an idempotency key, backs off on failure, and parks bad requests", async () => {
@@ -484,6 +538,74 @@ for (const decision of ["approved", "declined"]) {
     });
   }
 }
+
+// Delayed "Verify your identity" fallback email (identity_fallback).
+async function provisionViaWorker(applicantId) {
+  const { handlers } = h.load("lib/worker.ts");
+  const database = h.load("lib/db/index.ts").getDb();
+  return handlers.identity_session({ payload: { applicantId } }, database);
+}
+const fallbackJobs = async (applicantId) => (await jobsFor(applicantId)).filter((j) => j.payload.template === "identity_fallback");
+async function runFallback(applicantId) {
+  const { handlers } = h.load("lib/worker.ts");
+  const database = h.load("lib/db/index.ts").getDb();
+  const [job] = await fallbackJobs(applicantId);
+  const before = h.state.delivered.length;
+  const outcome = await handlers.email({ id: job.id, dedupeKey: job.dedupe_key, payload: job.payload }, database);
+  return { job, outcome, sent: h.state.delivered.slice(before).filter((m) => m.key === job.dedupe_key) };
+}
+
+test("identity fallback: reaching Didit from the redirect means no email", async () => {
+  const a = await h.apply({ track: "in_person" });
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  const [job] = await fallbackJobs(a.id);
+  assert.equal(job.dedupe_key, `identity-link-fallback:${a.id}:0`);
+  const delay = new Date(job.available_at).getTime() - new Date(job.created_at).getTime();
+  assert.ok(delay >= 10 * 60_000 && delay <= 15 * 60_000, `delay ${delay}`);
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+  assert.match(res.url, /^https:\/\/identity\.invalid\//);
+  assert.ok((await row("applicants", a.id)).identity_link_opened_at);
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.deliveryStatus, "skipped: link opened");
+  assert.equal(sent.length, 0);
+});
+
+test("identity fallback: a closed tab gets exactly one email, even with duplicate webhooks", async () => {
+  const a = await h.apply({ track: "in_person", language: "fr" });
+  await h.videoask(a.id);
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  await provisionViaWorker(a.id);
+  await h.videoask(a.id);
+  assert.equal((await fallbackJobs(a.id)).length, 1);
+  const applicant = await row("applicants", a.id);
+  assert.equal(applicant.identity_link_opened_at, null);
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.status, "done");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, applicant.email);
+  assert.equal(sent[0].subject, h.load("lib/emails.ts").identityEmail(applicant.full_name, applicant.identity_link, "fr").subject);
+  assert.ok(sent[0].html.includes(applicant.identity_link.replace(/&/g, "&amp;")));
+  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
+});
+
+test("identity fallback is skipped once the applicant has moved on, and id_failed retries still email at once", async () => {
+  const a = await h.apply({ track: "in_person" });
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  const { identity_session_id: session } = await row("applicants", a.id);
+  await h.identity({ reference: a.id, sessionId: session, decision: "declined", eventId: `d-${a.id}` });
+  assert.equal((await row("applicants", a.id)).status, "id_failed");
+  await provisionViaWorker(a.id);
+  const jobs = await jobsFor(a.id);
+  assert.equal(jobs.filter((j) => j.payload.template === "identity_retry").length, 1);
+  assert.equal((await fallbackJobs(a.id)).length, 1, "no second fallback for the retry session");
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.deliveryStatus, "skipped: status id_failed");
+  assert.equal(sent.length, 0);
+});
 
 test("identity events for another session or from the past are ignored", async () => {
   const a = await h.apply();
@@ -1237,6 +1359,8 @@ test("Spanish applicants confirm ownership before the form advances", async () =
     headers: { "x-webhook-secret": "videoask" }, body: JSON.stringify({ event_id: randomUUID(), event_type: "form_response", form: { form_id: formId }, contact: { status: "completed", variables: { application_ref: reference } } }),
   }));
   assert.equal((await send("wrong-form")).body.ignored, "other form");
-  assert.equal((await send(process.env.VIDEOASK_FORM_ID)).body.advanced, true);
+  process.env.VIDEOASK_FORM_ID_FR = "FORM-fr";
+  assert.equal((await send("FORM-fr")).body.advanced, true);
   assert.equal((await row("applicants", a.id)).status, "round1_complete");
+  delete process.env.VIDEOASK_FORM_ID_FR;
 });

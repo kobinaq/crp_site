@@ -17,7 +17,7 @@ import { Toast } from "./Toast";
 import { ContinueButton } from "./ContinueButton";
 import { FormRadioCard } from "./FormRadioCard";
 import { FormCheckRow } from "./FormCheckRow";
-import { FIELD, FIELD_LG, MINI_LABEL, PLACEHOLDER, VALUE_LG } from "./fieldStyles";
+import { FIELD, FIELD_LG, MINI_LABEL, PLACEHOLDER_LG, VALUE_LG } from "./fieldStyles";
 
 // Text pill with a floating label once filled (Figma 2308:2967): placeholder
 // label when empty, small label above the value when filled. Presentation only.
@@ -28,14 +28,33 @@ function FloatInput({
 }: { label: string; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   const filled = String(input.value ?? "").length > 0;
   return (
-    <label className={`${FIELD} ${FIELD_LG} min-w-0 flex-col items-start justify-center pl-5 pr-6 desk:pl-6 desk:pr-8 ${className}`}>
+    <label className={`${FIELD} ${FIELD_LG} min-w-0 flex-col items-start justify-center pl-6 pr-8 ${className}`}>
       {filled ? <span className={MINI_LABEL}>{label}</span> : null}
       <input
         {...input}
         placeholder={label}
-        className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER} ${filled ? "mt-0.5" : ""}`}
+        className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER_LG} ${filled ? "mt-0.5" : ""}`}
       />
     </label>
+  );
+}
+
+// Mobile travel question (Figma 2308:11086): 16px black box with a white tick, 15px copy.
+function SheetCheck({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" onClick={onToggle} aria-pressed={checked} className="flex w-full items-center gap-2 pl-6 pr-[22px] text-left">
+      <span
+        aria-hidden
+        className={`grid size-4 shrink-0 place-items-center rounded-[5.333px] border-[1.333px] border-black ${checked ? "bg-black" : "bg-transparent"}`}
+      >
+        {checked ? (
+          <svg viewBox="0 0 18 13" className="size-[10.667px]" fill="none" aria-hidden>
+            <path d="M2 7l4.5 4L16 2" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
+      </span>
+      <span className="min-w-0 flex-1 text-[15px] leading-[1.2] tracking-[-0.6px] text-black">{label}</span>
+    </button>
   );
 }
 
@@ -138,6 +157,7 @@ export function AboutStep({
     }
   }
   const shown = resumeToast ?? toast ?? (error && retryable ? "submit-failed" : null);
+  const travelSheet = track === "in_person";
 
   const valid =
     fullName.trim().length > 0 && EMAIL_RE.test(email.trim()) && /^\d{4}-\d{2}-\d{2}$/.test(dob);
@@ -223,26 +243,26 @@ export function AboutStep({
   return createPortal(
     <div className="fixed inset-0 z-[70] flex h-dvh flex-col overflow-hidden bg-cream">
       {/* Header */}
-      <header className="flex shrink-0 items-center justify-between px-4 py-2.5 desk:h-[88px] desk:px-16 desk:py-6">
+      <header className="flex h-[68px] shrink-0 items-center justify-between px-8 desk:h-[88px] desk:px-16 desk:py-6">
         <button
           type="button"
           onClick={onBack}
           aria-label={tr("Back")}
-          className="grid size-9 place-items-center rounded-full bg-white shadow-sm desk:size-10"
+          className="grid size-8 place-items-center rounded-full bg-white desk:size-10 desk:shadow-sm"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/apply/arrow-left.svg" alt="" width={20} height={20} className="size-5 desk:size-6" />
+          <img src="/icons/apply/arrow-left.svg" alt="" width={20} height={20} className="size-4 desk:size-6" />
         </button>
 
-        <div className="flex items-center rounded-full bg-white p-1">
+        <div className="flex h-[27px] items-center rounded-full bg-white p-0.5 desk:h-auto desk:p-1">
           {applicationLocales.map((code) => (
             <button
               key={code}
               type="button"
               onClick={() => setLocale(code)}
               aria-pressed={locale === code}
-              className={`h-7 rounded-full px-3.5 text-[12px] font-semibold uppercase tracking-[0.04em] transition-colors desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:tracking-[0.56px] ${
-                locale === code ? "bg-black text-white" : "bg-transparent text-black/50"
+              className={`h-full min-w-8 rounded-full px-2 text-[12px] font-semibold uppercase leading-[0.9] tracking-[0.48px] transition-colors desk:h-8 desk:min-w-[52px] desk:px-3 desk:text-[14px] desk:leading-normal desk:tracking-[0.56px] ${
+                locale === code ? "bg-black text-white" : "bg-transparent text-black/48 desk:text-black/50"
               }`}
             >
               {code}
@@ -252,15 +272,15 @@ export function AboutStep({
       </header>
 
       {/* Card */}
-      <main className="flex min-h-0 flex-1 items-center justify-center px-3 pb-2 desk:items-stretch desk:px-16 desk:pb-0">
-        <div className="flex max-h-full w-full min-w-0 max-w-[1072px] flex-col rounded-[36px] bg-white px-5 py-5 desk:h-full desk:rounded-[154px] desk:px-10 desk:py-16">
-          <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[632px] flex-1 flex-col overflow-x-hidden overflow-y-auto">
-            <h1 className="text-center text-[26px] leading-[0.9] tracking-[-1.04px] text-black desk:text-[48px] desk:tracking-[-1.92px]">
+      <main className="flex min-h-0 flex-1 items-stretch justify-center px-3 pb-2 desk:px-16 desk:pb-0">
+        <div className="flex h-full max-h-full w-full min-w-0 max-w-[1072px] flex-col overflow-hidden rounded-[88px] bg-white py-8 desk:overflow-visible desk:rounded-[154px] desk:px-10 desk:py-16">
+          <div className={`mx-auto flex min-h-0 w-full min-w-0 max-w-[632px] flex-1 flex-col overflow-x-hidden overflow-y-auto px-6 desk:px-0 ${travelSheet ? "max-desk:pb-12" : ""}`}>
+            <h1 className="shrink-0 py-8 text-center text-[28px] leading-[0.9] tracking-[-1.12px] text-black desk:py-0 desk:text-[48px] desk:tracking-[-1.92px]">
               {tr("More about you")}</h1>
 
-            <div className="mt-5 flex flex-col gap-1.5 desk:my-auto desk:gap-2 desk:pt-14">
+            <div className="my-auto flex flex-col gap-2 desk:pt-14">
               {/* Name + DOB */}
-              <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
+              <div className="flex min-w-0 flex-col gap-2 desk:flex-row">
                 <FloatInput
                   label={tr("*NAME")}
                   className="shrink-0 desk:shrink desk:flex-1"
@@ -273,7 +293,7 @@ export function AboutStep({
               </div>
 
               {/* Email + phone */}
-              <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
+              <div className="flex min-w-0 flex-col gap-2 desk:flex-row">
                 <FloatInput
                   label={tr("*EMAIL")}
                   className="shrink-0 desk:shrink desk:flex-1"
@@ -283,7 +303,7 @@ export function AboutStep({
                   aria-label={tr("Email")}
                   spellCheck={false}
                 />
-                <div className={`${FIELD} ${FIELD_LG} min-w-0 gap-3 pl-3 pr-5 desk:w-[312px] desk:shrink-0 desk:gap-4 desk:pl-4 desk:pr-10`}>
+                <div className={`${FIELD} ${FIELD_LG} min-w-0 gap-4 pl-4 pr-10 desk:w-[312px] desk:shrink-0`}>
                   <CountryDropdown variant="inline" size="lg" value={dialCountry} onChange={setDialCountry} />
                   <label className="flex min-w-0 flex-1 flex-col items-start justify-center">
                     {mobile ? <span className={MINI_LABEL}>{tr("MOBILE")}</span> : null}
@@ -293,26 +313,26 @@ export function AboutStep({
                       onChange={(e) => setMobile(e.target.value)}
                       placeholder={tr("MOBILE")}
                       aria-label={tr("Mobile number")}
-                      className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER} ${mobile ? "mt-0.5" : ""}`}
+                      className={`w-full min-w-0 bg-transparent outline-none ${VALUE_LG} ${PLACEHOLDER_LG} ${mobile ? "mt-0.5" : ""}`}
                     />
                   </label>
                 </div>
               </div>
 
               {/* Nationality + based in */}
-              <div className="flex min-w-0 flex-col gap-1.5 desk:flex-row desk:gap-2">
+              <div className="flex min-w-0 flex-col gap-2 desk:flex-row">
                 <CountryDropdown variant="field" size="lg" label={tr("Nationality")} value={nationality} onChange={setNationality} />
                 <CountryDropdown variant="field" size="lg" label={tr("Currently based in")} value={basedIn} onChange={setBasedIn} />
               </div>
 
               {/* Program radios */}
-              <div className="mt-0.5 flex min-w-0">
+              <div className="flex min-w-0 desk:mt-0.5">
                 <FormRadioCard label={tr("Only program")} selected={track === "online"} onSelect={() => setTrack("online")} />
                 <FormRadioCard label={tr("Travel to Antalya")} selected={track === "in_person"} onSelect={() => setTrack("in_person")} />
               </div>
 
               {track === "in_person" ? (
-                <div className="mt-6 flex flex-col gap-1.5 desk:mt-[60px] desk:gap-0.5">
+                <div className="flex flex-col max-desk:hidden desk:mt-[60px] desk:gap-0.5">
                   <FormCheckRow
                     label={tr("Can you travel out of the country you're located in")}
                     checked={canTravel}
@@ -337,12 +357,13 @@ export function AboutStep({
       </main>
 
       {/* Continue / toasts */}
-      <footer className="relative flex shrink-0 flex-col items-center gap-1.5 px-2.5 pb-2.5 pt-1 desk:p-[10px]">
+      {/* Mobile: travel questions sit in a cream sheet over the panel bottom (Figma 2308:11086). */}
+      <footer className={`relative flex shrink-0 flex-col items-center gap-1.5 px-2 pb-2 pt-0.5 desk:p-[10px] ${travelSheet ? "max-desk:z-10 max-desk:-mt-[44px] max-desk:gap-6 max-desk:rounded-t-[44px] max-desk:bg-cream max-desk:pt-6" : ""}`}>
         {shown ? (
           // White fade over the panel bottom behind the toast (Figma 2308:3296).
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[260px] bg-gradient-to-t from-white/80 via-white/50 to-transparent max-desk:hidden" />
         ) : null}
-        <div className="relative z-10 flex w-full justify-center desk:absolute desk:inset-x-0 desk:bottom-[40px] desk:px-[163px]">
+        <div className="absolute inset-x-3 bottom-3 z-20 flex justify-center desk:inset-x-0 desk:bottom-[40px] desk:z-10 desk:px-[163px]">
         {shown === "interest" ? (
           <Toast
             variant="error"
@@ -386,6 +407,20 @@ export function AboutStep({
         ) : null}
         </div>
 
+        {travelSheet ? (
+          <div className="flex w-full flex-col gap-6 desk:hidden">
+            <SheetCheck
+              label={tr("Can you travel out of the country you're located in")}
+              checked={canTravel}
+              onToggle={() => setCanTravel((v) => !v)}
+            />
+            <SheetCheck
+              label={tr("Do you have a passport valid for six months after the dates of travel?")}
+              checked={hasValidPassport}
+              onToggle={() => setHasValidPassport((v) => !v)}
+            />
+          </div>
+        ) : null}
         <Turnstile key={challengeKey} onToken={setTurnstileToken} size="compact" />
         <ContinueButton
           label={submitting ? tr("One moment…") : tr("Continue")}

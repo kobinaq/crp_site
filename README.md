@@ -12,11 +12,31 @@ Other scripts: `npm run build`, `npm run start`, `npm run lint`.
 
 ## Application verification
 
-Applicants complete one VideoAsk form configured by `VIDEOASK_FORM_URL` and
-`VIDEOASK_FORM_ID`. Online applications move straight to review. In-person
+Applicants open `VIDEOASK_FORM_URL` (often a language picker). Completions are
+accepted from any form id in `VIDEOASK_FORM_ID`, `VIDEOASK_FORM_ID_EN` /
+`_FR` / `_ES`, or the comma list `VIDEOASK_FORM_IDS`. Point every language
+form at the same webhook URL and secret, and pass the custom `application_ref`
+variable through each. Online applications move straight to review. In-person
 applications continue through Didit; approved identity images are copied into
 private Vercel Blob storage and can only be streamed through the authenticated
 operations document route.
+
+In every VideoAsk form, set the final-step Logic redirect to
+`https://www.climaterefugeepavilion.org/api/apply/verify?ref=@application_ref`
+(use `@` to insert the custom `application_ref` variable). The redirect only
+identifies the returning applicant; it never completes Round 1. Only the
+authenticated VideoAsk webhook does that. If the webhook has not landed yet,
+the page waits a few seconds and then shows a short "finishing up" page that
+re-checks automatically; once Round 1 is recorded, in-person applicants go on
+to Didit. Online applicants land on `/apply/complete`. Preview deployments use
+their own origin in place of the production host.
+
+If an in-person applicant never reaches Didit through that redirect (for
+example they closed the tab), a "Verify your identity" email with the Didit link
+is sent about 12 minutes after the session is created. It is skipped if the
+redirect already sent them to the link (`identity_link_opened_at`) or their
+status has moved on, and is keyed `identity-link-fallback:<applicantId>:<reviewCycle>`
+so it goes out at most once per review cycle.
 
 Configure Didit's webhook destination separately in its console, pointing to
 `https://<your-domain>/api/webhooks/identity`, and set `DIDIT_WEBHOOK_SECRET`.

@@ -95,6 +95,9 @@ export const applicants = pgTable(
     identityStatus: identityStatus("identity_status"),
     identitySessionId: text("identity_session_id"),
     identityLink: text("identity_link"),
+    // When /api/apply/verify last sent this browser on to identityLink. Reset
+    // whenever a new session is stored; the fallback email checks it.
+    identityLinkOpenedAt: timestamp("identity_link_opened_at", { withTimezone: true }),
     identityCheckedAt: timestamp("identity_checked_at", { withTimezone: true }),
     interviewAt: timestamp("interview_at", { withTimezone: true }),
     docsStatus: text("docs_status"),

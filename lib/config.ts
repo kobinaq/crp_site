@@ -21,12 +21,21 @@ let checked = false;
 // production deploy fails loudly before it can accept an application.
 export function assertBackendConfig(): void {
   if (checked || process.env.NODE_ENV !== "production") return;
-  const required = ["DATABASE_URL", "APP_URL", "RESEND_API_KEY", "RESEND_FROM", "APP_SECRET", "OPERATIONS_TOKENS", "CRON_SECRET", "SYNC_API_SECRET", "TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY", "VIDEOASK_WEBHOOK_SECRET", "VIDEOASK_FORM_URL", "VIDEOASK_FORM_ID", "DIDIT_API_KEY", "DIDIT_WORKFLOW_ID", "DIDIT_WEBHOOK_SECRET", "RESEND_WEBHOOK_SECRET", "BLOB_READ_WRITE_TOKEN"];
+  const required = ["DATABASE_URL", "APP_URL", "RESEND_API_KEY", "RESEND_FROM", "APP_SECRET", "OPERATIONS_TOKENS", "CRON_SECRET", "SYNC_API_SECRET", "TURNSTILE_SECRET_KEY", "NEXT_PUBLIC_TURNSTILE_SITE_KEY", "VIDEOASK_WEBHOOK_SECRET", "VIDEOASK_FORM_URL", "DIDIT_API_KEY", "DIDIT_WORKFLOW_ID", "DIDIT_WEBHOOK_SECRET", "RESEND_WEBHOOK_SECRET", "BLOB_READ_WRITE_TOKEN"];
   // Calendly is optional (CALENDLY_URL_*, CALENDLY_WEBHOOK_SIGNING_KEY): see
   // calendlyEnabled() in lib/calendly.ts.
   const missing = required.filter((key) => !process.env[key]);
   try { if (new URL(process.env.VIDEOASK_FORM_URL ?? "").protocol !== "https:") missing.push("VIDEOASK_FORM_URL"); }
   catch { missing.push("VIDEOASK_FORM_URL"); }
+  // At least one VideoAsk form id: VIDEOASK_FORM_ID and/or language ids /
+  // VIDEOASK_FORM_IDS (see videoaskFormIds() in lib/videoask.ts).
+  const hasVideoaskForm =
+    Boolean(process.env.VIDEOASK_FORM_ID?.trim()) ||
+    Boolean(process.env.VIDEOASK_FORM_ID_EN?.trim()) ||
+    Boolean(process.env.VIDEOASK_FORM_ID_FR?.trim()) ||
+    Boolean(process.env.VIDEOASK_FORM_ID_ES?.trim()) ||
+    (process.env.VIDEOASK_FORM_IDS ?? "").split(",").some((part) => part.trim());
+  if (!hasVideoaskForm) missing.push("VIDEOASK_FORM_ID (or VIDEOASK_FORM_ID_EN/FR/ES / VIDEOASK_FORM_IDS)");
   for (const key of ["APP_SECRET", "CRON_SECRET", "SYNC_API_SECRET"]) {
     if ((process.env[key]?.length ?? 0) < 32) missing.push(`${key} (32+ characters)`);
   }
