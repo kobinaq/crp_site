@@ -539,6 +539,74 @@ for (const decision of ["approved", "declined"]) {
   }
 }
 
+// Delayed "Verify your identity" fallback email (identity_fallback).
+async function provisionViaWorker(applicantId) {
+  const { handlers } = h.load("lib/worker.ts");
+  const database = h.load("lib/db/index.ts").getDb();
+  return handlers.identity_session({ payload: { applicantId } }, database);
+}
+const fallbackJobs = async (applicantId) => (await jobsFor(applicantId)).filter((j) => j.payload.template === "identity_fallback");
+async function runFallback(applicantId) {
+  const { handlers } = h.load("lib/worker.ts");
+  const database = h.load("lib/db/index.ts").getDb();
+  const [job] = await fallbackJobs(applicantId);
+  const before = h.state.delivered.length;
+  const outcome = await handlers.email({ id: job.id, dedupeKey: job.dedupe_key, payload: job.payload }, database);
+  return { job, outcome, sent: h.state.delivered.slice(before).filter((m) => m.key === job.dedupe_key) };
+}
+
+test("identity fallback: reaching Didit from the redirect means no email", async () => {
+  const a = await h.apply({ track: "in_person" });
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  const [job] = await fallbackJobs(a.id);
+  assert.equal(job.dedupe_key, `identity-link-fallback:${a.id}:0`);
+  const delay = new Date(job.available_at).getTime() - new Date(job.created_at).getTime();
+  assert.ok(delay >= 10 * 60_000 && delay <= 15 * 60_000, `delay ${delay}`);
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+  assert.match(res.url, /^https:\/\/identity\.invalid\//);
+  assert.ok((await row("applicants", a.id)).identity_link_opened_at);
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.deliveryStatus, "skipped: link opened");
+  assert.equal(sent.length, 0);
+});
+
+test("identity fallback: a closed tab gets exactly one email, even with duplicate webhooks", async () => {
+  const a = await h.apply({ track: "in_person", language: "fr" });
+  await h.videoask(a.id);
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  await provisionViaWorker(a.id);
+  await h.videoask(a.id);
+  assert.equal((await fallbackJobs(a.id)).length, 1);
+  const applicant = await row("applicants", a.id);
+  assert.equal(applicant.identity_link_opened_at, null);
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.status, "done");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, applicant.email);
+  assert.equal(sent[0].subject, h.load("lib/emails.ts").identityEmail(applicant.full_name, applicant.identity_link, "fr").subject);
+  assert.ok(sent[0].html.includes(applicant.identity_link.replace(/&/g, "&amp;")));
+  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
+});
+
+test("identity fallback is skipped once the applicant has moved on, and id_failed retries still email at once", async () => {
+  const a = await h.apply({ track: "in_person" });
+  await h.videoask(a.id);
+  await provisionViaWorker(a.id);
+  const { identity_session_id: session } = await row("applicants", a.id);
+  await h.identity({ reference: a.id, sessionId: session, decision: "declined", eventId: `d-${a.id}` });
+  assert.equal((await row("applicants", a.id)).status, "id_failed");
+  await provisionViaWorker(a.id);
+  const jobs = await jobsFor(a.id);
+  assert.equal(jobs.filter((j) => j.payload.template === "identity_retry").length, 1);
+  assert.equal((await fallbackJobs(a.id)).length, 1, "no second fallback for the retry session");
+  const { outcome, sent } = await runFallback(a.id);
+  assert.equal(outcome.deliveryStatus, "skipped: status id_failed");
+  assert.equal(sent.length, 0);
+});
+
 test("identity events for another session or from the past are ignored", async () => {
   const a = await h.apply();
   await h.videoask(a.id);

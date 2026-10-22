@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { applicants, getDb } from "@/lib/db";
 import { provisionIdentitySession } from "@/lib/application";
 import { LOCALE_COOKIE } from "@/lib/locale";
@@ -64,5 +64,9 @@ export async function GET(req: NextRequest) {
   }
 
   const { url } = await provisionIdentitySession(db, current.id);
-  return NextResponse.redirect(url ?? complete);
+  if (!url) return NextResponse.redirect(complete);
+  // The browser is being handed the link now, so the fallback email is not needed.
+  await db.update(applicants).set({ identityLinkOpenedAt: new Date() })
+    .where(and(eq(applicants.id, current.id), eq(applicants.identityLink, url)));
+  return NextResponse.redirect(url);
 }

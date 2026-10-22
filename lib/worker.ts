@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
-import { applicants, getDb, identityDocuments } from "@/lib/db";
+import { applicants, getDb, identityDocuments, type Db } from "@/lib/db";
+import { identityEmail } from "@/lib/emails";
 import { put } from "@vercel/blob";
 import { deliverEmail } from "@/lib/email";
 import { provisionIdentitySession } from "@/lib/application";
@@ -12,7 +13,9 @@ import {
   type EmailJobPayload,
   type IdentitySessionJobPayload,
   type IdentityDocumentsJobPayload,
+  type Job,
   type JobHandler,
+  type JobOutcome,
   type JobKind,
   type WebhookJobPayload,
 } from "@/lib/jobs";
@@ -20,6 +23,22 @@ import { processWebhookEvent, requeueUnprocessedWebhooks } from "@/lib/webhooks"
 import { fetchDiditDocuments } from "@/lib/identity";
 import { recordChange } from "@/lib/sync-log";
 import { applicantSyncRowWithDocuments } from "@/lib/sync";
+
+// Delayed "Verify your identity" email (see provisionIdentitySession). Sent
+// only if the applicant is still waiting on their first identity check and
+// /api/apply/verify never sent them to the current Didit link.
+async function sendIdentityFallback(db: Db, job: Job): Promise<JobOutcome> {
+  const applicantId = String(job.payload.applicantId ?? "");
+  const [applicant] = applicantId ? await db.select().from(applicants).where(eq(applicants.id, applicantId)) : [];
+  if (!applicant) return { status: "done", providerId: null, deliveryStatus: "skipped: unknown applicant" };
+  if (applicant.status !== "round1_complete" || applicant.track === "online") return { status: "done", providerId: null, deliveryStatus: `skipped: status ${applicant.status}` };
+  if (!applicant.identityLink) return { status: "done", providerId: null, deliveryStatus: "skipped: no identity link" };
+  if (applicant.identityLinkOpenedAt) return { status: "done", providerId: null, deliveryStatus: "skipped: link opened" };
+  const { subject, html } = identityEmail(applicant.fullName, applicant.identityLink, applicant.language);
+  const result = await deliverEmail({ to: applicant.email, subject, html }, job.dedupeKey);
+  if (result.ok) return { status: "done", providerId: result.id, deliveryStatus: result.skipped ? "skipped" : "accepted" };
+  return { status: result.retryable ? "retry" : "failed", error: result.error };
+}
 
 // One handler per job kind. Handlers must be idempotent: the worker may run a
 // job again after a crash or an expired lock, and dedupe keys only stop the same
@@ -32,6 +51,7 @@ export const handlers: Record<JobKind, JobHandler> = {
       const created = await saveQueuedCapture(db, job.payload.kind, job.payload.input);
       return { status: "done", providerId: null, deliveryStatus: created ? "saved without confirmation" : "already on file" };
     }
+    if (job.payload.template === "identity_fallback") return sendIdentityFallback(db, job);
     const payload = ["resume", "application"].includes(String(job.payload.template)) ? await prepareResumeEmail(db, job) : job.payload as EmailJobPayload;
     if (!payload) return { status: "failed", error: "confirmation token unavailable or already used; request a new link" };
     const { to, subject, html } = payload;
