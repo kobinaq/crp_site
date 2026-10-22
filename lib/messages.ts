@@ -14,4 +14,3 @@ export function placeholdersIn(text: string): string[] {
 export function t(template: string, vars: Record<string, string | number>): string {
   return template.replace(new RegExp(PLACEHOLDER.source, "g"), (_, key: string) => String(vars[key] ?? ""));
 }
-export function copyFor(locale: Locale): Messages { return messages[locale]; }

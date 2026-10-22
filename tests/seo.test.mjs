@@ -27,14 +27,14 @@ test('language links preserve public paths and query fragments without changing 
 });
 test('every public page has its own canonical, reciprocal alternatives and translated social metadata',()=>{
  for(const locale of locales)for(const [page,path]of Object.entries(pagePaths)){
-  const meta=pageMetadata(locale,page);
+  const meta=pageMetadata({locale,messages:messages[locale]},page);
   assert.equal(meta.alternates.canonical,SITE_URL+localePath(path,locale));
   assert.equal(meta.robots.index,true);
   assert.equal(meta.title,messages[locale].meta[page].title);
   assert.equal(meta.openGraph.url,meta.alternates.canonical);
   for(const other of locales)assert.equal(meta.alternates.languages[other],SITE_URL+localePath(path,other));
   assert.equal(meta.alternates.languages['x-default'],SITE_URL+localePath(path,'en'));
-  const graph=structuredData(locale,page)['@graph'];
+  const graph=structuredData({locale,messages:messages[locale]},page)['@graph'];
   assert.equal(graph.find(row=>row['@type']==='WebPage').inLanguage,locale);
   assert.equal(graph.some(row=>row['@type']==='LocalBusiness'),false);
  }
@@ -47,6 +47,7 @@ test('sitemap lists all language pages and excludes account and API routes',()=>
  const robots=load('app/robots.ts').default();
  assert.equal(robots.sitemap,`${SITE_URL}/sitemap.xml`);
  assert.ok(robots.rules.disallow.includes('/api/'));
+ assert.ok(robots.rules.disallow.includes('/admin'));
 });
 test('Spanish application emails stay Spanish and escape applicant names',()=>{
  const email=load('lib/emails.ts');

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { pageMetadata } from "@/lib/seo";
-import { requestLocale } from "@/lib/request-locale";
+import { metadataFor } from "@/lib/seo";
 import { StructuredData } from "@/components/StructuredData";
 import { ContentGrid } from "@/components/ContentGrid";
 import { Footer } from "@/components/Footer";
@@ -16,7 +15,7 @@ import { Sponsors } from "@/components/Sponsors";
 import { AboutTicker } from "@/components/about/AboutTicker";
 import { Waitlist } from "@/components/Waitlist";
 
-export async function generateMetadata(): Promise<Metadata> { return pageMetadata(await requestLocale(), "home"); }
+export async function generateMetadata(): Promise<Metadata> { return metadataFor("home"); }
 
 export default function Home() {
   return (<>

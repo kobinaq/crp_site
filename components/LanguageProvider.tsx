@@ -11,11 +11,13 @@ import {
 } from "react";
 import { localePath, persistLocale, type Locale } from "@/lib/locale";
 import type { Messages } from "@/lib/messages";
+import type { UiOverrides } from "@/lib/ui-messages";
 
 type LanguageContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   copy: Messages;
+  ui: UiOverrides;
   path: string;
 };
 
@@ -25,11 +27,13 @@ export function LanguageProvider({
   initialLocale,
   initialPath = "/",
   copy,
+  ui = {},
   children,
 }: {
   initialLocale: Locale;
   initialPath?: string;
   copy: Messages;
+  ui?: UiOverrides;
   children: ReactNode;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
@@ -46,8 +50,8 @@ export function LanguageProvider({
   }, [locale]);
 
   const value = useMemo<LanguageContextValue>(
-    () => ({ locale, setLocale, copy, path: initialPath }),
-    [locale, setLocale, copy, initialPath],
+    () => ({ locale, setLocale, copy, ui, path: initialPath }),
+    [locale, setLocale, copy, ui, initialPath],
   );
 
   return (

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgEnum,
   pgTable,
@@ -11,6 +12,8 @@ import {
   jsonb,
   bigint,
   boolean,
+  primaryKey,
+  check,
 } from "drizzle-orm/pg-core";
 
 // One source of truth for every closed set. These names match the Excel mirror
@@ -328,3 +331,66 @@ export const captureTokens = pgTable("capture_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
 }, (t) => [index("capture_tokens_expiry_idx").on(t.expiresAt)]);
+
+// Staff and, later, public members. Role is text so a new role does not need
+// ALTER TYPE. The email check keeps the allowlist comparison exact.
+export const users = pgTable("users", {
+  id: id(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  email: text("email").notNull(),
+  name: text("name"),
+  role: text("role").notNull(),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("users_email_key").on(t.email),
+  check("users_email_lowercase", sql`${t.email} = lower(${t.email})`),
+]);
+
+export const signInTokens = pgTable("sign_in_tokens", {
+  hash: text("hash").primaryKey(),
+  createdAt: createdAt(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+}, (t) => [index("sign_in_tokens_expires_idx").on(t.expiresAt)]);
+
+export const userSessions = pgTable("user_sessions", {
+  hash: text("hash").primaryKey(),
+  createdAt: createdAt(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, (t) => [
+  index("user_sessions_user_idx").on(t.userId),
+  index("user_sessions_expires_idx").on(t.expiresAt),
+]);
+
+// History and the published value are the same row. A null value means the
+// JSON bundle is live again. The highest revision for a key is the head.
+export const copyRevisions = pgTable("copy_revisions", {
+  catalog: text("catalog").notNull(),
+  locale: text("locale").notNull(),
+  key: text("key").notNull(),
+  revision: integer("revision").notNull(),
+  value: text("value"),
+  translatedFrom: text("translated_from"),
+  revertedFrom: integer("reverted_from"),
+  authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [
+  primaryKey({ columns: [t.catalog, t.locale, t.key, t.revision] }),
+  check("copy_revisions_revision_positive", sql`${t.revision} > 0`),
+]);
+
+export const copyDrafts = pgTable("copy_drafts", {
+  catalog: text("catalog").notNull(),
+  locale: text("locale").notNull(),
+  key: text("key").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  value: text("value").notNull(),
+  translatedFrom: text("translated_from"),
+  updatedAt: updatedAt(),
+}, (t) => [
+  primaryKey({ columns: [t.catalog, t.locale, t.key, t.authorId] }),
+]);

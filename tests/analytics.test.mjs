@@ -135,5 +135,6 @@ test('before_send adds environment to events that lack it (the opt-in pageview) 
  const o=posthogOptions(DEFAULT_POSTHOG_HOST,'preview');assert.ok(Array.isArray(o.before_send));
  const out=o.before_send.reduce((e,f)=>f(e),{event:'$pageview',properties:{$current_url:'https://x.org/a?token=1'}});
  assert.deepEqual(out.properties,{$current_url:'https://x.org/a',environment:'preview'});
+ assert.equal(o.before_send.reduce((e,f)=>f(e),{event:'$pageview',properties:{$pathname:'/admin/copy',$current_url:'https://x.org/admin/copy?token=1'}}),null);
  assert.match(readFileSync('components/analytics/PostHogProvider.tsx','utf8'),/analyticsEnvironment\(process\.env\.NEXT_PUBLIC_VERCEL_ENV\)/);
 });

@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { eq, sql } from "drizzle-orm";
 import { decisionReceipts, type Db } from "@/lib/db";
 import { lockApplicant, transition, updateApplicant } from "@/lib/lifecycle";
+import { loadEmailSources } from "@/lib/copy/read";
 import { queueDecisionEmail } from "@/lib/webhooks";
 import {
   decisionSourceStatuses,
@@ -30,6 +31,7 @@ export function decisionHash(d: DecisionRow): string {
 // built from an older view; the receipt lets a retried poll replay its stored
 // result instead of re-applying it.
 export async function applyDecision(db: Db, d: DecisionRow): Promise<DecisionOutcome> {
+  const sources = await loadEmailSources();
   return db.transaction(async (tx) => {
     if (d.decisionId) {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${d.decisionId}, 0))`);
@@ -76,7 +78,7 @@ export async function applyDecision(db: Db, d: DecisionRow): Promise<DecisionOut
         },
       });
       if (moved.ok) {
-        await queueDecisionEmail(tx, moved.applicant, target, moved.version);
+        await queueDecisionEmail(tx, moved.applicant, target, moved.version, sources);
         outcome = { applicantId: current.id, result: "applied", status: target, version: moved.version };
       } else {
         // Decision columns are the team's notes; keep them even when the stage

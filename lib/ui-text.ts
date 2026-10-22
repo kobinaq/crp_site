@@ -7,6 +7,6 @@ export function uiText(locale: Locale, text: string, overrides?: UiOverrides) {
   return lookupUi(locale, text, overrides);
 }
 export function useText() {
-  const { locale } = useLanguage();
-  return (text: string) => uiText(locale, text);
+  const { locale, ui } = useLanguage();
+  return (text: string) => uiText(locale, text, ui);
 }

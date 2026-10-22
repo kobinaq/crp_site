@@ -99,6 +99,13 @@
       "when": 1792660000000,
       "tag": "0013_identity_link_opened",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0014_admin_cms",
+      "breakpoints": true
     }
   ]
 }
