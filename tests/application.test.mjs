@@ -340,31 +340,71 @@ test("the verify hand-off trusts the signed session, never the echoed applicant 
   const forged = await h.verify({ crp_session: `${a.id}.9999999999.forged` });
   assert.equal(forged.url, "https://example.invalid/apply");
 
-  // Without the VideoAsk thank-you ref, verify still waits for the webhook.
-  const premature = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.equal(premature.url, "https://example.invalid/apply/complete");
+  const timings = { ...h.load("lib/verify-wait.ts").verifyWait };
+  const wait = h.load("lib/verify-wait.ts").verifyWait;
+  Object.assign(wait, { budgetMs: 60, intervalMs: 20 });
+  try {
+    // Neither the session nor the signed thank-you ref advances the applicant.
+    const premature = await h.verify({ crp_session: signSession(a.id, 1) });
+    assert.equal(premature.url, "https://example.invalid/apply/complete");
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+    const ref = encodeURIComponent(videoaskReference(a.id));
+    const fromThankYou = await h.verify({}, `?ref=${ref}`);
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+    assert.equal((await row("applicants", a.id)).round1_completed_at, null);
+    assert.match(await fromThankYou.text(), /url=https:\/\/example\.invalid\/api\/apply\/verify\?ref=[^"&]+&amp;attempt=1/);
+    // A ref for someone else while signed in is refused outright.
+    const b = await h.apply();
+    assert.equal((await h.verify({ crp_session: signSession(a.id, 1) }, `?ref=${encodeURIComponent(videoaskReference(b.id))}`)).url, "https://example.invalid/apply");
+
+    // Timeout path: after the last re-check the applicant lands on /apply/complete.
+    const last = await h.verify({}, `?ref=${ref}&attempt=${wait.maxAttempts}`);
+    assert.equal(last.url, "https://example.invalid/apply/complete");
+    assert.equal((await row("applicants", a.id)).status, "submitted");
+
+    // Only the authenticated webhook completes Round 1; then verify hands off to Didit.
+    await h.videoask(a.id);
+    assert.equal((await row("applicants", a.id)).status, "round1_complete");
+    const first = await h.verify({}, `?ref=${ref}`);
+    assert.match(first.url, /^https:\/\/identity\.invalid\/session-/);
+    const second = await h.verify({ crp_session: signSession(a.id, 1) });
+    assert.equal(second.url, first.url);
+    const applicant = await row("applicants", a.id);
+    assert.ok(applicant.round1_completed_at);
+    assert.equal(applicant.identity_link, first.url);
+    assert.equal(applicant.identity_status, "pending");
+  } finally {
+    Object.assign(wait, timings);
+  }
+});
+
+test("verify waits for an in-flight webhook, then sends in-person applicants to Didit", async () => {
+  const a = await h.apply({ track: "in_person" });
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const wait = h.load("lib/verify-wait.ts").verifyWait;
+  const timings = { ...wait };
+  let polls = 0;
+  Object.assign(wait, {
+    budgetMs: 5000, intervalMs: 10,
+    // The webhook lands while verify is polling.
+    sleep: async () => { if (++polls === 2) await h.videoask(a.id); },
+  });
+  try {
+    const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+    assert.match(res.url, /^https:\/\/identity\.invalid\/session-/);
+    assert.ok(polls >= 2 && polls < 5, `polled ${polls} times`);
+    assert.equal((await row("applicants", a.id)).status, "round1_complete");
+  } finally {
+    Object.assign(wait, timings);
+  }
+});
+
+test("verify sends online applicants to /apply/complete without advancing them", async () => {
+  const a = await h.apply({ track: "online" });
+  const { videoaskReference } = h.load("lib/videoask.ts");
+  const res = await h.verify({}, `?ref=${encodeURIComponent(videoaskReference(a.id))}`);
+  assert.equal(res.url, "https://example.invalid/apply/complete");
   assert.equal((await row("applicants", a.id)).status, "submitted");
-
-  // Thank-you redirect carries application_ref and can beat the webhook to Didit.
-  const fromThankYou = await h.verify(
-    { crp_session: signSession(a.id, 1) },
-    `?ref=${encodeURIComponent(videoaskReference(a.id))}`,
-  );
-  assert.match(fromThankYou.url, /^https:\/\/identity\.invalid\/session-/);
-  assert.equal((await row("applicants", a.id)).status, "round1_complete");
-  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
-
-  await h.videoask(a.id);
-  const first = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.equal(first.url, fromThankYou.url);
-  const second = await h.verify({ crp_session: signSession(a.id, 1) });
-  assert.equal(second.url, first.url);
-  const applicant = await row("applicants", a.id);
-  assert.equal(applicant.status, "round1_complete");
-  assert.ok(applicant.round1_completed_at);
-  assert.equal(applicant.identity_link, first.url);
-  assert.equal(applicant.identity_status, "pending");
-  assert.equal((await jobsFor(a.id)).filter((j) => j.payload.template === "identity").length, 0);
 });
 
 test("the worker delivers queued email with an idempotency key, backs off on failure, and parks bad requests", async () => {
