@@ -24,7 +24,9 @@ before(async () => {
   process.env.OPERATIONS_TOKENS = JSON.stringify([{ id: "tester", tokenHash: createHash("sha256").update("test-operator-token-at-least-32-characters").digest("hex") }]);
   for (const lang of ["EN", "FR", "ES"]) {
     process.env[`VIDEOASK_${lang}`] = undefined;
+    process.env[`VIDEOASK_FORM_ID_${lang}`] = undefined;
   }
+  process.env.VIDEOASK_FORM_IDS = undefined;
   process.env.VIDEOASK_FORM_ID = "FORM-fixture";
   process.env.VIDEOASK_FORM_URL = "https://videoask.invalid/form";
   process.env.CRON_SECRET = "cron";
@@ -1249,6 +1251,8 @@ test("Spanish applicants confirm ownership before the form advances", async () =
     headers: { "x-webhook-secret": "videoask" }, body: JSON.stringify({ event_id: randomUUID(), event_type: "form_response", form: { form_id: formId }, contact: { status: "completed", variables: { application_ref: reference } } }),
   }));
   assert.equal((await send("wrong-form")).body.ignored, "other form");
-  assert.equal((await send(process.env.VIDEOASK_FORM_ID)).body.advanced, true);
+  process.env.VIDEOASK_FORM_ID_FR = "FORM-fr";
+  assert.equal((await send("FORM-fr")).body.advanced, true);
   assert.equal((await row("applicants", a.id)).status, "round1_complete");
+  delete process.env.VIDEOASK_FORM_ID_FR;
 });

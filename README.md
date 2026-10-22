@@ -12,13 +12,16 @@ Other scripts: `npm run build`, `npm run start`, `npm run lint`.
 
 ## Application verification
 
-Applicants complete one VideoAsk form configured by `VIDEOASK_FORM_URL` and
-`VIDEOASK_FORM_ID`. Online applications move straight to review. In-person
+Applicants open `VIDEOASK_FORM_URL` (often a language picker). Completions are
+accepted from any form id in `VIDEOASK_FORM_ID`, `VIDEOASK_FORM_ID_EN` /
+`_FR` / `_ES`, or the comma list `VIDEOASK_FORM_IDS`. Point every language
+form at the same webhook URL and secret, and pass the custom `application_ref`
+variable through each. Online applications move straight to review. In-person
 applications continue through Didit; approved identity images are copied into
 private Vercel Blob storage and can only be streamed through the authenticated
 operations document route.
 
-In VideoAsk, set the final-step Logic redirect to
+In every VideoAsk form, set the final-step Logic redirect to
 `https://www.climaterefugeepavilion.org/api/apply/verify?ref=@application_ref`
 (use `@` to insert the custom `application_ref` variable). That site URL marks
 the form complete if the webhook is still in flight, then sends in-person

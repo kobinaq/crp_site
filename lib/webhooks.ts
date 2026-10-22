@@ -10,6 +10,7 @@ import { reconcileIdentity } from "@/lib/application-status";
 import { issueAccessToken } from "@/lib/access";
 import { appUrl } from "@/lib/config";
 import { calendlyLink, parseCalendlyReference } from "@/lib/calendly";
+import { isAllowedVideoaskForm } from "@/lib/videoask";
 
 // Every verified webhook is written down before anything acts on it. The
 // (provider, event key) pair is unique, so a redelivery is recognised and
@@ -118,8 +119,7 @@ async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
 export type VideoaskPayload = { applicantId: string; formId: string; eventId: string };
 
 async function processVideoask(tx: Tx, payload: VideoaskPayload): Promise<ProcessOutcome> {
-  const expected = process.env.VIDEOASK_FORM_ID;
-  if (!expected || payload.formId !== expected) return { outcome: "invalid form" };
+  if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
   return applyVideoaskCompletion(tx, payload.applicantId);
 }
 
