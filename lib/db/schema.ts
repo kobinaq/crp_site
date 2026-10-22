@@ -118,8 +118,12 @@ export const applicants = pgTable(
     interviewOutcome: interviewOutcome("interview_outcome"),
     interviewNotes: text("interview_notes"),
     interviewDate: timestamp("interview_date", { withTimezone: true }),
+    assignedStaffId: uuid("assigned_staff_id").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [uniqueIndex("applicants_email_key").on(t.email)],
+  (t) => [
+    uniqueIndex("applicants_email_key").on(t.email),
+    index("applicants_assigned_staff_idx").on(t.assignedStaffId),
+  ],
 );
 
 // Append-only lawful-basis record: one row per consent given, never updated.
@@ -252,7 +256,9 @@ export const applicationEvents = pgTable("application_events", {
   id: id(), createdAt: createdAt(),
   applicantId: uuid("applicant_id").references(() => applicants.id, { onDelete: "cascade" }),
   fromStatus: text("from_status"), toStatus: text("to_status"),
-  actor: text("actor").notNull(), reason: text("reason").notNull(),
+  actor: text("actor").notNull(),
+  actorStaffId: uuid("actor_staff_id").references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
   version: integer("version"),
 }, (t) => [index("application_events_applicant_idx").on(t.applicantId, t.createdAt)]);
 
@@ -296,7 +302,12 @@ export const decisionReceipts = pgTable("decision_receipts", {
   applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
   requestHash: text("request_hash").notNull(),
   result: jsonb("result").$type<{ version: number; status: string }>().notNull(),
-});
+  origin: text("origin"),
+  staffUserId: uuid("staff_user_id").references(() => users.id, { onDelete: "set null" }),
+  reviewCycle: integer("review_cycle"),
+}, (t) => [
+  index("decision_receipts_staff_hold_idx").on(t.applicantId, t.reviewCycle, t.createdAt.desc()).where(sql`${t.origin} = 'staff'`),
+]);
 
 // A transactional clock (rather than a sequence) serializes revision allocation
 // until commit, so consumers cannot skip a lower revision committed later.
@@ -395,6 +406,41 @@ export const adminEvents = pgTable("admin_events", {
 }, (t) => [
   index("admin_events_created_idx").on(t.createdAt),
   index("admin_events_subject_idx").on(t.subjectId, t.createdAt),
+]);
+
+export const reviewPositions = pgTable("review_positions", {
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  scores: jsonb("scores").$type<Record<string, number>>().notNull().default({}),
+  recommendation: text("recommendation"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.applicantId, t.reviewCycle, t.authorId] }),
+  index("review_positions_applicant_idx").on(t.applicantId, t.reviewCycle),
+]);
+
+export const reviewNotes = pgTable("review_notes", {
+  id: uuid("id").primaryKey(),
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("review_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+  index("review_notes_applicant_idx").on(t.applicantId, t.reviewCycle, t.createdAt),
+]);
+
+export const sheetConflicts = pgTable("sheet_conflicts", {
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  decisionId: uuid("decision_id").notNull(),
+  sheetTarget: text("sheet_target").notNull(),
+  heldStatus: text("held_status").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.applicantId, t.reviewCycle, t.decisionId] }),
 ]);
 
 export const copyDrafts = pgTable("copy_drafts", {
