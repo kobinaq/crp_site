@@ -1,5 +1,4 @@
-import { pageMetadata } from "@/lib/seo";
-import { requestLocale } from "@/lib/request-locale";
+import { metadataFor } from "@/lib/seo";
 import { StructuredData } from "@/components/StructuredData";
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
@@ -13,7 +12,7 @@ import { ProgramTestimonials } from "@/components/programs/ProgramTestimonials";
 import { ProgramWhatYouGet } from "@/components/programs/ProgramWhatYouGet";
 import { outfit } from "@/lib/fonts";
 
-export async function generateMetadata(): Promise<Metadata> { return pageMetadata(await requestLocale(), "programs"); }
+export async function generateMetadata(): Promise<Metadata> { return metadataFor("programs"); }
 
 export default async function ProgramsPage({
   searchParams,

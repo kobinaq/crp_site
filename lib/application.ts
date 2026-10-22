@@ -15,7 +15,9 @@ import {
   CONSENT_VERSION,
   type ApplicationInput,
 } from "@/lib/capture";
+import { loadEmailSources } from "@/lib/copy/read";
 import { applicationEmail, identityRetryEmail, receivedEmail } from "@/lib/emails";
+import type { EmailSources } from "@/lib/copy/sources";
 import { getIdentityProvider } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
 import { videoaskLink } from "@/lib/videoask";
@@ -40,6 +42,7 @@ export async function createApplication(db: Db, input: ApplicationInput): Promis
 
   const id = randomUUID();
   const round1Link = videoaskLink(id);
+  const sources = await loadEmailSources();
 
   return db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -71,7 +74,7 @@ export async function createApplication(db: Db, input: ApplicationInput): Promis
     // Validate/render the acknowledgement inside the transaction; the worker
     // replaces its CTA with a short-lived confirmation link at delivery.
     await enqueue(tx, { kind: "email", dedupeKey: `email:application:${id}`, applicantId: id,
-      payload: { to: email, name: fullName, language, template: "application", subject: applicationEmail(fullName, null, language).subject } });
+      payload: { to: email, name: fullName, language, template: "application", subject: applicationEmail(fullName, null, language, sources).subject } });
     return { ok: true, id, round1Link } as const;
   });
 }
@@ -112,7 +115,7 @@ export function nextStepUrl(applicant: Applicant): string {
 // (x-webhook-secret + isAllowedVideoaskForm): a browser redirect or a signed
 // application_ref is not proof the form was completed. Transitions are
 // idempotent and identity is only queued when a Didit link is still missing.
-export async function applyVideoaskCompletion(tx: Store, applicantId: string): Promise<{
+export async function applyVideoaskCompletion(tx: Store, applicantId: string, sources: EmailSources): Promise<{
   outcome: string;
   advanced: boolean;
   status?: Applicant["status"];
@@ -158,7 +161,7 @@ export async function applyVideoaskCompletion(tx: Store, applicantId: string): P
       if (review.ok) {
         await enqueueEmail(tx, `email:received:${applicant.id}:${review.applicant.reviewCycle}`, {
           to: review.applicant.email,
-          ...receivedEmail(review.applicant.fullName, review.applicant.language),
+          ...receivedEmail(review.applicant.fullName, review.applicant.language, sources),
         }, "received", applicant.id);
         return { outcome: "advanced", advanced: true, status: review.to, applicant: review.applicant };
       }
@@ -177,7 +180,7 @@ export async function applyVideoaskCompletion(tx: Store, applicantId: string): P
   if (reconciled && after.status === "under_review") {
     await enqueueEmail(tx, `email:received:${after.id}:${after.reviewCycle}`, {
       to: after.email,
-      ...receivedEmail(after.fullName, after.language),
+      ...receivedEmail(after.fullName, after.language, sources),
     }, "received", after.id);
     return { outcome: "advanced", advanced: true, status: after.status, applicant: after };
   }
@@ -212,6 +215,7 @@ export async function provisionIdentitySession(db: Db, applicantId: string): Pro
   const callback = `${appUrl()}/apply/complete`;
   const session = await getIdentityProvider().createSession(existing.id, callback);
   if (!session) return { url: null, created: false };
+  const sources = await loadEmailSources();
 
   return db.transaction(async (tx) => {
     const [fresh] = await tx.select().from(applicants).where(eq(applicants.id, applicantId)).for("update");
@@ -237,7 +241,7 @@ export async function provisionIdentitySession(db: Db, applicantId: string): Pro
       await enqueueEmail(
         tx,
         `email:identity:${applicantId}:${session.sessionId}`,
-        { to: updated.email, ...identityRetryEmail(updated.fullName, session.url, updated.language) },
+        { to: updated.email, ...identityRetryEmail(updated.fullName, session.url, updated.language, sources) },
         "identity_retry",
         applicantId,
       );

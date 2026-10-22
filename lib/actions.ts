@@ -12,6 +12,7 @@ import { recordChange } from "@/lib/sync-log";
 import { rateLimit } from "@/lib/rate-limit";
 import { createApplication, requestResumeLink } from "@/lib/application";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { loadEmailSources } from "@/lib/copy/read";
 import { nominationEmail, partnerEmail } from "@/lib/emails";
 import {
   waitlistInput,
@@ -102,6 +103,7 @@ export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
   if (!(await withinLimits("nomination", nominatorEmail, 20, 10))) return { ok: false };
 
   const basedIn = nomineeBasedIn ?? nomineeLocation;
+  const sources = await loadEmailSources();
 
   await getDb().transaction(async (tx) => {
     const [row] = await tx
@@ -128,7 +130,7 @@ export async function submitNomination(raw: unknown): Promise<{ ok: boolean }> {
     // A repeated nomination of the same person is acknowledged, not re-mailed.
     if (!row) return;
     await recordChange(tx, "nominations", row.id, "insert", row);
-    await enqueueEmail(tx, `email:nomination:${row.id}`, { to: nominatorEmail, ...nominationEmail(nomineeName, locale, nominatorName) }, "nomination");
+    await enqueueEmail(tx, `email:nomination:${row.id}`, { to: nominatorEmail, ...nominationEmail(nomineeName, locale, nominatorName, sources) }, "nomination");
   });
   return { ok: true };
 }
@@ -140,10 +142,11 @@ export async function submitPartner(raw: unknown): Promise<{ ok: boolean; reason
   if (!(await withinLimits("partner", parsed.data.email, 20, 5))) return { ok: false, reason: "rate_limited" };
 
   const { locale, ...fields } = parsed.data;
+  const sources = await loadEmailSources();
   await getDb().transaction(async (tx) => {
     const [row] = await tx.insert(partnerInquiries).values(fields).returning();
     await recordChange(tx, "partners", row.id, "insert", row);
-    await enqueueEmail(tx, `email:partner:${row.id}`, { to: row.email, ...partnerEmail(row.name, locale) }, "partner");
+    await enqueueEmail(tx, `email:partner:${row.id}`, { to: row.email, ...partnerEmail(row.name, locale, sources) }, "partner");
   });
   return { ok: true };
 }

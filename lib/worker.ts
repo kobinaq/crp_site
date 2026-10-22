@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { applicants, getDb, identityDocuments, type Db } from "@/lib/db";
+import { loadEmailSources } from "@/lib/copy/read";
 import { identityEmail } from "@/lib/emails";
+import { purgeExpiredSignIns } from "@/lib/staff/auth";
 import { put } from "@vercel/blob";
 import { deliverEmail } from "@/lib/email";
 import { provisionIdentitySession } from "@/lib/application";
@@ -34,7 +36,8 @@ async function sendIdentityFallback(db: Db, job: Job): Promise<JobOutcome> {
   if (applicant.status !== "round1_complete" || applicant.track === "online") return { status: "done", providerId: null, deliveryStatus: `skipped: status ${applicant.status}` };
   if (!applicant.identityLink) return { status: "done", providerId: null, deliveryStatus: "skipped: no identity link" };
   if (applicant.identityLinkOpenedAt) return { status: "done", providerId: null, deliveryStatus: "skipped: link opened" };
-  const { subject, html } = identityEmail(applicant.fullName, applicant.identityLink, applicant.language);
+  const sources = await loadEmailSources();
+  const { subject, html } = identityEmail(applicant.fullName, applicant.identityLink, applicant.language, sources);
   const result = await deliverEmail({ to: applicant.email, subject, html }, job.dedupeKey);
   if (result.ok) return { status: "done", providerId: result.id, deliveryStatus: result.skipped ? "skipped" : "accepted" };
   return { status: result.retryable ? "retry" : "failed", error: result.error };
@@ -116,5 +119,10 @@ export async function tick(limit = 25) {
   await purgeExpiredTokens(db);
   await purgeCaptureTokens(db);
   await purgeExpiredRateLimits(db);
+  try {
+    await purgeExpiredSignIns(db);
+  } catch (err) {
+    console.error("[worker] staff purge skipped", err instanceof Error ? err.message : err);
+  }
   return { ...jobs, requeuedWebhooks: requeued };
 }

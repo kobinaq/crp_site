@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { applicants, jobs, webhookEvents, type Db, type JobPayload } from "@/lib/db";
+import { loadEmailSources } from "@/lib/copy/read";
+import type { EmailSources } from "@/lib/copy/sources";
 import { decisionEmail, receivedEmail } from "@/lib/emails";
 import { getIdentityProvider, type IdentityDecision } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
@@ -48,12 +50,13 @@ export type ProcessOutcome = { outcome: string; advanced?: boolean; status?: str
 // Throws on infrastructure failure so the caller can queue a retry; a business
 // refusal (unknown applicant, stale event) is a recorded outcome, not an error.
 export async function processWebhookEvent(db: Db, eventId: string): Promise<ProcessOutcome> {
+  const sources = await loadEmailSources();
   return db.transaction(async (tx) => {
     const [event] = await tx.select().from(webhookEvents).where(eq(webhookEvents.id, eventId)).for("update");
     if (!event) return { outcome: "missing" };
     if (event.processedAt) return { outcome: event.outcome ?? "processed" };
 
-    const result = await dispatch(tx, event);
+    const result = await dispatch(tx, event, sources);
     await tx.update(webhookEvents).set({ processedAt: new Date(), outcome: result.outcome }).where(eq(webhookEvents.id, eventId));
     return result;
   });
@@ -99,12 +102,12 @@ export async function requeueUnprocessedWebhooks(db: Db, olderThanMs = 5 * 60_00
 
 type Tx = Parameters<typeof transition>[0];
 
-async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
+async function dispatch(tx: Tx, event: WebhookEvent, sources: EmailSources): Promise<ProcessOutcome> {
   switch (event.provider) {
     case "videoask":
-      return processVideoask(tx, event.payload as VideoaskPayload);
+      return processVideoask(tx, event.payload as VideoaskPayload, sources);
     case "identity":
-      return processIdentity(tx, event.payload as IdentityPayload);
+      return processIdentity(tx, event.payload as IdentityPayload, sources);
     case "resend":
       return processResend(tx, event.payload as ResendPayload);
     case "calendly":
@@ -118,9 +121,9 @@ async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
 
 export type VideoaskPayload = { applicantId: string; formId: string; eventId: string };
 
-async function processVideoask(tx: Tx, payload: VideoaskPayload): Promise<ProcessOutcome> {
+async function processVideoask(tx: Tx, payload: VideoaskPayload, sources: EmailSources): Promise<ProcessOutcome> {
   if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
-  return applyVideoaskCompletion(tx, payload.applicantId);
+  return applyVideoaskCompletion(tx, payload.applicantId, sources);
 }
 
 // --- Identity provider --------------------------------------------------------
@@ -134,7 +137,7 @@ const IDENTITY_STATUS: Record<IdentityDecision, "verified" | "failed" | "review"
   pending: "pending",
 };
 
-async function processIdentity(tx: Tx, payload: IdentityPayload): Promise<ProcessOutcome> {
+async function processIdentity(tx: Tx, payload: IdentityPayload, sources: EmailSources): Promise<ProcessOutcome> {
   const event = getIdentityProvider().parse(payload.body, new Headers(payload.headers));
   if (!event.reference && !event.sessionId) return { outcome: "missing reference" };
 
@@ -172,7 +175,7 @@ async function processIdentity(tx: Tx, payload: IdentityPayload): Promise<Proces
   if (advanced && after.status === "under_review") {
     await enqueueEmail(tx, `email:received:${after.id}:${after.reviewCycle}`, {
       to: after.email,
-      ...receivedEmail(after.fullName, after.language),
+      ...receivedEmail(after.fullName, after.language, sources),
     }, "received", after.id);
     if (after.identitySessionId) {
       await enqueue(tx, {
@@ -270,24 +273,25 @@ export async function queueDecisionEmail(
   applicant: { id: string; email: string; language: "en" | "fr" | "es" },
   status: string,
   version: number,
+  sources: EmailSources,
 ): Promise<void> {
   let mail = null;
   switch (status) {
     case "rejected":
-      mail = decisionEmail(status, null, applicant.language);
+      mail = decisionEmail(status, null, applicant.language, sources);
       break;
     case "online_offered": {
       const token = await issueAccessToken(tx, applicant.id, "switch_online", 7 * 24 * 3600);
-      mail = decisionEmail(status, `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(token.raw)}&lang=${applicant.language}`, applicant.language);
+      mail = decisionEmail(status, `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(token.raw)}&lang=${applicant.language}`, applicant.language, sources);
       break;
     }
     case "accepted": {
       const [full] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
-      mail = decisionEmail(status, full ? calendlyLink(full) : null, applicant.language);
+      mail = decisionEmail(status, full ? calendlyLink(full) : null, applicant.language, sources);
       break;
     }
     case "interview_yes": {
-      mail = decisionEmail(status, null, applicant.language);
+      mail = decisionEmail(status, null, applicant.language, sources);
       break;
     }
   }
