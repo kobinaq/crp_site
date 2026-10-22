@@ -22,7 +22,9 @@ import {
   type WebhookJobPayload,
 } from "@/lib/jobs";
 import { processWebhookEvent, requeueUnprocessedWebhooks } from "@/lib/webhooks";
+import { identityPathname, parseApplicantId, readVideoaskMediaJob } from "@/lib/holdings";
 import { fetchDiditDocuments } from "@/lib/identity";
+import { copyVideoaskMedia } from "@/lib/media";
 import { recordChange } from "@/lib/sync-log";
 import { applicantSyncRowWithDocuments } from "@/lib/sync";
 
@@ -81,7 +83,10 @@ export const handlers: Record<JobKind, JobHandler> = {
       const body = Buffer.from(await response.arrayBuffer());
       const contentType = response.headers.get("content-type")?.split(";")[0] || "application/octet-stream";
       const extension = contentType.split("/")[1]?.replace(/[^a-z0-9]+/gi, "") || "bin";
-      const pathname = `identity/${applicantId}/${source.kind}-${index}.${extension}`;
+      const parsedId = parseApplicantId(applicantId);
+      const pathname = parsedId
+        ? identityPathname(parsedId, source.kind, index, contentType)
+        : `identity/${applicantId}/${source.kind}-${index}.${extension}`;
       await put(pathname, body, { access: "private", contentType, allowOverwrite: true });
       await db.insert(identityDocuments).values({
         applicantId,
@@ -107,6 +112,12 @@ export const handlers: Record<JobKind, JobHandler> = {
     const { eventId } = job.payload as WebhookJobPayload;
     const result = await processWebhookEvent(db, eventId);
     return { status: "done", deliveryStatus: result.outcome };
+  },
+
+  async videoask_media(job, db) {
+    const ids = readVideoaskMediaJob(job.payload);
+    if (!ids) return { status: "failed", error: "videoask media job is missing ids" };
+    return copyVideoaskMedia(db, ids.applicantId, ids.questionId);
   },
 };
 
