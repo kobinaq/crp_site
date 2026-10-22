@@ -5,8 +5,9 @@ export type DeliveryResult =
   | { ok: false; error: string; retryable: boolean };
 
 // Talks to Resend once. The job worker is the usual caller. The staff sign-in
-// action also calls it, with the token hash as the idempotency key, because a
-// magic link has to leave in the request that created it. Every other email is
+// action and the staff invite action also call it, with the token hash as the
+// idempotency key, because a magic link has to leave in the request that
+// created it. Every other email is
 // stored as a job in the same transaction as the record it belongs to, and this
 // function is retried from the worker until Resend accepts it. The idempotency
 // key stops a retry after a timeout from delivering twice inside Resend's

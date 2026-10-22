@@ -1,16 +1,16 @@
 import { randomBytes } from "crypto";
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { hashToken } from "@/lib/access";
-import { signInTokens, userSessions, users, type Store } from "@/lib/db";
+import { signInTokens, userSessions, users, type Db, type Store, type Tx } from "@/lib/db";
 import { can, isUserRole, type UserRole } from "@/lib/staff/roles";
-import { parseEmail, resolveSignIn } from "@/lib/staff/users";
+import { isUserId, parseEmail, resolveSignIn, type UserId } from "@/lib/staff/users";
 
 export const STAFF_COOKIE = "crp_staff";
 export const SIGN_IN_TTL_MS = 15 * 60 * 1000;
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 export type Staff = {
-  id: string;
+  id: UserId;
   email: string;
   role: UserRole;
   name: string | null;
@@ -29,7 +29,22 @@ export function staffCookieOptions(secure: boolean) {
   };
 }
 
-export async function issueSignInLink(db: Store, email: string): Promise<{ raw: string; hash: string } | null> {
+export function staffLinkHtml(link: string, role: UserRole | null): string {
+  const href = escapeHtml(link);
+  const invite = role ? `<p style="font-family:Outfit,Helvetica,Arial,sans-serif">You were invited as ${escapeHtml(role)}.</p>` : "";
+  return `${invite}<p style="font-family:Outfit,Helvetica,Arial,sans-serif">Sign in to the Climate Refugee Pavilion admin. This link works once and expires in 15 minutes.</p><p><a href="${href}">Finish signing in</a></p>`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"]/g, (char) => {
+    if (char === "&") return "&amp;";
+    if (char === "<") return "&lt;";
+    if (char === ">") return "&gt;";
+    return "&quot;";
+  });
+}
+
+export async function issueSignInLink(db: Db | Tx, email: string): Promise<{ raw: string; hash: string } | null> {
   const user = await resolveSignIn(db, email);
   if (!user) return null;
   const raw = randomBytes(32).toString("base64url");
@@ -84,7 +99,7 @@ export async function readStaff(db: Store, raw: string | undefined | null): Prom
     .from(userSessions)
     .innerJoin(users, eq(users.id, userSessions.userId))
     .where(and(eq(userSessions.hash, hashToken(raw)), gt(userSessions.expiresAt, new Date())));
-  if (!row || row.disabledAt || !isUserRole(row.role) || !can(row.role, "dashboard.read")) return null;
+  if (!row || row.disabledAt || !isUserRole(row.role) || !can(row.role, "dashboard.read") || !isUserId(row.id)) return null;
   return { id: row.id, email: row.email, role: row.role, name: row.name };
 }
 

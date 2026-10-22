@@ -1,13 +1,12 @@
 export const USER_ROLES = ["admin", "editor", "reviewer"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-export const CAPABILITIES = ["dashboard.read", "copy.edit", "copy.publish"] as const;
+export const CAPABILITIES = ["dashboard.read", "copy.edit", "copy.publish", "users.manage", "records.export", "activity.read"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-// A new role has to be added here or it has no capabilities and is not staff.
-// Phase 2 adds `member` with none of these three.
+// A role missing from this map has no capabilities and is not staff.
 export const ROLE_CAPABILITIES: Record<UserRole, readonly Capability[]> = {
-  admin: ["dashboard.read", "copy.edit", "copy.publish"],
+  admin: ["dashboard.read", "copy.edit", "copy.publish", "users.manage", "records.export", "activity.read"],
   editor: ["dashboard.read", "copy.edit", "copy.publish"],
   reviewer: ["dashboard.read"],
 };

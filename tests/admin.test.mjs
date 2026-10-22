@@ -43,9 +43,33 @@ test("roles keep reviewers off copy and leave an unknown role with nothing", () 
   const { can, ROLE_CAPABILITIES, USER_ROLES } = mod("lib/staff/roles.ts");
   assert.equal(can("reviewer", "dashboard.read"), true);
   assert.equal(can("reviewer", "copy.publish"), false);
+  assert.equal(can("reviewer", "records.export"), false);
+  assert.equal(can("reviewer", "activity.read"), false);
   assert.equal(can("editor", "copy.publish"), true);
+  assert.equal(can("editor", "users.manage"), false);
+  assert.equal(can("editor", "records.export"), false);
+  assert.equal(can("editor", "activity.read"), false);
+  assert.equal(can("admin", "users.manage"), true);
+  assert.equal(can("admin", "records.export"), true);
+  assert.equal(can("admin", "activity.read"), true);
   assert.equal(can("member", "dashboard.read"), false);
   for (const role of USER_ROLES) assert.ok(ROLE_CAPABILITIES[role].includes("dashboard.read"));
+});
+
+test("preview links stay on public routes and line diffs keep shared lines", () => {
+  const { previewPath } = mod("lib/copy/preview.ts");
+  const { lineDiff } = mod("lib/copy/diff.ts");
+  assert.equal(previewPath("page", "apply", "es"), "/es/apply");
+  assert.equal(previewPath("page", "nav", "en"), "/en");
+  assert.equal(previewPath("page", "a11y", "en"), null);
+  assert.equal(previewPath("page", "meta", "fr"), null);
+  assert.equal(previewPath("ui", "nav", "en"), null);
+  assert.equal(previewPath("page", "missing", "en"), null);
+  assert.deepEqual(lineDiff("a\nb", "a\nc"), [
+    { kind: "same", text: "a" },
+    { kind: "remove", text: "b" },
+    { kind: "add", text: "c" },
+  ]);
 });
 
 test("staff mutations refuse a request with no origin signal", () => {
@@ -73,6 +97,7 @@ test("staff sign-in, copy publish, and the dashboard share one database", async 
   await allowlistAndSession();
   await publishedCopy();
   await dashboardCounts();
+  await applicantReview();
 });
 
 async function allowlistAndSession() {
@@ -141,6 +166,11 @@ async function publishedCopy() {
   const state = translationState({ ref: french, enOverride: "unequally", live: null });
   assert.equal(state.kind, "stale");
   assert.equal(bundledValue(french).length > 0, true);
+  const { englishDigest, markReviewed } = mod("lib/copy/editor.ts");
+  assert.deepEqual(await publishCopy(database, french, authorId, { kind: "mark-current", digest: englishDigest("differently") }, 0), { ok: false, reason: "conflict" });
+  assert.deepEqual(await publishCopy(database, french, authorId, { kind: "mark-current", digest: englishDigest("unequally") }, 0), { ok: true });
+  const capped = Array.from({ length: 101 }, () => ({ catalog: "page", locale: "fr", key: "hero.line1Accent", revision: 0, digest: "nope" }));
+  assert.deepEqual(await markReviewed(database, authorId, capped), { ok: false, reason: "invalid" });
   assert.deepEqual(await publishCopy(database, english, authorId, { kind: "reset" }, 1), { ok: true });
   const after = await queryPublishedRows(database);
   assert.equal(after.some((row) => row.key === "hero.line1Accent"), false);
@@ -165,6 +195,118 @@ async function dashboardCounts() {
   assert.equal(JSON.stringify(dashboard).includes("round1_link"), false);
   assert.equal(JSON.stringify(dashboard).includes("identity_link"), false);
 }
+
+async function applicantReview() {
+  const { loadApplicant, loadRecords, exportList, parseRecordQuery } = mod("lib/admin/records.ts");
+  const { weeklyIntake } = mod("lib/admin/weeks.ts");
+  const { loadActivity, activityLabel } = mod("lib/admin/activity.ts");
+  const { parseUserId } = mod("lib/staff/users.ts");
+  const database = mod("lib/db/index.ts").getDb();
+  const inserted = await sql.query(`
+    insert into applicants (
+      full_name, email, dob, age, track, phone, language, status, review_cycle,
+      round1_link, identity_link, identity_session_id, round1_completed_at, identity_status
+    ) values (
+      'Nia Tester', 'nia@example.org', '1990-01-02', 36, 'in_person', '+3531000000', 'fr', 'submitted', 2,
+      'https://secret.example/resume', 'https://secret.example/identity', 'session-secret', now(), 'verified'
+    ) returning id
+  `);
+  const id = inserted.rows[0].id;
+  await sql.query(`insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', 'secret.example/doc', 'image/jpeg', 12)`, [id]);
+  await sql.query(`insert into application_events (applicant_id, from_status, to_status, actor, reason) values ($1, 'submitted', 'round1_complete', 'videoask', 'round 1 finished')`, [id]);
+  await sql.query(`insert into nominations (nominator_name, nominator_email, nominee_name, nominee_email, videoask_link) values ('Ivy', 'ivy@example.org', 'Nia', 'nia-nom@example.org', 'https://secret.example/ask')`);
+  const detail = await loadApplicant(database, id);
+  assert.equal(detail.dob, "1990-01-02");
+  assert.equal(detail.videoAsk, "complete");
+  assert.equal(detail.identity, "verified");
+  assert.equal(detail.events.some((event) => event.reason === "round 1 finished"), true);
+  assert.equal(Object.hasOwn(detail, "round1Link"), false);
+  assert.equal(JSON.stringify(detail).includes("secret.example"), false);
+  assert.equal(JSON.stringify(detail).includes("session-secret"), false);
+  assert.equal(await loadApplicant(database, parseUserId("00000000-0000-4000-8000-000000000000")), null);
+  const query = parseRecordQuery({ list: "applicants", q: "nia", status: "submitted", track: "in_person", language: "fr", cycle: "2" });
+  const listed = await loadRecords(database, query);
+  assert.equal(listed.total, 1);
+  assert.equal(listed.rows[0].href, `/admin/records/applicants/${id}`);
+  assert.equal(JSON.stringify(listed.rows).includes("secret.example"), false);
+  assert.equal(JSON.stringify(listed.rows).includes("1990-01-02"), false);
+  const missed = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "accepted" }));
+  assert.equal(missed.rows.some((row) => row.id === id), false);
+  const labeled = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "Accepted" }));
+  assert.equal(labeled.total, 0);
+  assert.equal(JSON.stringify(listed.rows).includes("session-secret"), false);
+  const user = await sql.query(`select id, email from users where email = 'admin@example.org'`);
+  const actor = { id: user.rows[0].id, email: user.rows[0].email, role: "editor", name: null };
+  assert.equal(await exportList(database, actor, query), null);
+  const before = await sql.query(`select count(*)::int as n from admin_events where kind = 'records.exported'`);
+  actor.role = "admin";
+  const file = await exportList(database, actor, query);
+  assert.match(file.body, /'\+3531000000/);
+  assert.equal(file.body.includes("secret.example"), false);
+  assert.equal(file.body.includes("session-secret"), false);
+  assert.equal(file.body.includes("1990-01-02"), false);
+  const nominations = await exportList(database, actor, parseRecordQuery({ list: "nominations", q: "ivy" }));
+  assert.equal(nominations.body.includes("secret.example"), false);
+  assert.match(nominations.body, /ivy@example.org/);
+  const after = await sql.query(`select count(*)::int as n from admin_events where kind = 'records.exported'`);
+  assert.equal(after.rows[0].n, before.rows[0].n + 2);
+  const weeks = await weeklyIntake(database, "applicants");
+  assert.equal(weeks.length, 26);
+  for (const week of weeks) assert.equal(new Date(`${week.week}T00:00:00Z`).getUTCDay(), 1);
+  assert.equal(weeks.some((week) => week.count > 0), true);
+  const activity = await loadActivity(database, null);
+  assert.equal(activity.rows.some((row) => row.label.startsWith("Exported")), true);
+  assert.equal(activityLabel("nope", {}), "Unknown event");
+}
+
+test("an admin invites an editor and cannot remove the last admin", async () => {
+  const { resolveSignIn, parseEmail, parseUserId } = mod("lib/staff/users.ts");
+  const { inviteStaff, changeStaff } = mod("lib/staff/manage.ts");
+  const db = mod("lib/db/index.ts").getDb();
+  process.env.ADMIN_EMAILS = "roster-admin@example.org,admin@example.org";
+  const adminEmail = parseEmail("roster-admin@example.org");
+  const created = await resolveSignIn(db, adminEmail);
+  assert.ok(created);
+  const actor = { id: created.id, email: adminEmail, role: "admin", name: null };
+  const editorEmail = parseEmail("editor-one@example.org");
+  const invited = await inviteStaff(db, actor, { email: editorEmail, role: "editor" });
+  assert.equal(invited.kind, "invited");
+  assert.equal(invited.mail.kind, "skipped");
+  assert.match(invited.mail.devLink, /\/admin\/confirm\?token=/);
+  const resent = await inviteStaff(db, actor, { email: editorEmail, role: "editor" });
+  assert.equal(resent.kind, "resent");
+  const wrongRole = await inviteStaff(db, actor, { email: editorEmail, role: "reviewer" });
+  assert.equal(wrongRole.reason, "role-differs");
+  assert.equal(wrongRole.role, "editor");
+  const bootstrap = await sql.query(`select actor_id from admin_events where kind = 'staff.bootstrap' and detail->>'email' = 'roster-admin@example.org'`);
+  assert.equal(bootstrap.rows.length, 1);
+  assert.equal(bootstrap.rows[0].actor_id, null);
+  const invites = await sql.query(`select kind from admin_events where kind = 'staff.invited' and detail->>'email' = 'editor-one@example.org'`);
+  assert.equal(invites.rows.length, 1);
+  const last = await changeStaff(db, actor, parseUserId(created.id), { kind: "disable" });
+  assert.deepEqual(last, { ok: false, reason: "last-admin" });
+  const secondEmail = parseEmail("admin-two@example.org");
+  const second = await inviteStaff(db, actor, { email: secondEmail, role: "admin" });
+  assert.equal(second.kind, "invited");
+  const { listStaff } = mod("lib/staff/manage.ts");
+  const other = (await listStaff(db)).find((row) => row.email === secondEmail);
+  assert.ok(other);
+  const stepped = await changeStaff(db, actor, parseUserId(actor.id), { kind: "disable" });
+  assert.deepEqual(stepped, { ok: false, reason: "self" });
+  const demoted = await changeStaff(db, actor, other.id, { kind: "role", role: "editor" });
+  assert.deepEqual(demoted, { ok: true, changed: true });
+  const repeat = await changeStaff(db, actor, other.id, { kind: "role", role: "editor" });
+  assert.deepEqual(repeat, { ok: true, changed: false });
+  const alone = await changeStaff(db, actor, parseUserId(actor.id), { kind: "disable" });
+  assert.deepEqual(alone, { ok: false, reason: "last-admin" });
+  await sql.query(`insert into user_sessions (hash, user_id, expires_at) values ('roster-session', $1, now() + interval '1 hour')`, [other.id]);
+  const blocked = await changeStaff(db, actor, other.id, { kind: "disable" });
+  assert.deepEqual(blocked, { ok: true, changed: true });
+  const again = await inviteStaff(db, actor, { email: secondEmail, role: "editor" });
+  assert.equal(again.reason, "disabled");
+  const sessions = await sql.query(`select count(*)::int as n from user_sessions where user_id = $1`, [other.id]);
+  assert.equal(sessions.rows[0].n, 0);
+});
 
 test("email body overrides are escaped and subjects lose line breaks", () => {
   const { interestEmail, JSON_EMAILS } = { ...mod("lib/emails.ts"), ...mod("lib/copy/sources.ts") };
