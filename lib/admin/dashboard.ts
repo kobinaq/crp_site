@@ -1,4 +1,4 @@
-import { count, desc } from "drizzle-orm";
+import { count, desc, sql } from "drizzle-orm";
 import {
   applicants,
   interest,
@@ -9,6 +9,7 @@ import {
   waitlistStatus,
   type Db,
 } from "@/lib/db";
+import { deskColumns, loadDeskSummary, type DeskSummary } from "@/lib/desk/case";
 import type { Status } from "@/lib/lifecycle";
 
 // Lifecycle order, including statuses the transition map does not currently reach.
@@ -56,6 +57,8 @@ export type Dashboard = {
   waitlist: { counts: readonly { status: string; count: number }[]; recent: readonly { id: string; createdAt: Date; name: string | null; email: string; status: string }[] };
   interest: { total: number; recent: readonly { id: string; createdAt: Date; name: string | null; email: string; ageGroup: string; track: string | null }[] };
   partners: { total: number; recent: readonly { id: string; createdAt: Date; name: string; email: string; organization: string; support: string }[] };
+  nominationDesk: DeskSummary;
+  partnerWorkflow: DeskSummary;
 };
 
 function num(value: unknown): number {
@@ -79,13 +82,15 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
     const waitlistCounts = await tx.select({ key: waitlist.status, count: count() }).from(waitlist).groupBy(waitlist.status);
     const [interestTotal] = await tx.select({ count: count() }).from(interest);
     const [partnerTotal] = await tx.select({ count: count() }).from(partnerInquiries);
+    const nominationDesk = await loadDeskSummary(tx, "nomination");
+    const partnerWorkflow = await loadDeskSummary(tx, "partner");
     const recentNominations = await tx
       .select({
         id: nominations.id,
         createdAt: nominations.createdAt,
         nominatorName: nominations.nominatorName,
         nomineeName: nominations.nomineeName,
-        status: nominations.status,
+        status: deskColumns("nomination", sql`${nominations.id}`).label,
       })
       .from(nominations)
       .orderBy(desc(nominations.createdAt))
@@ -132,6 +137,8 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
       waitlist: { counts: fill(waitlistStatus.enumValues, waitlistCounts), recent: recentWaitlist },
       interest: { total: num(interestTotal?.count), recent: recentInterest },
       partners: { total: num(partnerTotal?.count), recent: recentPartners },
+      nominationDesk,
+      partnerWorkflow,
     };
   });
 }

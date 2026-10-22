@@ -45,12 +45,35 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
           <h2 className="text-lg font-semibold">Partner inquiries</h2>
           <p className="mt-2 text-3xl font-semibold">{data.partners.total}</p>
         </article>
+        <AttentionCard title="Nominations needing attention" summary={data.nominationDesk} />
+        <AttentionCard title="Partners needing attention" summary={data.partnerWorkflow} />
       </section>
       <Table title="Recent nominations" empty="No nominations yet." headers={["When", "Nominator", "Nominee", "Status"]} rows={data.nominations.recent.map((row) => [when(row.createdAt), row.nominatorName, row.nomineeName, row.status])} />
       <Table title="Recent interest" empty="No interest sign-ups yet." headers={["When", "Name", "Email", "Age", "Track"]} rows={data.interest.recent.map((row) => [when(row.createdAt), row.name ?? "", row.email, row.ageGroup, row.track ?? ""])} />
       <Table title="Recent waitlist" empty="No waitlist sign-ups yet." headers={["When", "Name", "Email", "Status"]} rows={data.waitlist.recent.map((row) => [when(row.createdAt), row.name ?? "", row.email, row.status])} />
       <Table title="Recent partner inquiries" empty="No partner inquiries yet." headers={["When", "Name", "Organization", "Support"]} rows={data.partners.recent.map((row) => [when(row.createdAt), row.name, row.organization, row.support])} />
     </div>
+  );
+}
+
+function AttentionCard({ title, summary }: { title: string; summary: Dashboard["nominationDesk"] }) {
+  return (
+    <article className={card}>
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <Link href={`/admin/records?list=${summary.list}&attention=needs`} className="mt-2 block text-3xl font-semibold">
+        {summary.needsAttention}
+      </Link>
+      <ul className="mt-3 grid gap-2">
+        {summary.counts.map((row) => (
+          <li key={row.status}>
+            <Link href={`/admin/records?list=${summary.list}&status=${row.status}`} className="flex items-center justify-between text-sm">
+              <span>{row.label}</span>
+              <span className="font-semibold">{row.count}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
