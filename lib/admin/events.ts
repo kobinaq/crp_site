@@ -1,3 +1,4 @@
+import type { NominationStatus, PartnerStatus } from "@/lib/desk/case";
 import { adminEvents, type Tx } from "@/lib/db";
 import type { Recommendation } from "@/lib/review/rubric";
 import type { UserRole } from "@/lib/staff/roles";
@@ -11,7 +12,13 @@ export type AdminEvent =
   | { readonly kind: "records.exported"; readonly list: string; readonly rows: number; readonly filters: Readonly<Record<string, string>> }
   | { readonly kind: "review.saved"; readonly applicantId: string; readonly reviewCycle: number; readonly recommendation: Recommendation | null; readonly criteria: readonly string[]; readonly noteId: string | null }
   | { readonly kind: "review.assigned"; readonly subject: string | null; readonly applicantId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
-  | { readonly kind: "decision.confirmed"; readonly applicantId: string; readonly from: string; readonly to: string; readonly decisionId: string; readonly version: number };
+  | { readonly kind: "decision.confirmed"; readonly applicantId: string; readonly from: string; readonly to: string; readonly decisionId: string; readonly version: number }
+  | { readonly kind: "nomination.noted"; readonly nominationId: string; readonly noteId: string }
+  | { readonly kind: "nomination.status"; readonly nominationId: string; readonly from: NominationStatus; readonly to: NominationStatus }
+  | { readonly kind: "nomination.assigned"; readonly subject: string | null; readonly nominationId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
+  | { readonly kind: "partner.noted"; readonly partnerId: string; readonly noteId: string }
+  | { readonly kind: "partner.status"; readonly partnerId: string; readonly from: PartnerStatus; readonly to: PartnerStatus }
+  | { readonly kind: "partner.assigned"; readonly subject: string | null; readonly partnerId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null };
 
 export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEvent): Promise<void> {
   const subjectId = "subject" in event ? event.subject : null;
@@ -27,6 +34,8 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
     detail.filters = event.filters;
   }
   if ("applicantId" in event) detail.applicantId = event.applicantId;
+  if ("nominationId" in event) detail.nominationId = event.nominationId;
+  if ("partnerId" in event) detail.partnerId = event.partnerId;
   if ("reviewCycle" in event) detail.reviewCycle = event.reviewCycle;
   if ("recommendation" in event) detail.recommendation = event.recommendation;
   if ("criteria" in event) detail.criteria = [...event.criteria];
