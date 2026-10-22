@@ -54,6 +54,12 @@ export function activityLabel(kind: string, detail: Record<string, unknown>): st
   }
   if (kind === "review.assigned") return textOf(detail, "assigneeId") ? "Assigned a reviewer" : "Cleared the reviewer";
   if (kind === "decision.confirmed") return `Confirmed ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "nomination.noted") return "Added a nomination note";
+  if (kind === "nomination.status") return `Moved a nomination from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "nomination.assigned") return textOf(detail, "assigneeId") ? "Assigned a nomination" : "Cleared a nomination assignee";
+  if (kind === "partner.noted") return "Added a partner note";
+  if (kind === "partner.status") return `Moved a partner inquiry from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "partner.assigned") return textOf(detail, "assigneeId") ? "Assigned a partner inquiry" : "Cleared a partner assignee";
   return "Unknown event";
 }
 

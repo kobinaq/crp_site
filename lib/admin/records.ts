@@ -7,7 +7,6 @@ import {
   applicants,
   applicationEvents,
   interest,
-  nominationStatus,
   nominations,
   partnerInquiries,
   reviewNotes,
@@ -24,6 +23,7 @@ import type { StaffGrant } from "@/lib/staff/auth";
 import { can } from "@/lib/staff/roles";
 import { isUserId } from "@/lib/staff/users";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
+import { deskColumns, deskOfList, deskWhere, statusOptions as deskStatusOptions } from "@/lib/desk/case";
 import { offeredMoves, type ConfirmMove } from "@/lib/sync";
 import { NEEDS_DECISION_STATUSES, parseQueue, type QueueName } from "@/lib/review/queue";
 
@@ -40,6 +40,7 @@ export type RecordQuery = {
   readonly cycle: string;
   readonly age: string;
   readonly queue: "" | QueueName;
+  readonly attention: "" | "needs";
   readonly page: number;
 };
 
@@ -60,6 +61,7 @@ export type RecordPage = {
   readonly page: number;
   readonly pageSize: number;
   readonly filters: RecordQuery;
+  readonly statusOptions: readonly (readonly [string, string])[];
   readonly weeks: readonly WeekCount[];
 };
 
@@ -73,10 +75,10 @@ const TITLES: Record<RecordList, string> = {
 
 const SCREEN: Record<RecordList, readonly string[]> = {
   applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Cycle", "Created"],
-  nominations: ["Nominator", "Nominee", "Email", "Track", "Status", "Created"],
+  nominations: ["Nominator", "Nominee", "Email", "Track", "Staff status", "Assignee", "Created"],
   interest: ["Name", "Email", "Age", "Track", "Created"],
   waitlist: ["Name", "Email", "Status", "Created"],
-  partners: ["Name", "Email", "Organization", "Support", "Created"],
+  partners: ["Name", "Email", "Organization", "Support", "Staff status", "Assignee", "Created"],
 };
 
 export type ApplicantReview = {
@@ -205,6 +207,7 @@ export function parseRecordQuery(raw: Readonly<Record<string, unknown>>): Record
     cycle: clip(raw.cycle),
     age: clip(raw.age),
     queue: parseQueue(clip(raw.queue)),
+    attention: clip(raw.attention) === "needs" ? "needs" : "",
     page: pageOf(clip(raw.page)),
   };
 }
@@ -218,6 +221,7 @@ function auditOf(query: RecordQuery): Record<string, string> {
     ["cycle", query.cycle],
     ["age", query.age],
     ["queue", query.queue],
+    ["attention", query.attention],
   ];
   return Object.fromEntries(pairs.filter(([, value]) => value.length > 0));
 }
@@ -228,7 +232,7 @@ function whereOf(parts: readonly (SQL | undefined)[]): SQL | undefined {
   return and(...present);
 }
 
-export async function loadRecords(db: Db, query: RecordQuery, viewer: { readonly id: string }): Promise<RecordPage> {
+export async function loadRecords(db: Db, query: RecordQuery, viewer: { readonly id: string; readonly role?: string }): Promise<RecordPage> {
   const [listed, weeks] = await Promise.all([
     listRows(db, query, viewer, PAGE_SIZE, (query.page - 1) * PAGE_SIZE),
     weeklyIntake(db, query.list),
@@ -242,8 +246,14 @@ export async function loadRecords(db: Db, query: RecordQuery, viewer: { readonly
     page: query.page,
     pageSize: PAGE_SIZE,
     filters: query,
+    statusOptions: deskList(query.list),
     weeks,
   };
+}
+
+function deskList(list: RecordList): readonly (readonly [string, string])[] {
+  const desk = deskOfList(list);
+  return desk ? deskStatusOptions(desk) : [];
 }
 
 export async function exportList(
@@ -434,12 +444,12 @@ export async function loadReviewers(db: Db): Promise<readonly ReviewerOption[]> 
   });
 }
 
-async function listRows(db: Store, query: RecordQuery, viewer: { readonly id: string }, limit: number, offset: number): Promise<{ rows: readonly RecordRow[]; total: number }> {
+async function listRows(db: Store, query: RecordQuery, viewer: { readonly id: string; readonly role?: string }, limit: number, offset: number): Promise<{ rows: readonly RecordRow[]; total: number }> {
   if (query.list === "applicants") return applicantRows(db, query, viewer, limit, offset);
-  if (query.list === "nominations") return nominationRows(db, query, limit, offset);
+  if (query.list === "nominations") return nominationRows(db, query, viewer, limit, offset);
   if (query.list === "interest") return interestRows(db, query, limit, offset);
   if (query.list === "waitlist") return waitlistRows(db, query, limit, offset);
-  return partnerRows(db, query, limit, offset);
+  return partnerRows(db, query, viewer, limit, offset);
 }
 
 async function sheetOf(db: Store, query: RecordQuery, viewer: { readonly id: string }): Promise<Sheet> {
@@ -484,7 +494,7 @@ async function neighborId(
   direction: "prev" | "next",
 ): Promise<string | null> {
   const where = applicantWhere({
-    list: "applicants", q: "", status: "", track: "", language: "", cycle: "", age: "", page: 1, queue,
+    list: "applicants", q: "", status: "", track: "", language: "", cycle: "", age: "", attention: "", page: 1, queue,
   }, viewer);
   if (where === "empty") return null;
   const closer = direction === "prev"
@@ -602,11 +612,11 @@ async function applicantSheet(db: Store, query: RecordQuery, viewer: { readonly 
 }
 
 function nominationWhere(query: RecordQuery): SQL | "empty" {
-  const status = token(query.status, nominationStatus.enumValues);
   const chosenTrack = token(query.track, track.enumValues);
-  if (status === "reject" || chosenTrack === "reject") return "empty";
+  if (chosenTrack === "reject") return "empty";
+  const desk = deskWhere("nomination", sql`${nominations.id}`, { status: query.status, attention: query.attention });
+  if (desk === "empty") return "empty";
   return whereOf([
-    status ? eq(nominations.status, status) : undefined,
     chosenTrack ? eq(nominations.track, chosenTrack) : undefined,
     query.q
       ? or(
@@ -616,10 +626,12 @@ function nominationWhere(query: RecordQuery): SQL | "empty" {
           matches(nominations.nomineeEmail, query.q),
         )
       : undefined,
+    desk,
   ]) ?? sql`true`;
 }
 
 function nominationSelect() {
+  const desk = deskColumns("nomination", sql`${nominations.id}`);
   return {
     id: nominations.id,
     createdAt: nominations.createdAt,
@@ -636,6 +648,10 @@ function nominationSelect() {
     nomineeLocation: nominations.nomineeLocation,
     track: nominations.track,
     status: nominations.status,
+    staffStatus: desk.status,
+    assigneeEmail: desk.assigneeEmail,
+    staffLabel: desk.label,
+    assignee: desk.assignee,
   };
 }
 
@@ -647,7 +663,7 @@ async function selectNominations(db: Store, query: RecordQuery, limit: number | 
   return await base.limit(limit).offset(offset);
 }
 
-async function nominationRows(db: Store, query: RecordQuery, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
+async function nominationRows(db: Store, query: RecordQuery, viewer: { readonly role?: string }, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
   const where = nominationWhere(query);
   if (where === "empty") return { rows: [], total: 0 };
   const [rows, totals] = await Promise.all([
@@ -658,8 +674,8 @@ async function nominationRows(db: Store, query: RecordQuery, limit: number, offs
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: null,
-      cells: [row.nominatorName, row.nomineeName, row.nomineeEmail, textOf(row.track), row.status, stamp(row.createdAt)],
+      href: can(viewer.role ?? "", "nominations.read") ? `/admin/records/nominations/${row.id}` : null,
+      cells: [row.nominatorName, row.nomineeName, row.nomineeEmail, textOf(row.track), row.staffLabel, row.assignee, stamp(row.createdAt)],
     })),
   };
 }
@@ -670,12 +686,12 @@ async function nominationSheet(db: Store, query: RecordQuery): Promise<Sheet> {
     headers: [
       "nominator_name", "nominator_email", "nominator_phone", "nominator_organization", "nominator_relation",
       "nominee_name", "nominee_email", "nominee_phone", "nominee_nationality", "nominee_based_in", "nominee_location",
-      "track", "status", "created_at",
+      "track", "status", "created_at", "staff_status", "assignee_email",
     ],
     rows: rows.map((row) => [
       row.nominatorName, row.nominatorEmail, textOf(row.nominatorPhone), textOf(row.nominatorOrganization), textOf(row.nominatorRelation),
       row.nomineeName, row.nomineeEmail, textOf(row.nomineePhone), textOf(row.nomineeNationality), textOf(row.nomineeBasedIn),
-      textOf(row.nomineeLocation), textOf(row.track), row.status, stamp(row.createdAt),
+      textOf(row.nomineeLocation), textOf(row.track), row.status, stamp(row.createdAt), row.staffStatus, textOf(row.assigneeEmail),
     ]),
   };
 }
@@ -789,17 +805,24 @@ async function waitlistSheet(db: Store, query: RecordQuery): Promise<Sheet> {
   };
 }
 
-function partnerWhere(query: RecordQuery): SQL | undefined {
-  if (!query.q) return undefined;
-  return or(
-    matches(partnerInquiries.name, query.q),
-    matches(partnerInquiries.email, query.q),
-    matches(partnerInquiries.organization, query.q),
-    matches(partnerInquiries.support, query.q),
-  );
+function partnerWhere(query: RecordQuery): SQL | "empty" {
+  const desk = deskWhere("partner", sql`${partnerInquiries.id}`, { status: query.status, attention: query.attention });
+  if (desk === "empty") return "empty";
+  return whereOf([
+    query.q
+      ? or(
+          matches(partnerInquiries.name, query.q),
+          matches(partnerInquiries.email, query.q),
+          matches(partnerInquiries.organization, query.q),
+          matches(partnerInquiries.support, query.q),
+        )
+      : undefined,
+    desk,
+  ]) ?? sql`true`;
 }
 
 function partnerSelect() {
+  const desk = deskColumns("partner", sql`${partnerInquiries.id}`);
   return {
     id: partnerInquiries.id,
     createdAt: partnerInquiries.createdAt,
@@ -811,27 +834,34 @@ function partnerSelect() {
     support: partnerInquiries.support,
     sponsorship: partnerInquiries.sponsorship,
     message: partnerInquiries.message,
+    staffStatus: desk.status,
+    assigneeEmail: desk.assigneeEmail,
+    staffLabel: desk.label,
+    assignee: desk.assignee,
   };
 }
 
 async function selectPartners(db: Store, query: RecordQuery, limit: number | null, offset: number) {
   const where = partnerWhere(query);
+  if (where === "empty") return [];
   const base = db.select(partnerSelect()).from(partnerInquiries).where(where).orderBy(desc(partnerInquiries.createdAt), desc(partnerInquiries.id));
   if (limit === null) return await base;
   return await base.limit(limit).offset(offset);
 }
 
-async function partnerRows(db: Store, query: RecordQuery, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
+async function partnerRows(db: Store, query: RecordQuery, viewer: { readonly role?: string }, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
+  const where = partnerWhere(query);
+  if (where === "empty") return { rows: [], total: 0 };
   const [rows, totals] = await Promise.all([
     selectPartners(db, query, limit, offset),
-    db.select({ count: count() }).from(partnerInquiries).where(partnerWhere(query)),
+    db.select({ count: count() }).from(partnerInquiries).where(where),
   ]);
   return {
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: null,
-      cells: [row.name, row.email, row.organization, row.support, stamp(row.createdAt)],
+      href: can(viewer.role ?? "", "partners.read") ? `/admin/records/partners/${row.id}` : null,
+      cells: [row.name, row.email, row.organization, row.support, row.staffLabel, row.assignee, stamp(row.createdAt)],
     })),
   };
 }
@@ -839,9 +869,13 @@ async function partnerRows(db: Store, query: RecordQuery, limit: number, offset:
 async function partnerSheet(db: Store, query: RecordQuery): Promise<Sheet> {
   const rows = await selectPartners(db, query, null, 0);
   return {
-    headers: ["name", "email", "phone", "organization", "designation", "support", "sponsorship", "message", "created_at"],
+    headers: [
+      "name", "email", "phone", "organization", "designation", "support", "sponsorship", "message", "created_at",
+      "staff_status", "assignee_email",
+    ],
     rows: rows.map((row) => [
       row.name, row.email, textOf(row.phone), row.organization, row.designation, row.support, textOf(row.sponsorship), textOf(row.message), stamp(row.createdAt),
+      row.staffStatus, textOf(row.assigneeEmail),
     ]),
   };
 }

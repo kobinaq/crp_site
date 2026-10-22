@@ -1,24 +1,38 @@
 export const USER_ROLES = ["admin", "editor", "reviewer"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-export const CAPABILITIES = [
-  "dashboard.read",
-  "copy.edit",
-  "copy.publish",
-  "users.manage",
-  "records.export",
-  "activity.read",
-  "reviews.write",
-  "reviews.assign",
-  "decisions.confirm",
-] as const;
-export type Capability = (typeof CAPABILITIES)[number];
+const GRANTS = [
+  ["dashboard.read", "admin", "editor", "reviewer"],
+  ["copy.edit", "admin", "editor"],
+  ["copy.publish", "admin", "editor"],
+  ["users.manage", "admin"],
+  ["records.export", "admin"],
+  ["activity.read", "admin"],
+  ["reviews.write", "admin", "reviewer"],
+  ["reviews.assign", "admin"],
+  ["decisions.confirm", "admin"],
+  ["nominations.read", "admin", "reviewer"],
+  ["nominations.note", "admin", "reviewer"],
+  ["nominations.manage", "admin"],
+  ["partners.read", "admin"],
+  ["partners.manage", "admin"],
+] as const satisfies readonly (readonly [string, ...UserRole[]])[];
 
-// A role missing from this map has no capabilities and is not staff.
+export type Capability = (typeof GRANTS)[number][0];
+
+function capabilitiesFor(role: UserRole): readonly Capability[] {
+  return GRANTS.flatMap((row) => {
+    const granted = row.slice(1) as readonly UserRole[];
+    return granted.includes(role) ? [row[0]] : [];
+  });
+}
+
+export const CAPABILITIES = GRANTS.map((row) => row[0]);
+
 export const ROLE_CAPABILITIES: Record<UserRole, readonly Capability[]> = {
-  admin: ["dashboard.read", "copy.edit", "copy.publish", "users.manage", "records.export", "activity.read", "reviews.write", "reviews.assign", "decisions.confirm"],
-  editor: ["dashboard.read", "copy.edit", "copy.publish"],
-  reviewer: ["dashboard.read", "reviews.write"],
+  admin: capabilitiesFor("admin"),
+  editor: capabilitiesFor("editor"),
+  reviewer: capabilitiesFor("reviewer"),
 };
 
 export function isUserRole(value: string): value is UserRole {

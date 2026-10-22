@@ -5,7 +5,7 @@ import { WeekBars } from "@/components/admin/WeekBars";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
 import type { RecordPage } from "@/lib/admin/records";
 import { RECORD_LISTS } from "@/lib/admin/records";
-import { ageGroup, appLanguage, nominationStatus, track, waitlistStatus } from "@/lib/db";
+import { ageGroup, appLanguage, track, waitlistStatus } from "@/lib/db";
 
 const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
   applicants: "Applicants",
@@ -27,7 +27,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
       </div>
       <nav className="flex flex-wrap gap-2" aria-label="Record lists">
         {RECORD_LISTS.map((list) => (
-          <Link key={list} className={list === data.list ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "" })}>
+          <Link key={list} className={list === data.list ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "", attention: "" })}>
             {LABELS[list]}
           </Link>
         ))}
@@ -36,7 +36,8 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
         <input type="hidden" name="list" value={data.list} />
         <Filter label="Search" name="q" value={data.filters.q} />
         {data.list === "applicants" ? <Choice label="Status" name="status" value={data.filters.status} options={PIPELINE_ORDER.map((status) => [status, STATUS_LABEL[status]])} /> : null}
-        {data.list === "nominations" ? <Choice label="Status" name="status" value={data.filters.status} options={nominationStatus.enumValues.map((status) => [status, status])} /> : null}
+        {data.statusOptions.length > 0 ? <Choice label="Staff status" name="status" value={data.filters.status} options={data.statusOptions} /> : null}
+        {data.statusOptions.length > 0 ? <Choice label="Attention" name="attention" value={data.filters.attention} options={[["needs", "Needs attention"]]} /> : null}
         {data.list === "waitlist" ? <Choice label="Status" name="status" value={data.filters.status} options={waitlistStatus.enumValues.map((status) => [status, status])} /> : null}
         {data.list === "applicants" || data.list === "nominations" || data.list === "interest" ? <Choice label="Track" name="track" value={data.filters.track} options={track.enumValues.map((item) => [item, item])} /> : null}
         {data.list === "applicants" ? <Choice label="Language" name="language" value={data.filters.language} options={appLanguage.enumValues.map((item) => [item, item])} /> : null}
@@ -94,6 +95,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
             <input type="hidden" name="cycle" value={data.filters.cycle} />
             <input type="hidden" name="age" value={data.filters.age} />
             <input type="hidden" name="queue" value={data.filters.queue} />
+            <input type="hidden" name="attention" value={data.filters.attention} />
             <button className="inline-flex h-12 items-center justify-center rounded-full gradient-brand px-6 text-sm font-semibold uppercase tracking-wide text-white" type="submit">Download CSV</button>
           </form>
         ) : <p className="mt-4 text-sm text-black/60">CSV download is limited to admins.</p>}
@@ -147,6 +149,7 @@ function hrefFor(filters: RecordPage["filters"]): string {
   if (filters.cycle) params.set("cycle", filters.cycle);
   if (filters.age) params.set("age", filters.age);
   if (filters.queue) params.set("queue", filters.queue);
+  if (filters.attention) params.set("attention", filters.attention);
   if (filters.page > 1) params.set("page", String(filters.page));
   return `/admin/records?${params.toString()}`;
 }

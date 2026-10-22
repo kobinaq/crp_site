@@ -120,6 +120,13 @@
       "when": 1793200000000,
       "tag": "0016_staff_review",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793300000000,
+      "tag": "0017_desk_cases",
+      "breakpoints": true
     }
   ]
 }
