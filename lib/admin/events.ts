@@ -7,7 +7,8 @@ export type AdminEvent =
   | { readonly kind: "staff.role"; readonly subject: string; readonly email: string; readonly from: string; readonly to: UserRole }
   | { readonly kind: "staff.disabled"; readonly subject: string; readonly email: string }
   | { readonly kind: "staff.enabled"; readonly subject: string; readonly email: string }
-  | { readonly kind: "records.exported"; readonly list: string; readonly rows: number; readonly filters: Readonly<Record<string, string>> };
+  | { readonly kind: "records.exported"; readonly list: string; readonly rows: number; readonly filters: Readonly<Record<string, string>> }
+  | { readonly kind: "decision.confirmed"; readonly applicantId: string; readonly from: string; readonly to: string; readonly decisionId: string; readonly version: number };
 
 export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEvent): Promise<void> {
   const subjectId = "subject" in event ? event.subject : null;
@@ -22,5 +23,8 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
     detail.rows = event.rows;
     detail.filters = event.filters;
   }
+  if ("applicantId" in event) detail.applicantId = event.applicantId;
+  if ("decisionId" in event) detail.decisionId = event.decisionId;
+  if ("version" in event) detail.version = event.version;
   await tx.insert(adminEvents).values({ actorId, subjectId, kind, detail });
 }
