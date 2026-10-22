@@ -5,7 +5,7 @@ import { appUrl } from "@/lib/config";
 import { deliverEmail } from "@/lib/email";
 import { getDb } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { issueSignInLink } from "@/lib/staff/auth";
+import { issueSignInLink, staffLinkHtml } from "@/lib/staff/auth";
 import { staffSameOrigin } from "@/lib/staff/origin";
 import { parseEmail } from "@/lib/staff/users";
 
@@ -22,7 +22,7 @@ export async function requestStaffLink(_previous: { message: string; devLink?: s
   const issued = await issueSignInLink(getDb(), email);
   if (!issued) return { message: SENT };
   const link = `${appUrl()}/admin/confirm?token=${encodeURIComponent(issued.raw)}`;
-  const html = `<p style="font-family:Outfit,Helvetica,Arial,sans-serif">Sign in to the Climate Refugee Pavilion admin. This link works once and expires in 15 minutes.</p><p><a href="${link}">Finish signing in</a></p>`;
+  const html = staffLinkHtml(link, null);
   const sent = await deliverEmail({ to: email, subject: "Sign in to Climate Refugee Pavilion", html }, issued.hash);
   if (!sent.ok) return { message: SENT };
   if (sent.skipped && process.env.NODE_ENV !== "production") return { message: SENT, devLink: link };

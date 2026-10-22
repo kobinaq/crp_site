@@ -381,6 +381,20 @@ export const copyRevisions = pgTable("copy_revisions", {
 }, (t) => [
   primaryKey({ columns: [t.catalog, t.locale, t.key, t.revision] }),
   check("copy_revisions_revision_positive", sql`${t.revision} > 0`),
+  index("copy_revisions_created_idx").on(t.createdAt),
+]);
+
+// Staff account changes and record exports. Publishes stay in copy_revisions.
+export const adminEvents = pgTable("admin_events", {
+  id: id(),
+  createdAt: createdAt(),
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+  subjectId: uuid("subject_id").references(() => users.id, { onDelete: "set null" }),
+  kind: text("kind").notNull(),
+  detail: jsonb("detail").$type<Record<string, unknown>>().notNull().default({}),
+}, (t) => [
+  index("admin_events_created_idx").on(t.createdAt),
+  index("admin_events_subject_idx").on(t.subjectId, t.createdAt),
 ]);
 
 export const copyDrafts = pgTable("copy_drafts", {

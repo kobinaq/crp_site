@@ -1,26 +1,29 @@
+import Link from "next/link";
 import { card } from "@/components/admin/marks";
+import { WeekBars } from "@/components/admin/WeekBars";
 import type { Dashboard } from "@/lib/admin/dashboard";
+import type { WeekCount } from "@/lib/admin/weeks";
 
 function when(value: Date): string {
   return value.toISOString().slice(0, 16).replace("T", " ");
 }
 
-export function DashboardView({ data, denied }: { data: Dashboard; denied: boolean }) {
+export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied: boolean; weeks: readonly WeekCount[] }) {
   return (
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-black/60">{data.applicantTotal} applicants. Counts only. No documents and no resume links.</p>
-        {denied ? <p className="mt-3 text-sm font-semibold text-magenta">That page needs a copy editor.</p> : null}
+        <p className="mt-1 text-sm text-black/60">{data.applicantTotal} applicants. Open a status to review that queue.</p>
+        {denied ? <p className="mt-3 text-sm font-semibold text-magenta">That page is not available for your role.</p> : null}
       </div>
       <section className={card}>
         <h2 className="text-lg font-semibold">Pipeline</h2>
         <div className="mt-4 grid grid-cols-2 gap-3 desk:grid-cols-4">
           {data.pipeline.map((row) => (
-            <div key={row.status} className="rounded-3xl bg-cream px-4 py-3">
+            <Link key={row.status} href={`/admin/records?list=applicants&status=${row.status}`} className="rounded-3xl bg-cream px-4 py-3">
               <p className="text-2xl font-semibold">{row.count}</p>
               <p className="text-sm">{row.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
         {data.cycles.length > 0 ? (
@@ -28,6 +31,8 @@ export function DashboardView({ data, denied }: { data: Dashboard; denied: boole
             Review cycles. {data.cycles.map((row) => `cycle ${row.cycle}: ${row.count}`).join(", ")}
           </p>
         ) : null}
+        <h3 className="mt-6 text-base font-semibold">Applicants by week</h3>
+        <WeekBars weeks={weeks} />
       </section>
       <section className="grid gap-6 desk:grid-cols-2">
         <CountCard title="Nominations" rows={data.nominations.counts} />

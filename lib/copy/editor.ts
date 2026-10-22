@@ -1,5 +1,6 @@
+import { createHash } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { copyDrafts, copyRevisions, type Db, type Store } from "@/lib/db";
+import { copyDrafts, copyRevisions, users, type Db, type Store } from "@/lib/db";
 import {
   bundledValue,
   CATALOGS,
@@ -20,7 +21,7 @@ export type PublishFrom =
   | { kind: "draft" }
   | { kind: "revision"; revision: number }
   | { kind: "reset" }
-  | { kind: "mark-current" };
+  | { kind: "mark-current"; digest: string };
 
 export type EditorFailure = { ok: false; reason: "invalid" | "missing" | "conflict"; problems?: readonly CopyProblem[] };
 export type EditorSuccess = { ok: true; unchanged?: boolean };
@@ -32,6 +33,7 @@ export type Head = {
   translatedFrom: string | null;
   createdAt: Date;
   authorId: string | null;
+  authorEmail: string | null;
   revertedFrom: number | null;
 };
 
@@ -45,11 +47,19 @@ export type LocaleCell = {
 };
 
 export type CopyRow = {
+  catalog: CatalogId;
   key: string;
   section: string;
   english: string;
+  digest: string;
   cells: readonly LocaleCell[];
 };
+
+export const REVIEW_CAP = 100;
+
+export function englishDigest(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 function isUniqueViolation(err: unknown): boolean {
   const seen = new Set<unknown>();
@@ -70,9 +80,11 @@ async function headOf(db: Store, ref: CopyRef): Promise<Head | null> {
       translatedFrom: copyRevisions.translatedFrom,
       createdAt: copyRevisions.createdAt,
       authorId: copyRevisions.authorId,
+      authorEmail: users.email,
       revertedFrom: copyRevisions.revertedFrom,
     })
     .from(copyRevisions)
+    .leftJoin(users, eq(users.id, copyRevisions.authorId))
     .where(and(eq(copyRevisions.catalog, ref.catalog), eq(copyRevisions.locale, ref.locale), eq(copyRevisions.key, ref.key)))
     .orderBy(desc(copyRevisions.revision))
     .limit(1);
@@ -152,7 +164,9 @@ async function nextValue(
 ): Promise<{ ok: true; value: string | null; translatedFrom: string | null } | EditorFailure> {
   if (from.kind === "reset") return { ok: true, value: null, translatedFrom: null };
   if (from.kind === "mark-current") {
-    return { ok: true, value: head?.value ?? null, translatedFrom: ref.locale === "en" ? null : await englishNow(db, ref) };
+    const english = await englishNow(db, ref);
+    if (from.digest !== englishDigest(english)) return { ok: false, reason: "conflict" };
+    return { ok: true, value: head?.value ?? null, translatedFrom: ref.locale === "en" ? null : english };
   }
   if (from.kind === "revision") {
     const [row] = await db
@@ -178,7 +192,33 @@ async function nextValue(
   return { ok: true, value: draft.value, translatedFrom: ref.locale === "en" ? null : await englishNow(db, ref) };
 }
 
-export async function listCatalog(db: Db, catalog: CatalogId, authorId: string): Promise<readonly CopyRow[]> {
+function catalogIds(): readonly CatalogId[] {
+  return Object.keys(CATALOGS).filter((key): key is CatalogId => Object.hasOwn(CATALOGS, key));
+}
+
+export type DeskFilter = {
+  readonly catalog: CatalogId | null;
+  readonly query: string;
+  readonly needsReview: boolean;
+  readonly authorId: string;
+};
+
+export async function loadDesk(db: Db, filter: DeskFilter): Promise<{ readonly rows: readonly CopyRow[]; readonly reviewCount: number }> {
+  const catalogs = filter.catalog ? [filter.catalog] : catalogIds();
+  const built: CopyRow[] = [];
+  for (const catalog of catalogs) built.push(...await catalogRows(db, catalog, filter.authorId));
+  const reviewCount = built.filter((row) => row.cells.some((cell) => cell.state.kind === "stale")).length;
+  const needle = filter.query.trim().toLowerCase();
+  const rows = built.filter((row) => {
+    if (filter.needsReview && !row.cells.some((cell) => cell.state.kind === "stale")) return false;
+    if (!needle) return true;
+    const haystack = [row.key, row.english, ...row.cells.flatMap((cell) => [cell.value, cell.draft ?? ""])].join("\n").toLowerCase();
+    return haystack.includes(needle);
+  });
+  return { rows, reviewCount };
+}
+
+async function catalogRows(db: Db, catalog: CatalogId, authorId: string): Promise<readonly CopyRow[]> {
   const heads = await db
     .select({
       locale: copyRevisions.locale,
@@ -204,16 +244,19 @@ export async function listCatalog(db: Db, catalog: CatalogId, authorId: string):
   return leaves(catalog).map((leaf) => {
     const english = latest.get(`en\0${leaf.key}`);
     const enOverride = english?.value ?? null;
+    const englishRef = parseCopyRef({ catalog, locale: "en", key: leaf.key });
+    const liveEnglish = enOverride ?? (englishRef ? bundledValue(englishRef) : leaf.english);
     const cells = catalogLocales.map((locale) => {
       const ref = parseCopyRef({ catalog, locale, key: leaf.key });
       const head = latest.get(`${locale}\0${leaf.key}`);
-      const state = ref
+      const source: TranslationState = { kind: "source" };
+      const state: TranslationState = ref
         ? translationState({
             ref,
             enOverride,
             live: head ? { value: head.value ?? "", translatedFrom: head.translatedFrom } : null,
           })
-        : ({ kind: "source" } as const);
+        : source;
       return {
         locale,
         revision: head?.revision ?? 0,
@@ -223,8 +266,27 @@ export async function listCatalog(db: Db, catalog: CatalogId, authorId: string):
         state,
       };
     });
-    return { key: leaf.key, section: leaf.section, english: leaf.english, cells };
+    return { catalog, key: leaf.key, section: leaf.section, english: leaf.english, digest: englishDigest(liveEnglish), cells };
   });
+}
+
+export type ReviewCell = {
+  readonly catalog: string;
+  readonly locale: string;
+  readonly key: string;
+  readonly revision: number;
+  readonly digest: string;
+};
+
+export async function markReviewed(db: Db, authorId: string, cells: readonly ReviewCell[]): Promise<EditorResult> {
+  if (cells.length === 0 || cells.length > REVIEW_CAP) return { ok: false, reason: "invalid" };
+  for (const cell of cells) {
+    const ref = parseCopyRef({ catalog: cell.catalog, locale: cell.locale, key: cell.key });
+    if (!ref || !Number.isInteger(cell.revision)) return { ok: false, reason: "invalid" };
+    const result = await publishCopy(db, ref, authorId, { kind: "mark-current", digest: cell.digest }, cell.revision);
+    if (!result.ok) return result;
+  }
+  return { ok: true };
 }
 
 export async function copyHistory(db: Db, ref: CopyRef): Promise<readonly Head[]> {
@@ -235,9 +297,11 @@ export async function copyHistory(db: Db, ref: CopyRef): Promise<readonly Head[]
       translatedFrom: copyRevisions.translatedFrom,
       createdAt: copyRevisions.createdAt,
       authorId: copyRevisions.authorId,
+      authorEmail: users.email,
       revertedFrom: copyRevisions.revertedFrom,
     })
     .from(copyRevisions)
+    .leftJoin(users, eq(users.id, copyRevisions.authorId))
     .where(and(eq(copyRevisions.catalog, ref.catalog), eq(copyRevisions.locale, ref.locale), eq(copyRevisions.key, ref.key)))
     .orderBy(desc(copyRevisions.revision))
     .limit(12);
