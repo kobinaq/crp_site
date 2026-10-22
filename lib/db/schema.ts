@@ -443,6 +443,35 @@ export const sheetConflicts = pgTable("sheet_conflicts", {
   primaryKey({ columns: [t.applicantId, t.reviewCycle, t.decisionId] }),
 ]);
 
+// No row means status new and no assignee. Public inserts do not write one.
+export const deskCases = pgTable("desk_cases", {
+  desk: text("desk").notNull(),
+  recordId: uuid("record_id").notNull(),
+  status: text("status").notNull(),
+  assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+}, (t) => [
+  primaryKey({ columns: [t.desk, t.recordId] }),
+  index("desk_cases_assignee_idx").on(t.assigneeId),
+  check("desk_cases_desk", sql`${t.desk} in ('nomination', 'partner')`),
+  check("desk_cases_status", sql`
+    (${t.desk} = 'nomination' and ${t.status} in ('new', 'reviewing', 'contacted', 'converted', 'closed'))
+    or (${t.desk} = 'partner' and ${t.status} in ('new', 'in_conversation', 'committed', 'declined', 'closed'))
+  `),
+]);
+
+export const deskNotes = pgTable("desk_notes", {
+  id: uuid("id").primaryKey(),
+  desk: text("desk").notNull(),
+  recordId: uuid("record_id").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("desk_notes_desk", sql`${t.desk} in ('nomination', 'partner')`),
+  check("desk_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+  index("desk_notes_record_idx").on(t.desk, t.recordId, t.createdAt),
+]);
+
 export const copyDrafts = pgTable("copy_drafts", {
   catalog: text("catalog").notNull(),
   locale: text("locale").notNull(),
