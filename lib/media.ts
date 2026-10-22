@@ -141,7 +141,6 @@ async function fetchMedia(sourceUrl: string, signal: AbortSignal): Promise<Downl
     }
     if (response.status < 300 || response.status >= 400) return { ok: true, response };
     await response.body?.cancel();
-    // A redirect off media.videoask.com would make the worker fetch an arbitrary host.
     const next = parseVideoAskMediaUrl(response.headers.get("location"));
     if (!next || hop === REDIRECT_HOPS) return { ok: false, outcome: { status: "failed", error: "media redirect was refused" } };
     current = next;
@@ -537,7 +536,6 @@ export async function retainPrivateMedia(db: Db, now: Date, env: MediaEnv): Prom
         .select({ id: identityDocuments.id })
         .from(identityDocuments)
         .where(eq(identityDocuments.applicantId, row.applicantId));
-      // The sheet's ops link is this change. A delete without it leaves the old link.
       await recordChange(tx, "applicants", row.applicantId, "update", applicantSyncRowWithDocuments(applicant, remaining.map((item) => item.id)));
       return true;
     });
@@ -546,41 +544,52 @@ export async function retainPrivateMedia(db: Db, now: Date, env: MediaEnv): Prom
   return { mode: "delete", answers, documents };
 }
 
-function headAccess(access: "private" | "public") {
-  // The installed head() type omits access, but a public head does not see a private blob.
-  return { access } as NonNullable<Parameters<typeof head>[1]>;
+function blobAccessFromUrl(url: string): "private" | "public" | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return null;
+    if (parsed.hostname.endsWith(".private.blob.vercel-storage.com")) return "private";
+    if (parsed.hostname.endsWith(".public.blob.vercel-storage.com")) return "public";
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function classifyIdentityBlob(pathname: string): Promise<"private" | "public" | "missing"> {
   try {
-    await head(pathname, headAccess("private"));
-    return "private";
+    const listed = await head(pathname);
+    return blobAccessFromUrl(listed.url) ?? "missing";
   } catch {
-    try {
-      await head(pathname, headAccess("public"));
-      return "public";
-    } catch {
-      return "missing";
-    }
+    return "missing";
   }
 }
 
 export async function copyIdentityBlobPrivate(pathname: string): Promise<boolean> {
   let listed;
   try {
-    listed = await head(pathname, headAccess("public"));
+    listed = await head(pathname);
   } catch {
     return false;
   }
+  if (blobAccessFromUrl(listed.url) !== "public") return false;
   const file = await get(pathname, { access: "public", useCache: false });
   if (!file?.stream) return false;
   const body = Buffer.from(await new Response(file.stream).arrayBuffer());
   await put(pathname, body, { access: "private", allowOverwrite: true, contentType: listed.contentType });
+  let stored;
   try {
-    await head(pathname, headAccess("private"));
+    stored = await head(pathname);
   } catch {
     return false;
   }
+  // Same URL means the private put replaced the public object. Deleting it would remove the only copy.
+  if (stored.url === listed.url || blobAccessFromUrl(stored.url) !== "private") return false;
   await del(listed.url);
-  return true;
+  try {
+    const after = await head(pathname);
+    return blobAccessFromUrl(after.url) === "private";
+  } catch {
+    return false;
+  }
 }

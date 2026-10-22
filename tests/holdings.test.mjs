@@ -255,6 +255,6 @@ before(async () => {
 });
 
 after(async () => {
-  try { await sql.end(); } catch { /* ignore */ }
-  try { await db.stop(); } catch { /* ignore */ }
+  await sql?.end()?.catch(() => undefined);
+  await db?.stop()?.catch(() => undefined);
 });

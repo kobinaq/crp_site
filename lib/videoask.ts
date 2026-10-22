@@ -51,8 +51,7 @@ export function videoaskLink(applicantId: string): string | null {
   url.hash = variables.toString();
   return url.toString();
 }
-// Named answer fields are stored for staff review. Other nested values are not
-// read. Events that are authentic but not ours to act on (other event types,
+// Events that are authentic but not ours to act on (other event types,
 // abandoned responses, or another environment's form sharing this webhook)
 // come back as { ignored } so the route can acknowledge them with 200 and
 // VideoAsk does not keep retrying. Malformed or forged references stay null.

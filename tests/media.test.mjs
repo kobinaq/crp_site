@@ -11,6 +11,7 @@ const missingBlobs = new Set();
 let delExplodes = false;
 let fetchHandler = async () => new Response(null, { status: 500 });
 let getImpl = async () => { throw new Error("get was not expected"); };
+let headImpl = async () => { throw new Error("head was not expected"); };
 let realFetch;
 let db;
 let sql;
@@ -45,7 +46,7 @@ before(async () => {
           throw err;
         }
       },
-      head: async () => { throw new Error("head was not expected"); },
+      head: async (pathname) => headImpl(pathname),
     },
   });
   realFetch = global.fetch;
@@ -54,9 +55,9 @@ before(async () => {
 
 after(async () => {
   global.fetch = realFetch;
-  try { await load("lib/db/index.ts").closeDb(); } catch { /* pool may already be closed */ }
-  try { await sql.end(); } catch { /* ignore */ }
-  try { await db.stop(); } catch { /* ignore */ }
+  await load?.("lib/db/index.ts")?.closeDb?.()?.catch(() => undefined);
+  await sql?.end()?.catch(() => undefined);
+  await db?.stop()?.catch(() => undefined);
 });
 
 async function applicant(email, status = "round1_complete") {
@@ -92,6 +93,22 @@ async function deliver(applicantId, eventId, options) {
   const ingest = await ingestWebhook(database, "videoask", `${read.formId}:${read.eventId}`, read);
   return { read, ingest };
 }
+
+test("an unverified applicant keeps the VideoAsk answer and the webhook row drops the media url", async () => {
+  const inserted = await sql.query(
+    `insert into applicants (full_name, email, dob, age, track, status)
+     values ('Grace Hopper', 'grace-unverified@example.org', '1990-01-02', 36, 'in_person', 'submitted') returning id`,
+  );
+  const id = inserted.rows[0].id;
+  const first = await deliver(id, "evt-unverified-1", { transcript: "spoken before verify" });
+  assert.equal(first.ingest.result.outcome, "email unverified");
+  const row = await sql.query(`select transcript, source_url from videoask_answers where applicant_id = $1`, [id]);
+  assert.equal(row.rows[0].transcript, "spoken before verify");
+  assert.equal(row.rows[0].source_url, "https://media.videoask.com/clip.mp4");
+  const stored = await sql.query(`select payload from webhook_events where event_key = 'FORM-fixture:evt-unverified-1'`);
+  assert.equal(JSON.stringify(stored.rows[0].payload).includes("media.videoask.com"), false);
+  assert.equal(JSON.stringify(stored.rows[0].payload).includes("spoken before verify"), false);
+});
 
 test("an already complete VideoAsk delivery stores the answer and drops the media url from the webhook row", async () => {
   const id = await applicant("ada-save@example.org");
@@ -624,5 +641,50 @@ test("retention counts in a dry run, deletes at most 20, and a later run finds n
   const still = await sql.query(`select transcript, pathname from videoask_answers where applicant_id = $1 and question_id = 'q-left'`, [id]);
   assert.equal(still.rows[0].pathname, survivor);
   assert.equal(still.rows[0].transcript, "kept words");
+});
+
+test("a public identity blob is copied aside and the public url is the only delete", async () => {
+  const { classifyIdentityBlob, copyIdentityBlobPrivate } = load("lib/media.ts");
+  const pathname = "identity/00000000-0000-4000-8000-000000000001/passport-0.jpg";
+  const publicUrl = `https://store.public.blob.vercel-storage.com/${pathname}`;
+  const privateUrl = `https://store.private.blob.vercel-storage.com/${pathname}`;
+  headImpl = async () => { throw new Error("missing"); };
+  assert.equal(await classifyIdentityBlob(pathname), "missing");
+  headImpl = async () => ({ url: privateUrl, contentType: "image/jpeg", pathname, size: 4 });
+  assert.equal(await classifyIdentityBlob(pathname), "private");
+  const beforeDel = dels.length;
+  assert.equal(await copyIdentityBlobPrivate(pathname), false);
+  assert.equal(dels.length, beforeDel);
+
+  let heads = 0;
+  headImpl = async () => {
+    heads += 1;
+    if (heads === 1) return { url: publicUrl, contentType: "image/jpeg", pathname, size: 4 };
+    return { url: publicUrl, contentType: "image/jpeg", pathname, size: 4 };
+  };
+  getImpl = async () => ({
+    stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("jpeg")); controller.close(); } }),
+    headers: new Headers(),
+  });
+  assert.equal(await classifyIdentityBlob(pathname), "public");
+  heads = 0;
+  const replaced = await copyIdentityBlobPrivate(pathname);
+  assert.equal(replaced, false);
+  assert.equal(dels.length, beforeDel);
+  assert.equal(puts.at(-1).access, "private");
+  assert.equal(puts.at(-1).pathname, pathname);
+
+  heads = 0;
+  headImpl = async () => {
+    heads += 1;
+    if (heads === 1) return { url: publicUrl, contentType: "image/jpeg", pathname, size: 4 };
+    return { url: privateUrl, contentType: "image/jpeg", pathname, size: 4 };
+  };
+  const copied = await copyIdentityBlobPrivate(pathname);
+  assert.equal(copied, true);
+  assert.equal(dels.at(-1), publicUrl);
+  assert.equal(dels.includes(pathname), false);
+  headImpl = async () => { throw new Error("head was not expected"); };
+  getImpl = async () => { throw new Error("get was not expected"); };
 });
 

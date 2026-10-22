@@ -135,10 +135,12 @@ function scrubbedVideoaskPayload(payload: JobPayload): JobPayload {
 async function processVideoask(tx: Tx, payload: VideoaskPayload, sources: EmailSources): Promise<ProcessOutcome> {
   if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
   const completion = await applyVideoaskCompletion(tx, payload.applicantId, sources);
-  if (completion.outcome === "unknown applicant" || completion.outcome === "email unverified") return completion;
-  const applicantId = parseApplicantId(payload.applicantId);
-  const incoming = readStoredAnswers(payload.answers);
-  if (applicantId && incoming.length > 0) await saveAnswers(tx, applicantId, incoming);
+  // An unverified applicant still has a row. Store the answers before the webhook body is reduced to ids.
+  if (completion.outcome !== "unknown applicant") {
+    const applicantId = parseApplicantId(payload.applicantId);
+    const incoming = readStoredAnswers(payload.answers);
+    if (applicantId && incoming.length > 0) await saveAnswers(tx, applicantId, incoming);
+  }
   return completion;
 }
 
