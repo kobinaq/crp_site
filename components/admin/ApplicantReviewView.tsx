@@ -45,7 +45,6 @@ export function ApplicantReviewView({
           {review.prevHref ? <Link className="underline" href={review.prevHref}>Previous</Link> : <span className="text-black/40">Previous</span>}
           {review.nextHref ? <Link className="underline" href={review.nextHref}>Next</Link> : <span className="text-black/40">Next</span>}
         </div>
-        <p className="mt-3 text-sm text-black/60">Resume links and identity documents are not shown.</p>
       </div>
       <div className="grid items-start gap-6 desk:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="order-2 grid gap-6 desk:order-1">
@@ -93,7 +92,7 @@ export function ApplicantReviewView({
             )}
           </section>
         </div>
-        <aside className={`${card} order-1 desk:sticky desk:top-6 desk:order-2`}>
+        <aside className={`${card} order-1 desk:sticky desk:top-6 desk:order-2 desk:max-h-[calc(100dvh-18rem)] desk:overflow-y-auto`}>
           <DecisionPanel review={review} queue={queue} canConfirm={canConfirm} decisionId={decisionId} statusLabel={STATUS_LABEL} />
         </aside>
       </div>
