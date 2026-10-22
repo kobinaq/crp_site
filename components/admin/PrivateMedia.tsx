@@ -84,7 +84,11 @@ export function DocumentReveal({ applicantId, view }: { applicantId: string; vie
   return (
     <div className="mt-4">
       <button className={quiet} type="button" onClick={() => open()}>{`Show document ${view.kind}`}</button>
-      {src && image ? <img alt="" className="mt-3 max-w-full" referrerPolicy="no-referrer" src={src} /> : null}
+      {src && image ? (
+        // The image optimizer would request this stream without the staff cookie.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt="" className="mt-3 max-w-full" referrerPolicy="no-referrer" src={src} />
+      ) : null}
       {src && !image ? <iframe className="mt-3 h-96 w-full" referrerPolicy="no-referrer" src={src} title={view.kind} /> : null}
     </div>
   );

@@ -6,6 +6,9 @@ import { startDatabase } from "./db.mjs";
 
 const puts = [];
 const gets = [];
+const dels = [];
+const missingBlobs = new Set();
+let delExplodes = false;
 let fetchHandler = async () => new Response(null, { status: 500 });
 let getImpl = async () => { throw new Error("get was not expected"); };
 let realFetch;
@@ -33,7 +36,15 @@ before(async () => {
         gets.push({ pathname, access: options.access, useCache: options.useCache, headers: options.headers });
         return getImpl(pathname, options);
       },
-      del: async () => {},
+      del: async (pathname) => {
+        dels.push(pathname);
+        if (delExplodes) throw new Error(`secret path ${pathname} https://store.example.vercel-storage.com/x`);
+        if (missingBlobs.has(pathname)) {
+          const err = new Error("The requested blob does not exist");
+          err.name = "BlobNotFoundError";
+          throw err;
+        }
+      },
       head: async () => { throw new Error("head was not expected"); },
     },
   });
@@ -401,7 +412,7 @@ test("a store failure stays a fixed unavailable response", async () => {
 test("the player button has no src until open returns a staff path", async () => {
   const hooks = hookHarness();
   const ui = loader({ react: hooks.react });
-  const { PrivateMedia, DocumentReveal } = ui("components/admin/PrivateMedia.tsx");
+  const { PrivateMedia } = ui("components/admin/PrivateMedia.tsx");
   const applicantId = "11111111-1111-4111-8111-111111111111";
   const view = { kind: "clip", questionId: "q-video", position: 0, title: "Story", medium: "video", transcript: "hello", playback: "ready" };
   let tree = hooks.render(() => PrivateMedia({ applicantId, view }));
@@ -506,5 +517,112 @@ test("the open and stream routes check the staff session", async () => {
   }, { params: Promise.resolve({ id, token }) });
   assert.equal(signedOut.status, 401);
   await routeLoad("lib/db/index.ts").closeDb();
+});
+
+test("retention counts in a dry run, deletes at most 20, and a later run finds nothing", async () => {
+  const { retainPrivateMedia } = load("lib/media.ts");
+  const { readMediaEnv } = load("lib/holdings.ts");
+  const { tick } = load("lib/worker.ts");
+  const database = load("lib/db/index.ts").getDb();
+  const id = await applicant("ada-retain@example.org");
+  const before = Number((await sql.query(`select count(*)::int as n from videoask_answers where pathname is not null`)).rows[0].n);
+  for (let i = 0; i < 21; i++) {
+    const questionId = `q${String(i).padStart(2, "0")}`;
+    await sql.query(
+      `insert into videoask_answers (
+        applicant_id, question_id, answer_id, position, title, medium, transcript, pathname, content_type, byte_size, copied_at
+      ) values ($1, $2, $2, $3, 'Story', 'video', 'kept words', $4, 'video/mp4', 4, now())`,
+      [id, questionId, i, `videoask/${id}/${questionId}.mp4`],
+    );
+  }
+  const total = before + 21;
+  const dry = await retainPrivateMedia(database, new Date(), readMediaEnv({ PROGRAM_END: "2020-01-01", MEDIA_RETENTION_DRY_RUN: "False" }));
+  assert.equal(dry.mode, "dry_run");
+  assert.equal(dry.answers, total);
+  assert.equal(dels.length, 0);
+  const kept = await sql.query(`select count(*)::int as n from videoask_answers where applicant_id = $1 and pathname is not null`, [id]);
+  assert.equal(kept.rows[0].n, 21);
+  const skipped = await retainPrivateMedia(database, new Date(), readMediaEnv({ MEDIA_RETENTION_DRY_RUN: "false" }));
+  assert.equal(skipped.mode, "skip");
+  const waiting = await retainPrivateMedia(database, new Date(), readMediaEnv({ PROGRAM_END: "2999-01-01", MEDIA_RETENTION_DRY_RUN: "false" }));
+  assert.equal(waiting.mode, "wait");
+
+  const liveEnv = readMediaEnv({ PROGRAM_END: "2020-01-01", MEDIA_RETENTION_DAYS: "30", MEDIA_RETENTION_DRY_RUN: "false" });
+  const first = await retainPrivateMedia(database, new Date(), liveEnv);
+  assert.equal(first.mode, "delete");
+  assert.equal(first.answers, 20);
+  const left = Number((await sql.query(`select count(*)::int as n from videoask_answers where pathname is not null`)).rows[0].n);
+  assert.equal(left, total - 20);
+  const words = await sql.query(`select count(*)::int as n from videoask_answers where applicant_id = $1 and transcript = 'kept words'`, [id]);
+  assert.equal(words.rows[0].n, 21);
+  let guard = 0;
+  while (Number((await sql.query(`select count(*)::int as n from videoask_answers where pathname is not null`)).rows[0].n) > 0) {
+    const report = await retainPrivateMedia(database, new Date(), liveEnv);
+    assert.equal(report.answers > 0, true);
+    guard += 1;
+    assert.equal(guard < 10, true);
+  }
+  const idle = await retainPrivateMedia(database, new Date(), liveEnv);
+  assert.equal(idle.answers, 0);
+
+  const docPath = `identity/${id}/passport-0.jpg`;
+  const document = await sql.query(
+    `insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', $2, 'image/jpeg', 9) returning id`,
+    [id, docPath],
+  );
+  const documentId = document.rows[0].id;
+  missingBlobs.add(docPath);
+  let docGuard = 0;
+  while (Number((await sql.query(`select count(*)::int as n from identity_documents where id = $1`, [documentId])).rows[0].n) > 0) {
+    await retainPrivateMedia(database, new Date(), liveEnv);
+    docGuard += 1;
+    assert.equal(docGuard < 10, true);
+  }
+  const gone = await sql.query(`select count(*)::int as n from identity_documents where id = $1`, [documentId]);
+  assert.equal(gone.rows[0].n, 0);
+  const change = await sql.query(`select payload from sync_changes where table_name = 'applicants' and record_id = $1 order by revision desc limit 1`, [id]);
+  const packed = JSON.stringify(change.rows[0].payload);
+  assert.equal(packed.includes(documentId), false);
+  assert.equal(packed.includes(docPath), false);
+  assert.equal(dels.includes(docPath), true);
+  let drain = 0;
+  while (Number((await sql.query(`select count(*)::int as n from identity_documents`)).rows[0].n) > 0) {
+    const report = await retainPrivateMedia(database, new Date(), liveEnv);
+    assert.equal(report.documents > 0, true);
+    drain += 1;
+    assert.equal(drain < 10, true);
+  }
+  const again = await retainPrivateMedia(database, new Date(), liveEnv);
+  assert.equal(again.answers, 0);
+  assert.equal(again.documents, 0);
+
+  const survivor = `videoask/${id}/q-left.mp4`;
+  await sql.query(
+    `insert into videoask_answers (
+      applicant_id, question_id, answer_id, position, title, medium, transcript, pathname, content_type, byte_size, copied_at
+    ) values ($1, 'q-left', 'a-left', 0, 'Story', 'video', 'kept words', $2, 'video/mp4', 4, now())`,
+    [id, survivor],
+  );
+  delExplodes = true;
+  const previous = process.env.PROGRAM_END;
+  const previousRun = process.env.MEDIA_RETENTION_DRY_RUN;
+  process.env.PROGRAM_END = "2020-01-01";
+  process.env.MEDIA_RETENTION_DRY_RUN = "false";
+  try {
+    const summary = await tick(1);
+    assert.equal(summary.mediaRetention.mode, "error");
+    assert.equal(summary.mediaRetention.answers, 0);
+    assert.equal(JSON.stringify(summary).includes("vercel-storage.com"), false);
+    assert.equal(JSON.stringify(summary).includes(survivor), false);
+  } finally {
+    delExplodes = false;
+    if (previous === undefined) delete process.env.PROGRAM_END;
+    else process.env.PROGRAM_END = previous;
+    if (previousRun === undefined) delete process.env.MEDIA_RETENTION_DRY_RUN;
+    else process.env.MEDIA_RETENTION_DRY_RUN = previousRun;
+  }
+  const still = await sql.query(`select transcript, pathname from videoask_answers where applicant_id = $1 and question_id = 'q-left'`, [id]);
+  assert.equal(still.rows[0].pathname, survivor);
+  assert.equal(still.rows[0].transcript, "kept words");
 });
 

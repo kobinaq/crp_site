@@ -22,9 +22,9 @@ import {
   type WebhookJobPayload,
 } from "@/lib/jobs";
 import { processWebhookEvent, requeueUnprocessedWebhooks } from "@/lib/webhooks";
-import { identityPathname, parseApplicantId, readVideoaskMediaJob } from "@/lib/holdings";
+import { identityPathname, parseApplicantId, readMediaEnv, readVideoaskMediaJob } from "@/lib/holdings";
 import { fetchDiditDocuments } from "@/lib/identity";
-import { copyVideoaskMedia } from "@/lib/media";
+import { copyVideoaskMedia, retainPrivateMedia, type RetentionReport } from "@/lib/media";
 import { recordChange } from "@/lib/sync-log";
 import { applicantSyncRowWithDocuments } from "@/lib/sync";
 
@@ -135,5 +135,11 @@ export async function tick(limit = 25) {
   } catch (err) {
     console.error("[worker] staff purge skipped", err instanceof Error ? err.message : err);
   }
-  return { ...jobs, requeuedWebhooks: requeued };
+  let mediaRetention: RetentionReport = { mode: "error", answers: 0, documents: 0 };
+  try {
+    mediaRetention = await retainPrivateMedia(db, new Date(), readMediaEnv(process.env));
+  } catch {
+    mediaRetention = { mode: "error", answers: 0, documents: 0 };
+  }
+  return { ...jobs, requeuedWebhooks: requeued, mediaRetention };
 }

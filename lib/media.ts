@@ -1,10 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { get, put } from "@vercel/blob";
+import { and, asc, count, eq, isNotNull, isNull } from "drizzle-orm";
+import { del, get, head, put } from "@vercel/blob";
 import { recordEvent } from "@/lib/admin/events";
-import { identityDocuments, videoaskAnswers, type Db, type IdentityDocument, type Store, type VideoaskAnswer } from "@/lib/db";
+import { applicants, identityDocuments, videoaskAnswers, type Db, type IdentityDocument, type Store, type VideoaskAnswer } from "@/lib/db";
 import {
   MEDIA_BYTE_CAP,
+  RETENTION_BATCH,
   answerInsert,
   clipStorage,
   isStaffStreamPath,
@@ -16,6 +17,7 @@ import {
   presentAnswer,
   presentDocument,
   readRangeHeader,
+  retentionPlan,
   storedObject,
   streamHeaders,
   videoaskPathname,
@@ -28,12 +30,15 @@ import {
   type IncomingAnswer,
   type MediaEnv,
   type PrivatePathname,
+  type RetentionPlan,
   type QuestionId,
   type StaffStreamPath,
 } from "@/lib/holdings";
 import { enqueue, type JobOutcome } from "@/lib/jobs";
 import { lockApplicant } from "@/lib/lifecycle";
 import { can } from "@/lib/staff/roles";
+import { recordChange } from "@/lib/sync-log";
+import { applicantSyncRowWithDocuments } from "@/lib/sync";
 
 const REDIRECT_HOPS = 2;
 
@@ -460,4 +465,122 @@ export async function streamHolding(db: Db, input: StreamInput, now: Date, env: 
   } catch {
     return { ok: false, status: 502 };
   }
+}
+
+export type RetentionReport = {
+  readonly mode: RetentionPlan["mode"] | "error";
+  readonly answers: number;
+  readonly documents: number;
+};
+
+async function removeBlob(pathname: string): Promise<void> {
+  try {
+    await del(pathname);
+  } catch (err) {
+    if (err instanceof Error && err.name === "BlobNotFoundError") return;
+    throw err;
+  }
+}
+
+export async function retainPrivateMedia(db: Db, now: Date, env: MediaEnv): Promise<RetentionReport> {
+  const plan = retentionPlan(now, env);
+  if (plan.mode === "skip" || plan.mode === "wait") return { mode: plan.mode, answers: 0, documents: 0 };
+  if (plan.mode === "dry_run") {
+    const [answerRow] = await db.select({ n: count() }).from(videoaskAnswers).where(isNotNull(videoaskAnswers.pathname));
+    const [documentRow] = await db.select({ n: count() }).from(identityDocuments);
+    return { mode: "dry_run", answers: Number(answerRow?.n ?? 0), documents: Number(documentRow?.n ?? 0) };
+  }
+  const answerRows = await db
+    .select({
+      applicantId: videoaskAnswers.applicantId,
+      questionId: videoaskAnswers.questionId,
+      pathname: videoaskAnswers.pathname,
+    })
+    .from(videoaskAnswers)
+    .where(isNotNull(videoaskAnswers.pathname))
+    .orderBy(asc(videoaskAnswers.applicantId), asc(videoaskAnswers.questionId))
+    .limit(RETENTION_BATCH);
+  let answers = 0;
+  for (const row of answerRows) {
+    if (!row.pathname) continue;
+    await removeBlob(row.pathname);
+    const cleared = await db
+      .update(videoaskAnswers)
+      .set({ pathname: null, contentType: null, byteSize: null, sourceUrl: null, copiedAt: null })
+      .where(and(
+        eq(videoaskAnswers.applicantId, row.applicantId),
+        eq(videoaskAnswers.questionId, row.questionId),
+        eq(videoaskAnswers.pathname, row.pathname),
+      ))
+      .returning({ questionId: videoaskAnswers.questionId });
+    if (cleared.length > 0) answers += 1;
+  }
+  const room = RETENTION_BATCH - answers;
+  let documents = 0;
+  if (room <= 0) return { mode: "delete", answers, documents };
+  const documentRows = await db
+    .select()
+    .from(identityDocuments)
+    .orderBy(asc(identityDocuments.applicantId), asc(identityDocuments.id))
+    .limit(room);
+  for (const row of documentRows) {
+    await removeBlob(row.pathname);
+    const removed = await db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(identityDocuments)
+        .where(and(eq(identityDocuments.id, row.id), eq(identityDocuments.pathname, row.pathname)))
+        .returning({ id: identityDocuments.id });
+      if (deleted.length === 0) return false;
+      const [applicant] = await tx.select().from(applicants).where(eq(applicants.id, row.applicantId));
+      if (!applicant) return true;
+      const remaining = await tx
+        .select({ id: identityDocuments.id })
+        .from(identityDocuments)
+        .where(eq(identityDocuments.applicantId, row.applicantId));
+      // The sheet's ops link is this change. A delete without it leaves the old link.
+      await recordChange(tx, "applicants", row.applicantId, "update", applicantSyncRowWithDocuments(applicant, remaining.map((item) => item.id)));
+      return true;
+    });
+    if (removed) documents += 1;
+  }
+  return { mode: "delete", answers, documents };
+}
+
+function headAccess(access: "private" | "public") {
+  // The installed head() type omits access, but a public head does not see a private blob.
+  return { access } as NonNullable<Parameters<typeof head>[1]>;
+}
+
+export async function classifyIdentityBlob(pathname: string): Promise<"private" | "public" | "missing"> {
+  try {
+    await head(pathname, headAccess("private"));
+    return "private";
+  } catch {
+    try {
+      await head(pathname, headAccess("public"));
+      return "public";
+    } catch {
+      return "missing";
+    }
+  }
+}
+
+export async function copyIdentityBlobPrivate(pathname: string): Promise<boolean> {
+  let listed;
+  try {
+    listed = await head(pathname, headAccess("public"));
+  } catch {
+    return false;
+  }
+  const file = await get(pathname, { access: "public", useCache: false });
+  if (!file?.stream) return false;
+  const body = Buffer.from(await new Response(file.stream).arrayBuffer());
+  await put(pathname, body, { access: "private", allowOverwrite: true, contentType: listed.contentType });
+  try {
+    await head(pathname, headAccess("private"));
+  } catch {
+    return false;
+  }
+  await del(listed.url);
+  return true;
 }

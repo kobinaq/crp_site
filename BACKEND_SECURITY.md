@@ -35,8 +35,9 @@ page; the identity provisioning job sends the next link after the event is proce
    matching VIDEOASK_WEBHOOK_SECRET. Remove secrets from query strings.
 4. Enable `form_response` or `form_response_transcribed`. Only events whose
    `contact.status` is `completed` are eligible. The handler reads the signed
-   reference from `contact.variables`, verifies the exact form and language, and
-   uses its bound stage. Answer text and caller-supplied applicant IDs are ignored.
+   reference from `contact.variables`, verifies the form id, and stores the
+   named answer fields for staff review. A recursive walk of the payload is
+   still forbidden.
 5. Verify a real test completion for each configured form before production rollout.
    If the provider uses a different variable field, normalize that documented field
    explicitly; do not restore arbitrary recursive payload searching.
