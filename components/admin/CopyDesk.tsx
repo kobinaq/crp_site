@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { markReviewedCopy, updateCopy } from "@/app/admin/(console)/copy/actions";
-import { area, card, field, pill, quiet } from "@/components/admin/marks";
+import { CopyEditor, HiddenScope } from "@/components/admin/CopyEditor";
+import { card, field, focusRing, pill, quiet } from "@/components/admin/marks";
+import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { lineDiff } from "@/lib/copy/diff";
 import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
-import { previewPath } from "@/lib/copy/preview";
 import type { CopyRow, Head } from "@/lib/copy/editor";
 import { REVIEW_CAP } from "@/lib/copy/editor";
 
@@ -68,8 +69,8 @@ export function CopyDesk({
         {needsReview ? <input type="hidden" name="review" value="1" /> : null}
         {selected ? <input type="hidden" name="key" value={selected.key} /> : null}
         <label className="sr-only" htmlFor="copy-filter">Filter copy</label>
-        <input id="copy-filter" name="q" defaultValue={query} placeholder="Key or any language" className={`${field} max-w-md`} />
-        <button className={quiet} type="submit">Filter</button>
+        <input id="copy-filter" key={query} name="q" defaultValue={query} placeholder="Key or any language" autoComplete="off" className={`${field} max-w-md`} />
+        <SubmitButton className={quiet} pendingLabel="Filtering">Filter</SubmitButton>
         <Link className={needsReview ? pill : quiet} href={deskHref({ catalog: scopeAll ? undefined : catalog, all: scopeAll, review: !needsReview, q: query, key: selected?.key })}>
           {needsReview ? "Showing needs review" : "Needs review"}
         </Link>
@@ -87,10 +88,10 @@ export function CopyDesk({
             </span>
           ))}
           <HiddenScope catalog={catalog} scopeAll={scopeAll} query={query} needsReview={needsReview} copyKey={selected?.key} />
-          <button className={pill} type="submit">Mark these reviewed</button>
+          <SubmitButton className={pill} pendingLabel="Saving">Mark these reviewed</SubmitButton>
         </form>
       ) : null}
-      <div className="grid items-start gap-6 desk:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 desk:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]">
         <nav className={`${card} max-h-[70vh] overflow-auto p-4`} aria-label="Copy keys">
           {rows.length === 0 ? <p className="text-sm">No keys match.</p> : null}
           {[...sections.entries()].map(([section, items]) => (
@@ -101,7 +102,7 @@ export function CopyDesk({
                   const stale = item.cells.some((cell) => cell.state.kind === "stale");
                   return (
                     <li key={`${item.catalog}:${item.key}`}>
-                      <Link className={`block rounded-2xl px-3 py-2 text-sm ${selected?.key === item.key && selected.catalog === item.catalog ? "bg-lime" : "hover:bg-cream"}`} href={deskHref({ catalog: item.catalog, all: scopeAll, review: needsReview, q: query, key: item.key })}>
+                      <Link className={`block rounded-2xl px-3 py-2 text-sm ${focusRing} ${selected?.key === item.key && selected.catalog === item.catalog ? "bg-lime" : "hover:bg-cream"}`} href={deskHref({ catalog: item.catalog, all: scopeAll, review: needsReview, q: query, key: item.key })}>
                         <span className="block break-all">{item.key}</span>
                         {stale ? <span className="text-xs font-semibold">Needs review</span> : null}
                       </Link>
@@ -112,67 +113,16 @@ export function CopyDesk({
             </details>
           ))}
         </nav>
-        {selected ? <Editor row={selected} scopeAll={scopeAll} query={query} needsReview={needsReview} history={history} /> : <p className={`${card} text-sm`}>Choose a key.</p>}
+        {selected ? (
+          <CopyEditor row={selected} scopeAll={scopeAll} query={query} needsReview={needsReview}>
+            {selected.cells.map((cell) => (
+              <History key={cell.locale} row={selected} scopeAll={scopeAll} query={query} needsReview={needsReview} locale={cell.locale} base={cell.revision} rows={history[cell.locale] ?? []} />
+            ))}
+          </CopyEditor>
+        ) : <p className={`${card} text-sm`}>Choose a key.</p>}
       </div>
     </div>
   );
-}
-
-function Editor({
-  row,
-  scopeAll,
-  query,
-  needsReview,
-  history,
-}: {
-  row: CopyRow;
-  scopeAll: boolean;
-  query: string;
-  needsReview: boolean;
-  history: Readonly<Record<string, readonly Head[]>>;
-}) {
-  return (
-    <section className="grid gap-4">
-      <h2 className="break-all text-xl font-semibold">{row.key}</h2>
-      <div className="grid gap-4 desk:grid-cols-2">
-        {row.cells.map((cell) => {
-          const preview = previewPath(row.catalog, row.section, cell.locale);
-          return (
-            <form key={cell.locale} action={updateCopy} className={`${card} grid gap-3`}>
-              <HiddenScope catalog={row.catalog} scopeAll={scopeAll} query={query} needsReview={needsReview} copyKey={row.key} />
-              <input type="hidden" name="locale" value={cell.locale} />
-              <input type="hidden" name="base" value={cell.revision} />
-              <input type="hidden" name="digest" value={row.digest} />
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold uppercase">{cell.locale}</h3>
-                <StateChip kind={cell.state.kind} />
-                {cell.override ? <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">Published</span> : <span className="rounded-full border border-black/15 px-2 py-1 text-xs">File</span>}
-                {cell.draft !== null ? <span className="rounded-full bg-orange px-2 py-1 text-xs font-semibold">Draft</span> : null}
-                {preview ? <a className="text-sm font-semibold underline" href={preview}>Preview</a> : null}
-              </div>
-              <label className="sr-only" htmlFor={`${row.catalog}-${row.key}-${cell.locale}`}>Value in {cell.locale}</label>
-              <textarea id={`${row.catalog}-${row.key}-${cell.locale}`} name="value" className={area} defaultValue={cell.draft ?? cell.value} />
-              <div className="flex flex-wrap gap-2">
-                <button className={quiet} type="submit" name="intent" value="draft">Save draft</button>
-                <button className={pill} type="submit" name="intent" value="publish">Publish</button>
-                <button className={quiet} type="submit" name="intent" value="reset">Reset to file</button>
-                {cell.state.kind === "stale" ? <button className={quiet} type="submit" name="intent" value="mark">Mark reviewed</button> : null}
-              </div>
-            </form>
-          );
-        })}
-        {row.cells.map((cell) => (
-          <History key={cell.locale} row={row} scopeAll={scopeAll} query={query} needsReview={needsReview} locale={cell.locale} base={cell.revision} rows={history[cell.locale] ?? []} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function StateChip({ kind }: { kind: "source" | "current" | "stale" }) {
-  if (kind === "source") return <span className="rounded-full bg-lime px-2 py-1 text-xs font-semibold">Source</span>;
-  if (kind === "stale") return <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-lime">Needs review</span>;
-  return <span className="rounded-full bg-leaf/40 px-2 py-1 text-xs font-semibold">Current</span>;
 }
 
 function History({
@@ -218,25 +168,13 @@ function History({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="base" value={base} />
                 <input type="hidden" name="revision" value={item.revision} />
-                <button className={`${quiet} h-10`} type="submit" name="intent" value="restore">Restore</button>
+                <ConfirmSubmit className={quiet} name="intent" value="restore" pendingLabel="Restoring" title="Restore this revision?" message="This language is published again from the revision you picked." confirmLabel="Restore">Restore</ConfirmSubmit>
               </form>
             </li>
           );
         })}
       </ul>
     </details>
-  );
-}
-
-function HiddenScope({ catalog, scopeAll, query, needsReview, copyKey }: { catalog: CatalogId; scopeAll: boolean; query: string; needsReview: boolean; copyKey?: string }) {
-  return (
-    <>
-      <input type="hidden" name="catalog" value={catalog} />
-      {scopeAll ? <input type="hidden" name="all" value="1" /> : null}
-      <input type="hidden" name="q" value={query} />
-      {needsReview ? <input type="hidden" name="review" value="1" /> : null}
-      {copyKey ? <input type="hidden" name="key" value={copyKey} /> : null}
-    </>
   );
 }
 

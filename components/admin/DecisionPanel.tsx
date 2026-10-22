@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useActionState } from "react";
 import { confirmDecisionAction, previewDecisionAction, type ConfirmFormState } from "@/app/admin/(console)/records/applicants/[id]/actions";
 import { pill, quiet } from "@/components/admin/marks";
@@ -34,21 +34,44 @@ export function DecisionPanel({
   decisionId: string;
   statusLabel: Readonly<Record<string, string>>;
 }) {
+  return <DecisionBody key={review.id} review={review} queue={queue} canConfirm={canConfirm} decisionId={decisionId} statusLabel={statusLabel} />;
+}
+
+function DecisionBody({
+  review,
+  queue,
+  canConfirm,
+  decisionId,
+  statusLabel,
+}: {
+  review: ApplicantReview;
+  queue: "" | QueueName;
+  canConfirm: boolean;
+  decisionId: string;
+  statusLabel: Readonly<Record<string, string>>;
+}) {
   const [index, setIndex] = useState(0);
   const [preview, setPreview] = useState<{ key: string; subject: string; html: string; notice: string } | null>(null);
   const [pending, setPending] = useState(false);
-  const [confirmState, confirm, confirmPending] = useActionState(confirmDecisionAction, null as ConfirmFormState);
-  const move = review.offeredMoves[index];
-  const key = move ? moveKey(move) : "";
+  const bounded = review.offeredMoves.length === 0 ? 0 : Math.min(index, review.offeredMoves.length - 1);
+  const move = review.offeredMoves[bounded];
+  const key = `${review.id}:${move ? moveKey(move) : ""}`;
   const ready = Boolean(preview && preview.key === key && preview.html);
+  const request = useRef(0);
 
   async function onPreview() {
     if (!move) return;
+    const requested = key;
+    const ticket = ++request.current;
     setPending(true);
-    const result = await previewDecisionAction({ applicantId: review.id, move });
-    setPending(false);
-    if (result.result === "ready") setPreview({ key, subject: result.subject, html: result.html, notice: "" });
-    else setPreview({ key, subject: "", html: "", notice: NOTICE[result.result] ?? "Preview failed." });
+    try {
+      const result = await previewDecisionAction({ applicantId: review.id, move });
+      if (request.current !== ticket) return;
+      if (result.result === "ready") setPreview({ key: requested, subject: result.subject, html: result.html, notice: "" });
+      else setPreview({ key: requested, subject: "", html: "", notice: NOTICE[result.result] ?? "Preview failed." });
+    } finally {
+      if (request.current === ticket) setPending(false);
+    }
   }
 
   return (
@@ -77,7 +100,7 @@ export function DecisionPanel({
             <legend className="sr-only">Offered moves</legend>
             {review.offeredMoves.map((item, itemIndex) => (
               <label key={moveKey(item)} className="flex items-center gap-2 text-sm">
-                <input type="radio" name="offered-move" checked={itemIndex === index} onChange={() => setIndex(itemIndex)} />
+                <input type="radio" name="offered-move" checked={itemIndex === bounded} onChange={() => setIndex(itemIndex)} />
                 {moveText(item, statusLabel)}
               </label>
             ))}
@@ -98,21 +121,40 @@ export function DecisionPanel({
             </div>
           ) : null}
           {preview && preview.key === key && preview.notice ? <p className="text-sm">{preview.notice}</p> : null}
-          <form action={confirm} className="grid gap-3">
-            <input type="hidden" name="applicantId" value={review.id} />
-            <input type="hidden" name="version" value={review.version} />
-            <input type="hidden" name="reviewCycle" value={review.reviewCycle} />
-            <input type="hidden" name="decisionId" value={decisionId} />
-            <input type="hidden" name="queue" value={queue} />
-            <input type="hidden" name="field" value={move.field} />
-            <input type="hidden" name="value" value={move.value} />
-            <input type="hidden" name="to" value={move.to} />
-            <button className={pill} type="submit" disabled={!ready || confirmPending}>Confirm</button>
-          </form>
-          {confirmState ? <p className="text-sm">{NOTICE[confirmState.result]}</p> : null}
+          <ConfirmForm key={review.id} review={review} queue={queue} decisionId={decisionId} move={move} ready={ready} />
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ConfirmForm({
+  review,
+  queue,
+  decisionId,
+  move,
+  ready,
+}: {
+  review: ApplicantReview;
+  queue: "" | QueueName;
+  decisionId: string;
+  move: ConfirmMove;
+  ready: boolean;
+}) {
+  const [confirmState, confirm, confirmPending] = useActionState(confirmDecisionAction, null as ConfirmFormState);
+  return (
+    <form action={confirm} className="grid gap-3">
+      <input type="hidden" name="applicantId" value={review.id} />
+      <input type="hidden" name="version" value={review.version} />
+      <input type="hidden" name="reviewCycle" value={review.reviewCycle} />
+      <input type="hidden" name="decisionId" value={decisionId} />
+      <input type="hidden" name="queue" value={queue} />
+      <input type="hidden" name="field" value={move.field} />
+      <input type="hidden" name="value" value={move.value} />
+      <input type="hidden" name="to" value={move.to} />
+      <button className={pill} type="submit" disabled={!ready || confirmPending}>{confirmPending ? "Confirming" : "Confirm"}</button>
+      {confirmState ? <p className="text-sm">{NOTICE[confirmState.result]}</p> : null}
+    </form>
   );
 }
 

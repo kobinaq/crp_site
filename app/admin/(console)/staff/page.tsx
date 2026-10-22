@@ -1,4 +1,6 @@
-import { card, field, quiet } from "@/components/admin/marks";
+import { AdminSelect } from "@/components/admin/AdminSelect";
+import { card, quiet } from "@/components/admin/marks";
+import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { InviteForm } from "@/components/admin/InviteForm";
 import { changeStaffAction } from "@/app/admin/(console)/staff/actions";
 import { listStaff } from "@/lib/staff/manage";
@@ -47,6 +49,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
               </tr>
             </thead>
             <tbody>
+              {members.length === 0 ? <tr><td className="py-3 text-sm text-black/60" colSpan={5}>No staff accounts.</td></tr> : null}
               {members.map((member) => (
                 <tr key={member.id}>
                   <td className="border-t border-black/10 py-3 pr-4">{member.email}</td>
@@ -57,13 +60,13 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
                     <form action={changeStaffAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="id" value={member.id} />
                       <label className="sr-only" htmlFor={`role-${member.id}`}>Role for {member.email}</label>
-                      <select id={`role-${member.id}`} name="role" defaultValue={member.role ?? "reviewer"} className={`${field} h-10 w-32 px-3`}>
-                        {USER_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-                      </select>
-                      <button className={`${quiet} h-10`} type="submit" name="intent" value="role">Save role</button>
-                      <button className={`${quiet} h-10`} type="submit" name="intent" value={member.status === "disabled" ? "enable" : "disable"}>
-                        {member.status === "disabled" ? "Enable" : "Disable"}
-                      </button>
+                      <AdminSelect id={`role-${member.id}`} name="role" className="w-36" defaultValue={member.role ?? "reviewer"} options={USER_ROLES.map((role) => ({ value: role, label: role }))} />
+                      <SubmitButton className={quiet} name="intent" value="role" pendingLabel="Saving">Save role</SubmitButton>
+                      {member.status === "disabled" ? (
+                        <SubmitButton className={quiet} name="intent" value="enable" pendingLabel="Saving">Enable</SubmitButton>
+                      ) : (
+                        <ConfirmSubmit className={quiet} name="intent" value="disable" pendingLabel="Saving" title="Disable this account?" message={`Sign-in stops for ${member.email}. An admin can enable it again.`} confirmLabel="Disable">Disable</ConfirmSubmit>
+                      )}
                     </form>
                   </td>
                 </tr>

@@ -40,7 +40,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
             </table>
           </div>
         )}
-        {next ? <Link className="mt-4 inline-block text-sm font-semibold underline" href={next}>Older</Link> : null}
+        {next ? <Link className="mt-4 inline-block rounded-full text-sm font-semibold underline outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" href={next}>Older</Link> : null}
       </section>
     </div>
   );

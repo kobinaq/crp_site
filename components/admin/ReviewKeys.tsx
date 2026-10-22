@@ -11,6 +11,7 @@ export function ReviewKeys({ previous, next }: { previous: string | null; next: 
       if (target instanceof HTMLElement) {
         const tag = target.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        if (target.closest("[data-admin-select], [role='listbox'], [role='dialog'], [role='alertdialog']")) return;
       }
       const href = event.key === "j" || event.key === "ArrowRight" ? next : event.key === "k" || event.key === "ArrowLeft" ? previous : null;
       if (!href) return;

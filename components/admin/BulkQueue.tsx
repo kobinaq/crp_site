@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmBulkAction, previewBulkAction } from "@/app/admin/(console)/records/actions";
-import { pill, quiet } from "@/components/admin/marks";
+import { AdminSelect } from "@/components/admin/AdminSelect";
+import { focusRing, pill, quiet } from "@/components/admin/marks";
 import type { RecordRow } from "@/lib/admin/records";
 import type { ConfirmMove } from "@/lib/sync";
 
@@ -42,8 +43,9 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
   const [results, setResults] = useState<readonly { applicantId: string; result: string }[]>([]);
   const choice = MOVES[moveIndex]?.move;
   const picked = rows.filter((row) => selected.includes(row.id) && typeof row.version === "number" && typeof row.reviewCycle === "number");
-  const key = `${picked.map((row) => row.id).sort().join(",")}::${choice ? `${choice.field}:${choice.value}:${choice.to}` : ""}`;
+  const key = `${picked.map((row) => `${row.id}:${row.version}`).sort().join(",")}::${choice ? `${choice.field}:${choice.value}:${choice.to}` : ""}`;
   const ready = Boolean(choice && picked.length > 0 && previewKey === key && counts);
+  const request = useRef(0);
 
   function toggle(id: string) {
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -51,49 +53,60 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
 
   async function onPreview() {
     if (!choice || picked.length === 0) return;
+    const requested = key;
+    const ticket = ++request.current;
     setPending(true);
     const ids = { ...decisionIds };
     for (const row of picked) if (!ids[row.id]) ids[row.id] = crypto.randomUUID();
     setDecisionIds(ids);
-    const result = await previewBulkAction({
-      move: choice,
-      rows: picked.map((row) => ({ applicantId: row.id, version: row.version, reviewCycle: row.reviewCycle })),
-    });
-    setPending(false);
-    if (result.result !== "ready") {
-      setPreviewKey("");
-      setCounts(null);
-      setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "Select at most 50 applicants.");
-      return;
+    try {
+      const result = await previewBulkAction({
+        move: choice,
+        rows: picked.map((row) => ({ applicantId: row.id, version: row.version, reviewCycle: row.reviewCycle })),
+      });
+      if (request.current !== ticket) return;
+      if (result.result !== "ready") {
+        setPreviewKey("");
+        setCounts(null);
+        setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "Select at most 50 applicants.");
+        return;
+      }
+      setPreviewKey(requested);
+      setCounts(result.preview.counts);
+      setLanguages(result.preview.byLanguage);
+      setNotice("");
+      setResults([]);
+    } finally {
+      if (request.current === ticket) setPending(false);
     }
-    setPreviewKey(key);
-    setCounts(result.preview.counts);
-    setLanguages(result.preview.byLanguage);
-    setNotice("");
-    setResults([]);
   }
 
   async function onConfirm() {
     if (!choice || !ready) return;
+    const ticket = ++request.current;
     setPending(true);
-    const result = await confirmBulkAction({
-      move: choice,
-      rows: picked.map((row) => ({
-        applicantId: row.id,
-        version: row.version,
-        reviewCycle: row.reviewCycle,
-        decisionId: decisionIds[row.id],
-      })),
-    });
-    setPending(false);
-    if (result.result !== "done") {
-      setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "That confirmation could not be read.");
-      return;
+    try {
+      const result = await confirmBulkAction({
+        move: choice,
+        rows: picked.map((row) => ({
+          applicantId: row.id,
+          version: row.version,
+          reviewCycle: row.reviewCycle,
+          decisionId: decisionIds[row.id],
+        })),
+      });
+      if (request.current !== ticket) return;
+      if (result.result !== "done") {
+        setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "That confirmation could not be read.");
+        return;
+      }
+      setResults(result.rows);
+      setPreviewKey("");
+      setCounts(null);
+      router.refresh();
+    } finally {
+      if (request.current === ticket) setPending(false);
     }
-    setResults(result.rows);
-    setPreviewKey("");
-    setCounts(null);
-    router.refresh();
   }
 
   return (
@@ -120,7 +133,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
                   </td>
                   {row.cells.map((cell, index) => (
                     <td key={`${row.id}-${index}`} className="border-t border-black/10 py-2 pr-4">
-                      {index === 0 && row.href ? <Link className="font-semibold underline" href={row.href}>{cell}</Link> : cell}
+                      {index === 0 && row.href ? <Link className={`font-semibold underline ${focusRing}`} href={row.href}>{cell}</Link> : cell}
                     </td>
                   ))}
                 </tr>
@@ -132,15 +145,18 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
       <div className="mt-4 grid gap-3">
         <label className="grid gap-1 text-sm font-semibold">
           Move
-          <select className="h-12 w-full max-w-sm rounded-[40px] border border-black/12 bg-cream px-4 text-base outline-none focus-visible:border-black" value={moveIndex} onChange={(event) => setMoveIndex(Number(event.target.value))}>
-            {MOVES.map((item, index) => <option key={item.label} value={index}>{item.label}</option>)}
-          </select>
+          <AdminSelect
+            className="w-full max-w-sm"
+            value={String(moveIndex)}
+            onValueChange={(next) => setMoveIndex(Number(next))}
+            options={MOVES.map((item, index) => ({ value: String(index), label: item.label }))}
+          />
         </label>
         <div className="flex flex-wrap gap-2">
           <button className={quiet} type="button" onClick={onPreview} disabled={pending || picked.length === 0}>Preview counts</button>
           <button className={pill} type="button" onClick={onConfirm} disabled={!ready || pending}>Confirm</button>
         </div>
-        {counts ? (
+        {counts && previewKey === key ? (
           <p className="text-sm text-black/70">
             {counts.apply} will apply, {counts.stale} are out of date, {counts.notAllowed} cannot move, {counts.notFound} were not found.
             {languages.length > 0 ? ` ${languages.map((item) => `${item.language} ${item.apply}`).join(", ")}.` : ""}

@@ -1,0 +1,158 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import { updateCopy } from "@/app/admin/(console)/copy/actions";
+import { area, card, pill, quiet } from "@/components/admin/marks";
+import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
+import { previewPath } from "@/lib/copy/preview";
+import {
+  copyCellId,
+  dropStaleCopyDrafts,
+  readCopyDrafts,
+  rememberCopyDraft,
+  shownCopyText,
+  writeCopyDrafts,
+  type CopyDraftMap,
+} from "@/lib/copy/draftState";
+import type { CopyRow } from "@/lib/copy/editor";
+import type { CatalogId } from "@/lib/copy/catalog";
+
+export function CopyEditor({
+  row,
+  scopeAll,
+  query,
+  needsReview,
+  children,
+}: {
+  row: CopyRow;
+  scopeAll: boolean;
+  query: string;
+  needsReview: boolean;
+  children?: ReactNode;
+}) {
+  const [drafts, setDrafts] = useState<CopyDraftMap>(readCopyDrafts);
+  const live = dropStaleCopyDrafts(
+    drafts,
+    row.cells.map((cell) => ({ id: copyCellId(row.catalog, row.key, cell.locale), revision: cell.revision })),
+  );
+  if (live !== drafts) {
+    writeCopyDrafts(live);
+    setDrafts(live);
+  }
+  const dirty = Object.keys(live).length > 0;
+
+  useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+    }
+    function onClick(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (href.startsWith("/admin/copy") || href.startsWith("?") || href.startsWith("#")) return;
+      if (typeof window.confirm !== "function") return;
+      if (window.confirm("You have unsaved copy edits. Leave without saving?")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
+
+  return (
+    <section className="grid min-w-0 gap-4">
+      <h2 className="break-all text-xl font-semibold">{row.key}</h2>
+      <div className="grid gap-4 desk:grid-cols-2">
+        {row.cells.map((cell) => {
+          const id = copyCellId(row.catalog, row.key, cell.locale);
+          const server = cell.draft ?? cell.value;
+          const shown = shownCopyText(live, id, cell.revision, server);
+          const fieldId = `${row.catalog}-${row.key}-${cell.locale}`;
+          const preview = previewPath(row.catalog, row.section, cell.locale);
+          return (
+            <form key={cell.locale} action={updateCopy} className={`${card} grid gap-3`}>
+              <HiddenScope catalog={row.catalog} scopeAll={scopeAll} query={query} needsReview={needsReview} copyKey={row.key} />
+              <input type="hidden" name="locale" value={cell.locale} />
+              <input type="hidden" name="base" value={cell.revision} />
+              <input type="hidden" name="digest" value={row.digest} />
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-semibold uppercase">{cell.locale}</h3>
+                <StateChip kind={cell.state.kind} />
+                {cell.override ? <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">Published</span> : <span className="rounded-full border border-black/15 px-2 py-1 text-xs">File</span>}
+                {cell.draft !== null || (live[id] && live[id].revision === cell.revision) ? <span className="rounded-full bg-orange px-2 py-1 text-xs font-semibold">Draft</span> : null}
+                {preview ? <a className="text-sm font-semibold underline" href={preview}>Preview</a> : null}
+              </div>
+              <label className="sr-only" htmlFor={fieldId}>Value in {cell.locale}</label>
+              <textarea
+                id={fieldId}
+                name="value"
+                className={area}
+                value={shown}
+                autoComplete="off"
+                onChange={(event) => {
+                  const next = rememberCopyDraft(readCopyDrafts(), id, cell.revision, event.target.value, server);
+                  writeCopyDrafts(next);
+                  setDrafts(next);
+                }}
+              />
+              <div className="flex flex-wrap gap-2">
+                <SubmitButton className={quiet} name="intent" value="draft" pendingLabel="Saving">Save draft</SubmitButton>
+                <SubmitButton className={pill} name="intent" value="publish" pendingLabel="Publishing">Publish</SubmitButton>
+                <ConfirmSubmit
+                  className={quiet}
+                  name="intent"
+                  value="reset"
+                  pendingLabel="Resetting"
+                  title="Reset this language to the file?"
+                  message="The published text is replaced by the file copy. You can restore an older revision from history."
+                  confirmLabel="Reset"
+                >
+                  Reset to file
+                </ConfirmSubmit>
+                {cell.state.kind === "stale" ? <SubmitButton className={quiet} name="intent" value="mark" pendingLabel="Saving">Mark reviewed</SubmitButton> : null}
+              </div>
+            </form>
+          );
+        })}
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export function HiddenScope({
+  catalog,
+  scopeAll,
+  query,
+  needsReview,
+  copyKey,
+}: {
+  catalog: CatalogId;
+  scopeAll: boolean;
+  query: string;
+  needsReview: boolean;
+  copyKey?: string;
+}) {
+  return (
+    <>
+      <input type="hidden" name="catalog" value={catalog} />
+      {scopeAll ? <input type="hidden" name="all" value="1" /> : null}
+      <input type="hidden" name="q" value={query} />
+      {needsReview ? <input type="hidden" name="review" value="1" /> : null}
+      {copyKey ? <input type="hidden" name="key" value={copyKey} /> : null}
+    </>
+  );
+}
+
+function StateChip({ kind }: { kind: "source" | "current" | "stale" }) {
+  if (kind === "source") return <span className="rounded-full bg-lime px-2 py-1 text-xs font-semibold">Source</span>;
+  if (kind === "stale") return <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-lime">Needs review</span>;
+  return <span className="rounded-full bg-leaf/40 px-2 py-1 text-xs font-semibold">Current</span>;
+}
