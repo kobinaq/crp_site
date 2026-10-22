@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "@/components/LocaleLink";
 import { useCallback, useState } from "react";
+import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { trail } from "@/lib/fonts";
 import {
   AgeSelectionLayout,
@@ -74,8 +76,13 @@ function InterestCard({
   );
 }
 
+// Same box for the button and the link so swapping them after hydration never shifts layout.
+const HERO_CTA =
+  "relative z-10 flex h-14 w-full items-center justify-center rounded-full px-4 text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] text-white mix-blend-hard-light transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] desk:h-[80px] desk:px-8 desk:text-[20px] desk:tracking-[0.8px]";
+
 export function ApplyPage() {
   const copy = useCopy();
+  const applyFlow = useApplyFlowEnabled();
   const [interestGroup, setInterestGroup] = useState<InterestAgeGroup | null>(
     null,
   );
@@ -89,16 +96,31 @@ export function ApplyPage() {
         headline={copy.apply.headline}
         body={copy.apply.body}
         cta={
-          <button
-            type="button"
-            onClick={() => setInterestGroup("19_26")}
-            aria-label={copy.a11y.expressInterest}
-            className="relative z-10 flex h-14 w-full items-center justify-center rounded-full px-4 text-[14px] font-semibold uppercase leading-[0.9] tracking-[0.56px] text-white mix-blend-hard-light transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] desk:h-[80px] desk:px-8 desk:text-[20px] desk:tracking-[0.8px]"
-            style={{ backgroundImage: APPLY_GRADIENT }}
-          >
-            {copy.apply.interest}
-          </button>
+          applyFlow ? (
+            // Gate on (dev / previews): straight into the apply flow, as before e9325bd.
+            <Link
+              href="/programs?intent=apply"
+              aria-label={copy.a11y.programDetails}
+              className={HERO_CTA}
+              style={{ backgroundImage: APPLY_GRADIENT }}
+            >
+              {copy.apply.applyNow}
+            </Link>
+          ) : (
+            // Production, plus the server render and first hydration pass: Express interest popup.
+            <button
+              type="button"
+              onClick={() => setInterestGroup("19_26")}
+              aria-label={copy.a11y.expressInterest}
+              className={HERO_CTA}
+              style={{ backgroundImage: APPLY_GRADIENT }}
+            >
+              {copy.apply.interest}
+            </button>
+          )
         }
+        // 15-18 and 27-34 have no apply flow; they have opened Express interest since the first
+        // version (4d378ca), so they keep it whichever way the gate is set.
         belowHero={
           <div className="no-scrollbar flex w-full overflow-x-auto desk:aspect-[948/316] desk:overflow-visible desk:flex-row desk:items-stretch">
             <InterestCard
