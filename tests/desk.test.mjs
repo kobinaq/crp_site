@@ -430,7 +430,14 @@ test("detail hides date of birth and videoask, and hides controls the viewer can
 
 test("desk controls stay hidden when the viewer cannot use them, and the form does not post a desk", () => {
   const viewLoad = loader({
-    react: { useActionState: (action) => [null, action, false] },
+    react: {
+      useActionState: (action) => [null, action, false],
+      useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}],
+      useRef: (initial) => ({ current: initial }),
+      useId: () => "desk-test",
+      useEffect: () => {},
+      useLayoutEffect: () => {},
+    },
     "next/link": (props) => ({ type: "a", props }),
   });
   const { DeskView } = viewLoad("components/admin/DeskView.tsx");

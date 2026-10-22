@@ -20,7 +20,7 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
         <h2 className="text-lg font-semibold">Pipeline</h2>
         <div className="mt-4 grid grid-cols-2 gap-3 desk:grid-cols-4">
           {data.pipeline.map((row) => (
-            <Link key={row.status} href={`/admin/records?list=applicants&status=${row.status}`} className="rounded-3xl bg-cream px-4 py-3">
+            <Link key={row.status} href={`/admin/records?list=applicants&status=${row.status}`} className="rounded-3xl bg-cream px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
               <p className="text-2xl font-semibold">{row.count}</p>
               <p className="text-sm">{row.label}</p>
             </Link>

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { AdminSelect } from "@/components/admin/AdminSelect";
 import { BulkQueue } from "@/components/admin/BulkQueue";
-import { card } from "@/components/admin/marks";
+import { card, field, focusRing, pill, quiet } from "@/components/admin/marks";
+import { SubmitButton } from "@/components/admin/SubmitButton";
 import { WeekBars } from "@/components/admin/WeekBars";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
 import type { RecordPage } from "@/lib/admin/records";
@@ -27,7 +29,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
       </div>
       <nav className="flex flex-wrap gap-2" aria-label="Record lists">
         {RECORD_LISTS.map((list) => (
-          <Link key={list} className={list === data.list ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "", attention: "" })}>
+          <Link key={list} className={list === data.list ? pill : quiet} href={hrefFor({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "", attention: "" })}>
             {LABELS[list]}
           </Link>
         ))}
@@ -44,7 +46,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
         {data.list === "applicants" ? <Filter label="Cycle" name="cycle" value={data.filters.cycle} /> : null}
         {data.list === "interest" ? <Choice label="Age" name="age" value={data.filters.age} options={ageGroup.enumValues.map((item) => [item, item])} /> : null}
         <input type="hidden" name="queue" value={data.filters.queue} />
-        <button className="inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold" type="submit">Apply</button>
+        <SubmitButton className={quiet} pendingLabel="Applying">Apply</SubmitButton>
       </form>
       {data.list === "applicants" ? (
         <nav className="flex flex-wrap gap-2" aria-label="Queues">
@@ -82,8 +84,8 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          {data.page > 1 ? <Link className="text-sm font-semibold underline" href={hrefFor({ ...data.filters, page: data.page - 1 })}>Previous</Link> : null}
-          {data.page < pages ? <Link className="text-sm font-semibold underline" href={hrefFor({ ...data.filters, page: data.page + 1 })}>Next</Link> : null}
+          {data.page > 1 ? <Link className={`text-sm font-semibold underline ${focusRing}`} href={hrefFor({ ...data.filters, page: data.page - 1 })}>Previous</Link> : null}
+          {data.page < pages ? <Link className={`text-sm font-semibold underline ${focusRing}`} href={hrefFor({ ...data.filters, page: data.page + 1 })}>Next</Link> : null}
         </div>
         {exportable ? (
           <form className="mt-4" method="post" action="/admin/records/export">
@@ -96,7 +98,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
             <input type="hidden" name="age" value={data.filters.age} />
             <input type="hidden" name="queue" value={data.filters.queue} />
             <input type="hidden" name="attention" value={data.filters.attention} />
-            <button className="inline-flex h-12 items-center justify-center rounded-full gradient-brand px-6 text-sm font-semibold uppercase tracking-wide text-white" type="submit">Download CSV</button>
+            <SubmitButton className={pill} pendingLabel="Preparing">Download CSV</SubmitButton>
           </form>
         ) : <p className="mt-4 text-sm text-black/60">CSV download is limited to admins.</p>}
       </section>
@@ -113,10 +115,12 @@ function Choice({ label, name, value, options }: { label: string; name: string; 
   return (
     <label className="grid gap-1 text-sm font-semibold">
       {label}
-      <select name={name} defaultValue={value} className="h-12 w-44 rounded-[40px] border border-black/12 bg-cream px-4 text-base outline-none focus-visible:border-black">
-        <option value="">Any</option>
-        {options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}
-      </select>
+      <AdminSelect
+        name={name}
+        defaultValue={value}
+        className="w-full min-w-44 desk:w-44"
+        options={[{ value: "", label: "Any" }, ...options.map(([option, text]) => ({ value: option, label: text }))]}
+      />
     </label>
   );
 }
@@ -125,7 +129,7 @@ function Filter({ label, name, value }: { label: string; name: string; value: st
   return (
     <label className="grid gap-1 text-sm font-semibold">
       {label}
-      <input name={name} defaultValue={value} className="h-12 w-44 rounded-[40px] border border-black/12 bg-cream px-4 text-base outline-none focus-visible:border-black" />
+      <input key={value} name={name} defaultValue={value} autoComplete="off" className={`${field} w-full min-w-44 desk:w-44`} />
     </label>
   );
 }
@@ -133,7 +137,7 @@ function Filter({ label, name, value }: { label: string; name: string; value: st
 function QueueLink({ current, queue, filters, children }: { current: string; queue: RecordPage["filters"]["queue"]; filters: RecordPage["filters"]; children: string }) {
   const active = current === queue;
   return (
-    <Link className={active ? "inline-flex h-12 items-center justify-center rounded-full gradient-brand px-5 text-sm font-semibold uppercase tracking-wide text-white" : "inline-flex h-12 items-center justify-center rounded-full border border-black/15 bg-white px-5 text-sm font-semibold"} href={hrefFor({ ...filters, queue, page: 1 })}>
+    <Link className={active ? pill : quiet} href={hrefFor({ ...filters, queue, page: 1 })}>
       {children}
     </Link>
   );

@@ -44,8 +44,8 @@ export function ApplicantReviewView({
           <Pill label={`Cycle ${review.reviewCycle}`} />
         </div>
         <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
-          {review.prevHref ? <Link className="underline" href={review.prevHref}>Previous</Link> : <span className="text-black/40">Previous</span>}
-          {review.nextHref ? <Link className="underline" href={review.nextHref}>Next</Link> : <span className="text-black/40">Next</span>}
+          {review.prevHref ? <Link className="rounded-full underline outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" href={review.prevHref}>Previous</Link> : <span className="text-black/40">Previous</span>}
+          {review.nextHref ? <Link className="rounded-full underline outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" href={review.nextHref}>Next</Link> : <span className="text-black/40">Next</span>}
         </div>
       </div>
       <div className="grid items-start gap-6 desk:grid-cols-[minmax(0,1fr)_22rem]">
@@ -60,19 +60,19 @@ export function ApplicantReviewView({
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Identity</h2>
               <p className="mt-2 text-2xl font-semibold">{review.identity}</p>
               <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt || "Not checked"}</p>
-              {review.documents.map((document) => (
-                <DocumentReveal key={document.documentId} applicantId={review.id} view={document} />
+              {review.documents.length === 0 ? <p className="mt-3 text-sm text-black/60">No document on file.</p> : review.documents.map((document) => (
+                <DocumentReveal key={`${review.id}:${document.documentId}`} applicantId={review.id} view={document} />
               ))}
             </article>
           </section>
           <ReviewEditor review={review} canWrite={canWrite} canAssign={canAssign} reviewers={reviewers} viewerId={viewerId} noteId={noteId} />
           <section className={card}>
             <h2 className="text-lg font-semibold">Answers</h2>
-            {review.answers.length > 0 ? (
+            {review.answers.length === 0 ? <p className="mt-3 text-sm text-black/60">No answers yet.</p> : (
               <div className="mt-4 grid gap-4">
-                {review.answers.map((answer) => <AnswerBlock key={answer.questionId} applicantId={review.id} view={answer} />)}
+                {review.answers.map((answer) => <AnswerBlock key={`${review.id}:${answer.questionId}`} applicantId={review.id} view={answer} />)}
               </div>
-            ) : null}
+            )}
             <dl className="mt-4 grid gap-4 desk:grid-cols-2">
               <Fact term="Date of birth" value={review.dob} />
               <Fact term="Age" value={String(review.age)} />

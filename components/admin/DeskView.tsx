@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
-import { area, card, field, pill, quiet } from "@/components/admin/marks";
+import { AdminSelect } from "@/components/admin/AdminSelect";
+import { area, card, pill, quiet } from "@/components/admin/marks";
 import type { DeskDetail } from "@/lib/desk/case";
 
 type DeskFormState =
@@ -71,7 +72,7 @@ export function DeskView({
           <h2 className="text-lg font-semibold">Status</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             {detail.moves.map((move) => (
-              <MoveButton key={move.to} detail={detail} move={move} action={moveAction} />
+              <MoveButton key={`${detail.recordId}:${move.to}`} detail={detail} move={move} action={moveAction} />
             ))}
           </div>
         </section>
@@ -79,7 +80,7 @@ export function DeskView({
       <section className={card}>
         <h2 className="text-lg font-semibold">Assignee</h2>
         <p className="mt-2 text-sm">{detail.assignee ? detail.assignee.name || detail.assignee.email : "Unassigned"}</p>
-        {detail.canAssign ? <AssignForm detail={detail} options={options} action={assignAction} /> : null}
+        {detail.canAssign ? <AssignForm key={detail.recordId} detail={detail} options={options} action={assignAction} /> : null}
       </section>
       <section className={card}>
         <h2 className="text-lg font-semibold">Notes</h2>
@@ -93,7 +94,7 @@ export function DeskView({
             ))}
           </div>
         )}
-        {detail.canNote ? <NoteForm detail={detail} noteId={noteId} action={noteAction} /> : null}
+        {detail.canNote ? <NoteForm key={detail.recordId} detail={detail} noteId={noteId} action={noteAction} /> : null}
       </section>
     </div>
   );
@@ -101,13 +102,19 @@ export function DeskView({
 
 function NoteForm({ detail, noteId, action }: { detail: DeskDetail; noteId: string; action: DeskAction }) {
   const [state, submit, pending] = useActionState(action, null);
+  const [body, setBody] = useState("");
+  const [cleared, setCleared] = useState<DeskFormState>(null);
+  if (state?.result === "saved" && cleared !== state) {
+    setCleared(state);
+    setBody("");
+  }
   return (
     <form action={submit} className="mt-6 grid gap-3">
       <input type="hidden" name="recordId" value={detail.recordId} />
       <input type="hidden" name="noteId" value={noteId} />
       <label className="grid gap-1 text-sm font-semibold">
         Note
-        <textarea className={area} name="body" maxLength={4000} />
+        <textarea className={area} name="body" maxLength={4000} value={body} onChange={(event) => setBody(event.target.value)} />
       </label>
       <button className={pill} type="submit" disabled={pending}>{pending ? "Saving" : "Save note"}</button>
       {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
@@ -152,10 +159,11 @@ function AssignForm({
       <input type="hidden" name="expectedAssigneeId" value={detail.assignee?.id ?? ""} />
       <label className="grid gap-1 text-sm font-semibold">
         Assignee
-        <select className={field} name="assigneeId" defaultValue={detail.assignee?.id ?? ""}>
-          <option value="">Unassigned</option>
-          {options.map((person) => <option key={person.id} value={person.id}>{person.name || person.email}</option>)}
-        </select>
+        <AdminSelect
+          name="assigneeId"
+          defaultValue={detail.assignee?.id ?? ""}
+          options={[{ value: "", label: "Unassigned" }, ...options.map((person) => ({ value: person.id, label: person.name || person.email }))]}
+        />
       </label>
       <button className={quiet} type="submit" disabled={pending}>{pending ? "Saving" : "Assign"}</button>
       {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
