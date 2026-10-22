@@ -52,7 +52,7 @@ async function insertUser(role, name) {
     "insert into users (email, role, name) values ($1, $2, $3) returning id, email",
     [email, role, name],
   );
-  return inserted.rows[0];
+  return { id: inserted.rows[0].id, email: inserted.rows[0].email, role, name };
 }
 
 async function insertApplicant({ track = "in_person", status = "under_review", language = "en" } = {}) {
@@ -326,3 +326,192 @@ test("the same decisionId confirmed twice replays and queues one email", async (
   assert.equal(history.rows[0].actor_staff_id, staff.id);
   assert.equal(history.rows[0].reason, "staff decision");
 });
+
+test("saving a review does not change applicants.version", async () => {
+  const reviewer = await insertUser("reviewer", "Rae Reviewer");
+  const applicant = await insertApplicant();
+  const before = await applicantRow(applicant.id);
+  const noteId = randomUUID();
+  const saved = await mod("lib/review/write.ts").saveReview(mod("lib/db/index.ts").getDb(), grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: 4, context: 5, contribution: 3 },
+    recommendation: "advance",
+    note: { id: noteId, body: "Fieldwork in the delta is specific and recent." },
+  });
+  assert.equal(saved.ok, true);
+  const after = await applicantRow(applicant.id);
+  assert.equal(after.version, before.version);
+  assert.equal(after.status, "under_review");
+  const note = await sql.query("select body, author_id from review_notes where id = $1", [noteId]);
+  assert.equal(note.rows[0].body, "Fieldwork in the delta is specific and recent.");
+  assert.equal(note.rows[0].author_id, reviewer.id);
+  const again = await mod("lib/review/write.ts").saveReview(mod("lib/db/index.ts").getDb(), grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: 4, context: 5, contribution: 3 },
+    recommendation: "advance",
+    note: { id: noteId, body: "A second body must not replace the first." },
+  });
+  assert.equal(again.ok, true);
+  const kept = await sql.query("select body from review_notes where id = $1", [noteId]);
+  assert.equal(kept.rows[0].body, "Fieldwork in the delta is specific and recent.");
+  const audits = await sql.query(
+    "select subject_id, detail from admin_events where kind = 'review.saved' and detail->>'applicantId' = $1",
+    [applicant.id],
+  );
+  assert.equal(audits.rows.length, 1);
+  assert.equal(audits.rows[0].subject_id, null);
+  assert.equal(audits.rows[0].detail.recommendation, "advance");
+  assert.equal((await applicantRow(applicant.id)).version, before.version);
+  const changes = await sql.query("select count(*)::int as n from sync_changes where record_id = $1", [applicant.id]);
+  assert.equal(changes.rows[0].n, 0);
+  const staleCycle = await mod("lib/review/write.ts").saveReview(mod("lib/db/index.ts").getDb(), grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 1,
+    scores: { commitment: 1 },
+    recommendation: undefined,
+    note: null,
+  });
+  assert.deepEqual(staleCycle, { ok: false, reason: "stale_cycle" });
+  const applied = await apply({
+    applicantId: applicant.id,
+    decisionId: randomUUID(),
+    version: before.version,
+    reviewCycle: 0,
+    reviewDecision: "accept",
+  }, { via: "sheet" });
+  assert.equal(applied.result, "applied");
+  assert.equal((await applicantRow(applicant.id)).status, "accepted");
+});
+
+test("an unknown rubric key is rejected and a retired stored key remains after a later save", async () => {
+  const reviewer = await insertUser("reviewer", "Rae Reviewer");
+  const applicant = await insertApplicant();
+  const database = mod("lib/db/index.ts").getDb();
+  const { saveReview } = mod("lib/review/write.ts");
+  const unknown = await saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { grit: 3 },
+    recommendation: "accept",
+    note: null,
+  });
+  assert.deepEqual(unknown, { ok: false, reason: "invalid" });
+  const high = await saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: 6 },
+    recommendation: undefined,
+    note: null,
+  });
+  assert.deepEqual(high, { ok: false, reason: "invalid" });
+  const longNote = await saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: {},
+    recommendation: undefined,
+    note: { id: randomUUID(), body: "x".repeat(4001) },
+  });
+  assert.deepEqual(longNote, { ok: false, reason: "invalid" });
+  const missing = await saveReview(database, grant(reviewer), {
+    applicantId: randomUUID(),
+    reviewCycle: 0,
+    scores: { commitment: 1 },
+    recommendation: undefined,
+    note: null,
+  });
+  assert.deepEqual(missing, { ok: false, reason: "not_found" });
+  const first = await saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: 4 },
+    recommendation: "advance",
+    note: null,
+  });
+  assert.equal(first.ok, true);
+  await sql.query(
+    "update review_positions set scores = scores || '{\"grit\":2}'::jsonb where applicant_id = $1 and author_id = $2",
+    [applicant.id, reviewer.id],
+  );
+  const later = await saveReview(database, grant(reviewer), {
+    applicantId: applicant.id,
+    reviewCycle: 0,
+    scores: { commitment: null, context: 5 },
+    recommendation: undefined,
+    note: null,
+  });
+  assert.equal(later.ok, true);
+  const position = await sql.query(
+    "select scores, recommendation from review_positions where applicant_id = $1 and author_id = $2",
+    [applicant.id, reviewer.id],
+  );
+  assert.equal(position.rows[0].scores.grit, 2);
+  assert.equal(position.rows[0].scores.context, 5);
+  assert.equal(position.rows[0].scores.commitment, undefined);
+  assert.equal(position.rows[0].recommendation, "advance");
+  assert.equal((await applicantRow(applicant.id)).version, applicant.version);
+});
+
+test("assignment does not change applicants.version and does not block a later sheet apply", async () => {
+  const admin = await insertUser("admin", "Ada Admin");
+  const reviewer = await insertUser("reviewer", "Rae Reviewer");
+  const editor = await insertUser("editor", "Ed Editor");
+  const applicant = await insertApplicant();
+  const before = await applicantRow(applicant.id);
+  const { assignReviewer } = mod("lib/review/write.ts");
+  const database = mod("lib/db/index.ts").getDb();
+  const assigned = await assignReviewer(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    assigneeId: reviewer.id,
+    expectedAssigneeId: null,
+  });
+  assert.equal(assigned.ok, true);
+  assert.equal(assigned.version, before.version);
+  const afterAssign = await applicantRow(applicant.id);
+  assert.equal(afterAssign.version, before.version);
+  assert.equal(afterAssign.assigned_staff_id, reviewer.id);
+  assert.equal(afterAssign.updated_at.toISOString(), before.updated_at.toISOString());
+  const repeat = await assignReviewer(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    assigneeId: reviewer.id,
+    expectedAssigneeId: reviewer.id,
+  });
+  assert.equal(repeat.ok, true);
+  const assignedEvents = await sql.query(
+    "select subject_id, detail from admin_events where kind = 'review.assigned' and detail->>'applicantId' = $1",
+    [applicant.id],
+  );
+  assert.equal(assignedEvents.rows.length, 1);
+  assert.equal(assignedEvents.rows[0].subject_id, reviewer.id);
+  assert.equal(assignedEvents.rows[0].detail.previousAssigneeId, null);
+  const refused = await assignReviewer(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    assigneeId: editor.id,
+    expectedAssigneeId: reviewer.id,
+  });
+  assert.deepEqual(refused, { ok: false, reason: "invalid_assignee" });
+  assert.equal((await applicantRow(applicant.id)).assigned_staff_id, reviewer.id);
+  const conflict = await assignReviewer(database, grant(admin, "admin"), {
+    applicantId: applicant.id,
+    assigneeId: null,
+    expectedAssigneeId: null,
+  });
+  assert.deepEqual(conflict, { ok: false, reason: "conflict" });
+  const applied = await apply({
+    applicantId: applicant.id,
+    decisionId: randomUUID(),
+    version: before.version,
+    reviewCycle: 0,
+    reviewDecision: "accept",
+  }, { via: "sheet" });
+  assert.equal(applied.result, "applied");
+  const after = await applicantRow(applicant.id);
+  assert.equal(after.status, "accepted");
+  assert.equal(after.assigned_staff_id, reviewer.id);
+  assert.equal(after.version, before.version + 1);
+});
+
+function grant(user, role = user.role) {
+  return { id: user.id, email: user.email, role, name: user.name };
+}

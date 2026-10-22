@@ -1,4 +1,5 @@
 import { adminEvents, type Tx } from "@/lib/db";
+import type { Recommendation } from "@/lib/review/rubric";
 import type { UserRole } from "@/lib/staff/roles";
 
 export type AdminEvent =
@@ -8,6 +9,8 @@ export type AdminEvent =
   | { readonly kind: "staff.disabled"; readonly subject: string; readonly email: string }
   | { readonly kind: "staff.enabled"; readonly subject: string; readonly email: string }
   | { readonly kind: "records.exported"; readonly list: string; readonly rows: number; readonly filters: Readonly<Record<string, string>> }
+  | { readonly kind: "review.saved"; readonly applicantId: string; readonly reviewCycle: number; readonly recommendation: Recommendation | null; readonly criteria: readonly string[]; readonly noteId: string | null }
+  | { readonly kind: "review.assigned"; readonly subject: string | null; readonly applicantId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
   | { readonly kind: "decision.confirmed"; readonly applicantId: string; readonly from: string; readonly to: string; readonly decisionId: string; readonly version: number };
 
 export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEvent): Promise<void> {
@@ -24,6 +27,12 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
     detail.filters = event.filters;
   }
   if ("applicantId" in event) detail.applicantId = event.applicantId;
+  if ("reviewCycle" in event) detail.reviewCycle = event.reviewCycle;
+  if ("recommendation" in event) detail.recommendation = event.recommendation;
+  if ("criteria" in event) detail.criteria = [...event.criteria];
+  if ("noteId" in event) detail.noteId = event.noteId;
+  if ("assigneeId" in event) detail.assigneeId = event.assigneeId;
+  if ("previousAssigneeId" in event) detail.previousAssigneeId = event.previousAssigneeId;
   if ("decisionId" in event) detail.decisionId = event.decisionId;
   if ("version" in event) detail.version = event.version;
   await tx.insert(adminEvents).values({ actorId, subjectId, kind, detail });
