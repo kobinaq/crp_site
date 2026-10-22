@@ -428,6 +428,72 @@ test("detail hides date of birth and videoask, and hides controls the viewer can
   assert.equal(reread.notes[0].body, "keep this off the list");
 });
 
+test("desk controls stay hidden when the viewer cannot use them, and the form does not post a desk", () => {
+  const viewLoad = loader({
+    react: { useActionState: (action) => [null, action, false] },
+    "next/link": (props) => ({ type: "a", props }),
+  });
+  const { DeskView } = viewLoad("components/admin/DeskView.tsx");
+  const detail = {
+    desk: "nomination",
+    recordId: "00000000-0000-4000-8000-000000000010",
+    heading: "Grace",
+    status: "new",
+    statusLabel: "New",
+    assignee: null,
+    moves: [],
+    canNote: true,
+    canAssign: false,
+    assignees: [],
+    notes: [],
+    fields: [{ label: "Intake status", value: "new" }],
+  };
+  const actions = { noteAction() {}, moveAction() {}, assignAction() {} };
+  const reviewer = DeskView({ detail, noteId: "note-1", ...actions });
+  const reviewerNames = fieldNames(reviewer);
+  assert.equal(reviewerNames.includes("desk"), false);
+  assert.equal(reviewerNames.includes("body"), true);
+  assert.equal(reviewerNames.includes("to"), false);
+  assert.equal(reviewerNames.includes("assigneeId"), false);
+
+  const admin = DeskView({
+    detail: {
+      ...detail,
+      canAssign: true,
+      moves: [{ to: "reviewing", label: "Reviewing" }, { to: "closed", label: "Closed" }],
+      assignees: [{ id: "00000000-0000-4000-8000-000000000011", name: "Ada Admin", email: "ada@example.org" }],
+    },
+    noteId: "note-1",
+    ...actions,
+  });
+  const adminNames = fieldNames(admin);
+  assert.equal(adminNames.includes("desk"), false);
+  assert.deepEqual(adminNames.filter((name) => name === "to"), ["to", "to"]);
+  assert.equal(adminNames.includes("expected"), true);
+  assert.equal(adminNames.includes("assigneeId"), true);
+  assert.equal(expand(admin).some((node) => node.props?.children === "Reviewing"), true);
+});
+
+function expand(tree) {
+  const all = [];
+  function walk(node) {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    all.push(node);
+    if (typeof node.type === "function") walk(node.type(node.props));
+    walk(node.props?.children);
+  }
+  walk(tree);
+  return all;
+}
+
+function fieldNames(tree) {
+  return expand(tree).flatMap((node) => (typeof node.props?.name === "string" ? [node.props.name] : []));
+}
+
 async function attentionIds(desk) {
   const { deskWhere } = mod("lib/desk/case.ts");
   const table = desk === "nomination" ? "nominations" : "partner_inquiries";
