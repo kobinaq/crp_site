@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { CopyDesk } from "@/components/admin/CopyDesk";
 import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
 import { copyHistory, entryRef, loadDesk, type Head } from "@/lib/copy/editor";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/staff/gate";
+
+export const metadata: Metadata = { title: "Copy" };
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";

@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { useActionState } from "react";
 import { confirmDecisionAction, previewDecisionAction, type ConfirmFormState } from "@/app/admin/(console)/records/applicants/[id]/actions";
-import { pill, quiet } from "@/components/admin/marks";
-import type { ApplicantReview } from "@/lib/admin/records";
-import type { QueueName } from "@/lib/review/queue";
+import { Button } from "@/components/admin/Button";
+import { ResultLine } from "@/components/admin/ResultLine";
+import type { ApplicantReview, RecordQuery } from "@/lib/admin/records";
 import type { ConfirmMove } from "@/lib/sync";
 
 const NOTICE: Record<string, string> = {
@@ -23,29 +23,29 @@ const NOTICE: Record<string, string> = {
 
 export function DecisionPanel({
   review,
-  queue,
+  listQuery,
   canConfirm,
   decisionId,
   statusLabel,
 }: {
   review: ApplicantReview;
-  queue: "" | QueueName;
+  listQuery: RecordQuery;
   canConfirm: boolean;
   decisionId: string;
   statusLabel: Readonly<Record<string, string>>;
 }) {
-  return <DecisionBody key={review.id} review={review} queue={queue} canConfirm={canConfirm} decisionId={decisionId} statusLabel={statusLabel} />;
+  return <DecisionBody key={review.id} review={review} listQuery={listQuery} canConfirm={canConfirm} decisionId={decisionId} statusLabel={statusLabel} />;
 }
 
 function DecisionBody({
   review,
-  queue,
+  listQuery,
   canConfirm,
   decisionId,
   statusLabel,
 }: {
   review: ApplicantReview;
-  queue: "" | QueueName;
+  listQuery: RecordQuery;
   canConfirm: boolean;
   decisionId: string;
   statusLabel: Readonly<Record<string, string>>;
@@ -113,7 +113,7 @@ function DecisionBody({
       </div>
       {canConfirm && move ? (
         <div className="grid gap-3">
-          <button className={quiet} type="button" onClick={onPreview} disabled={pending}>{pending ? "Previewing" : "Preview"}</button>
+          <Button variant="outline" type="button" onClick={onPreview} disabled={pending}>{pending ? "Previewing" : "Preview"}</Button>
           {preview && preview.key === key && preview.html ? (
             <div>
               <p className="text-sm font-semibold">{preview.subject}</p>
@@ -121,7 +121,7 @@ function DecisionBody({
             </div>
           ) : null}
           {preview && preview.key === key && preview.notice ? <p className="text-sm">{preview.notice}</p> : null}
-          <ConfirmForm key={review.id} review={review} queue={queue} decisionId={decisionId} move={move} ready={ready} />
+          <ConfirmForm key={review.id} review={review} listQuery={listQuery} decisionId={decisionId} move={move} ready={ready} />
         </div>
       ) : null}
     </div>
@@ -130,13 +130,13 @@ function DecisionBody({
 
 function ConfirmForm({
   review,
-  queue,
+  listQuery,
   decisionId,
   move,
   ready,
 }: {
   review: ApplicantReview;
-  queue: "" | QueueName;
+  listQuery: RecordQuery;
   decisionId: string;
   move: ConfirmMove;
   ready: boolean;
@@ -148,12 +148,20 @@ function ConfirmForm({
       <input type="hidden" name="version" value={review.version} />
       <input type="hidden" name="reviewCycle" value={review.reviewCycle} />
       <input type="hidden" name="decisionId" value={decisionId} />
-      <input type="hidden" name="queue" value={queue} />
+      <input type="hidden" name="q" value={listQuery.q} />
+      <input type="hidden" name="status" value={listQuery.status} />
+      <input type="hidden" name="track" value={listQuery.track} />
+      <input type="hidden" name="language" value={listQuery.language} />
+      <input type="hidden" name="cycle" value={listQuery.cycle} />
+      <input type="hidden" name="age" value={listQuery.age} />
+      <input type="hidden" name="queue" value={listQuery.queue} />
+      <input type="hidden" name="attention" value={listQuery.attention} />
+      <input type="hidden" name="page" value={listQuery.page} />
       <input type="hidden" name="field" value={move.field} />
       <input type="hidden" name="value" value={move.value} />
       <input type="hidden" name="to" value={move.to} />
-      <button className={pill} type="submit" disabled={!ready || confirmPending}>{confirmPending ? "Confirming" : "Confirm"}</button>
-      {confirmState ? <p className="text-sm">{NOTICE[confirmState.result]}</p> : null}
+      <Button variant="primary" type="submit" disabled={!ready || confirmPending}>{confirmPending ? "Confirming" : "Confirm"}</Button>
+      <ResultLine message={confirmState ? NOTICE[confirmState.result] : null} tone="warn" />
     </form>
   );
 }

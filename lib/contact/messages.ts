@@ -252,18 +252,7 @@ export async function listMessages(
   viewer: { readonly role: string },
 ): Promise<{ readonly rows: readonly MessageListRow[]; readonly total: number }> {
   if (query.status && !isContactStatus(query.status)) return { rows: [], total: 0 };
-  const where = and(
-    query.status && isContactStatus(query.status) ? eq(contactMessages.status, query.status) : undefined,
-    query.q
-      ? or(
-          matches(contactMessages.name, query.q),
-          matches(contactMessages.email, query.q),
-          matches(contactMessages.organization, query.q),
-          matches(contactMessages.phone, query.q),
-          matches(contactMessages.body, query.q),
-        )
-      : undefined,
-  );
+  const where = messageWhere(query);
   const [rows, totals] = await Promise.all([
     db
       .select({
@@ -372,6 +361,51 @@ export async function loadMessage(db: Store, actor: { readonly role: string }, i
     }),
     createdAt: row.createdAt,
   };
+}
+
+export async function adjacentMessageIds(
+  db: Store,
+  query: { readonly q: string; readonly status: string },
+  current: { readonly id: string; readonly createdAt: Date },
+): Promise<{ readonly previous: string | null; readonly next: string | null }> {
+  if (query.status && !isContactStatus(query.status)) return { previous: null, next: null };
+  const where = messageWhere(query);
+  const [previous, next] = await Promise.all([
+    messageStep(db, where, current, "prev"),
+    messageStep(db, where, current, "next"),
+  ]);
+  return { previous, next };
+}
+
+async function messageStep(
+  db: Store,
+  where: SQL | undefined,
+  current: { readonly id: string; readonly createdAt: Date },
+  direction: "prev" | "next",
+): Promise<string | null> {
+  const closer = direction === "prev"
+    ? or(sql`${contactMessages.createdAt} > ${current.createdAt}`, and(eq(contactMessages.createdAt, current.createdAt), sql`${contactMessages.id} > ${current.id}`))
+    : or(sql`${contactMessages.createdAt} < ${current.createdAt}`, and(eq(contactMessages.createdAt, current.createdAt), sql`${contactMessages.id} < ${current.id}`));
+  const order = direction === "prev"
+    ? [asc(contactMessages.createdAt), asc(contactMessages.id)]
+    : [desc(contactMessages.createdAt), desc(contactMessages.id)];
+  const [row] = await db.select({ id: contactMessages.id }).from(contactMessages).where(and(where, closer)).orderBy(...order).limit(1);
+  return row && isUserId(row.id) ? row.id : null;
+}
+
+function messageWhere(query: { readonly q: string; readonly status: string }): SQL | undefined {
+  return and(
+    query.status && isContactStatus(query.status) ? eq(contactMessages.status, query.status) : undefined,
+    query.q
+      ? or(
+          matches(contactMessages.name, query.q),
+          matches(contactMessages.email, query.q),
+          matches(contactMessages.organization, query.q),
+          matches(contactMessages.phone, query.q),
+          matches(contactMessages.body, query.q),
+        )
+      : undefined,
+  );
 }
 
 export async function countNewMessages(db: Store): Promise<number> {

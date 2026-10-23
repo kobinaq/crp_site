@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { loadApplicant, queueListHref } from "@/lib/admin/records";
+import { loadApplicant, parseRecordQuery } from "@/lib/admin/records";
+import { recordsHref } from "@/lib/admin/return";
 import { getDb } from "@/lib/db";
 import { STATUSES } from "@/lib/lifecycle";
 import { confirmDecision, previewDecision } from "@/lib/review/decide";
-import { parseQueue } from "@/lib/review/queue";
 import { RUBRIC, isRecommendation, parseScores } from "@/lib/review/rubric";
 import { assignReviewer, saveReview } from "@/lib/review/write";
 import { assertStaffAction } from "@/lib/staff/gate";
@@ -80,7 +80,18 @@ export async function confirmDecisionAction(_previous: ConfirmFormState, formDat
   const version = whole(formData.get("version"));
   const reviewCycle = whole(formData.get("reviewCycle"));
   const decisionId = String(formData.get("decisionId") ?? "");
-  const queue = parseQueue(String(formData.get("queue") ?? ""));
+  const listQuery = parseRecordQuery({
+    list: "applicants",
+    q: String(formData.get("q") ?? ""),
+    status: String(formData.get("status") ?? ""),
+    track: String(formData.get("track") ?? ""),
+    language: String(formData.get("language") ?? ""),
+    cycle: String(formData.get("cycle") ?? ""),
+    age: String(formData.get("age") ?? ""),
+    queue: String(formData.get("queue") ?? ""),
+    attention: String(formData.get("attention") ?? ""),
+    page: String(formData.get("page") ?? ""),
+  });
   const move = moveSchema.safeParse({
     field: formData.get("field"),
     value: formData.get("value"),
@@ -97,8 +108,8 @@ export async function confirmDecisionAction(_previous: ConfirmFormState, formDat
     move: move.data,
   });
   if (outcome.result === "applied") {
-    const review = await loadApplicant(getDb(), applicantId, admin, queue);
-    redirect(review?.nextHref ?? queueListHref(queue));
+    const review = await loadApplicant(getDb(), applicantId, admin, listQuery);
+    redirect(review?.nextHref ?? recordsHref(listQuery));
   }
   return { result: outcome.result };
 }

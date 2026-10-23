@@ -434,7 +434,7 @@ test("the player button has no src until open returns a staff path", async () =>
   const view = { kind: "clip", questionId: "q-video", position: 0, title: "Story", medium: "video", transcript: "hello", playback: "ready" };
   let tree = hooks.render(() => PrivateMedia({ applicantId, view }));
   assert.equal(nodes(tree).some((node) => node.type === "video" || node.props?.src), false);
-  const button = nodes(tree).find((node) => node.type === "button");
+  const button = nodes(tree).find((node) => node.props?.children === "Play video");
   assert.equal(button.props.children, "Play video");
   assert.equal(button.props.onPlay, undefined);
   fetchHandler = async () => new Response(JSON.stringify({ url: "https://evil.example/clip.mp4" }), { status: 201 });
@@ -443,7 +443,7 @@ test("the player button has no src until open returns a staff path", async () =>
   assert.equal(nodes(tree).some((node) => node.type === "video"), false);
   const path = `/admin/records/applicants/${applicantId}/stream/aaaa.bbbb`;
   fetchHandler = async () => new Response(JSON.stringify({ url: path }), { status: 201 });
-  await nodes(tree).find((node) => node.type === "button").props.onClick();
+  await nodes(tree).find((node) => node.props?.children === "Play video").props.onClick();
   tree = hooks.render(() => PrivateMedia({ applicantId, view }));
   const video = nodes(tree).find((node) => node.type === "video");
   assert.equal(video.props.src, undefined);
@@ -459,7 +459,7 @@ test("the player button has no src until open returns a staff path", async () =>
     view: { documentId: "doc", kind: "passport", contentType: "image/jpeg" },
   }));
   assert.equal(nodes(reveal).some((node) => node.type === "img" || node.type === "iframe"), false);
-  assert.equal(nodes(reveal).find((node) => node.type === "button").props.children, "Show document passport");
+  assert.equal(nodes(reveal).find((node) => node.props?.children === "Show document passport").props.children, "Show document passport");
 });
 
 test("the open and stream routes check the staff session", async () => {

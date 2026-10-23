@@ -1,18 +1,22 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
 import { AdminSelect } from "@/components/admin/AdminSelect";
-import { area, card, pill, quiet } from "@/components/admin/marks";
+import { buttonClass } from "@/components/admin/Button";
+import { EmailLine } from "@/components/admin/EmailLine";
+import { RecordChrome } from "@/components/admin/RecordChrome";
+import { ResultLine } from "@/components/admin/ResultLine";
+import { When } from "@/components/admin/When";
+import { area, card } from "@/components/admin/marks";
 import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import {
   MESSAGE_FIELDS,
   VERB_LABEL,
-  messagesListHref,
   verbNeedsConfirm,
   type ContactVerb,
   type MessageDetail,
 } from "@/lib/contact/model";
+import { languageLabel } from "@/lib/admin/labels";
 
 type MessageFormState =
   | { readonly result: "forbidden" | "invalid" | "not_found" | "conflict" | "illegal" | "invalid_assignee" | "saved" }
@@ -36,10 +40,16 @@ function when(value: Date): string {
 
 export function MessageView({
   detail,
+  listHref,
+  previous,
+  next,
   noteId,
   action,
 }: {
   detail: MessageDetail;
+  listHref: string;
+  previous: string | null;
+  next: string | null;
   noteId: string;
   action: MessageAction;
 }) {
@@ -57,24 +67,27 @@ export function MessageView({
   ];
   return (
     <div className="grid gap-6">
-      <div>
-        <Link className={quiet} href={messagesListHref()}>Messages</Link>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight">{detail.name}</h1>
-        <p className="mt-2 text-sm text-black/70">{detail.statusLabel}</p>
-      </div>
+      <RecordChrome
+        backHref={listHref}
+        backLabel="Back to messages"
+        title={detail.name}
+        previous={previous}
+        next={next}
+        meta={<p className="text-sm font-semibold">{detail.statusLabel}</p>}
+      />
       <section className={card}>
         <h2 className="text-lg font-semibold">Record</h2>
         <dl className="mt-4 grid gap-4 desk:grid-cols-2">
           {fields.map((item) => (
             <div key={item[0]} className={item[0] === "Message" ? "desk:col-span-2" : undefined}>
               <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{item[0]}</dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">{item[1] || "Not given"}</dd>
+              <dd className="mt-1 whitespace-pre-wrap text-sm">{messageField(item[0], item[1])}</dd>
             </div>
           ))}
         </dl>
       </section>
       {detail.canManage && detail.verbs.length > 0 ? (
-        <section className={card}>
+        <section className={`${card} desk:sticky desk:top-36 desk:z-10`}>
           <h2 className="text-lg font-semibold">Status</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             {detail.verbs.map((verb) => (
@@ -94,7 +107,7 @@ export function MessageView({
           <div className="mt-4 grid gap-3">
             {detail.notes.map((note) => (
               <article key={note.id} className="rounded-3xl bg-cream px-4 py-3">
-                <p className="text-sm font-semibold">{note.authorName} · {when(note.createdAt)}</p>
+                <p className="text-sm font-semibold">{note.authorName} · <When stamp={when(note.createdAt)} /></p>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{note.body}</p>
               </article>
             ))}
@@ -104,6 +117,14 @@ export function MessageView({
       </section>
     </div>
   );
+}
+
+function messageField(label: string, value: string) {
+  if (!value) return "Not given";
+  if (label === "Email") return <EmailLine email={value} />;
+  if (label === "Created") return <When stamp={value} />;
+  if (label === "Locale") return languageLabel(value);
+  return value;
 }
 
 function VerbForm({
@@ -122,7 +143,8 @@ function VerbForm({
       <input type="hidden" name={MESSAGE_FIELDS.expected} value={detail.state.status} />
       {verbNeedsConfirm(verb) ? (
         <ConfirmSubmit
-          className={quiet}
+          className={buttonClass("danger")}
+          confirmVariant="danger"
           name={MESSAGE_FIELDS.kind}
           value={verb}
           pendingLabel="Saving"
@@ -133,11 +155,11 @@ function VerbForm({
           {VERB_LABEL[verb]}
         </ConfirmSubmit>
       ) : (
-        <SubmitButton className={quiet} name={MESSAGE_FIELDS.kind} value={verb} pendingLabel="Saving">
+        <SubmitButton className={buttonClass(verb === "restore" ? "outline" : "solid")} name={MESSAGE_FIELDS.kind} value={verb} pendingLabel="Saving">
           {VERB_LABEL[verb]}
         </SubmitButton>
       )}
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }
@@ -165,8 +187,8 @@ function AssignForm({
           options={[{ value: "", label: "Unassigned" }, ...options.map((person) => ({ value: person.id, label: person.name || person.email }))]}
         />
       </label>
-      <SubmitButton className={quiet} pendingLabel="Saving">Assign</SubmitButton>
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <SubmitButton className={buttonClass("solid")} pendingLabel="Saving">Assign</SubmitButton>
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }
@@ -196,8 +218,8 @@ function NoteForm({
         Note
         <textarea className={area} name={MESSAGE_FIELDS.body} maxLength={4000} value={body} onChange={(event) => setBody(event.target.value)} />
       </label>
-      <SubmitButton className={pill} pendingLabel="Saving">Save note</SubmitButton>
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <SubmitButton className={buttonClass("primary")} pendingLabel="Saving">Save note</SubmitButton>
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }

@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmBulkAction, previewBulkAction } from "@/app/admin/(console)/records/actions";
 import { AdminSelect } from "@/components/admin/AdminSelect";
-import { focusRing, pill, quiet } from "@/components/admin/marks";
+import { Button, buttonClass } from "@/components/admin/Button";
+import { RecordCell } from "@/components/admin/RecordCell";
+import { ResultLine } from "@/components/admin/ResultLine";
 import type { RecordRow } from "@/lib/admin/records";
+import { languageLabel } from "@/lib/admin/labels";
 import type { ConfirmMove } from "@/lib/sync";
 
 const MOVES: readonly { readonly move: ConfirmMove; readonly label: string }[] = [
@@ -123,7 +126,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="border-t border-black/10 py-2 pr-4">
+                  <td className="border-t border-black/10 py-3 pr-4">
                     <input
                       type="checkbox"
                       aria-label={`Select ${row.cells[0] ?? "applicant"}`}
@@ -132,8 +135,12 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
                     />
                   </td>
                   {row.cells.map((cell, index) => (
-                    <td key={`${row.id}-${index}`} className="border-t border-black/10 py-2 pr-4">
-                      {index === 0 && row.href ? <Link className={`font-semibold underline ${focusRing}`} href={row.href}>{cell}</Link> : cell}
+                    <td key={`${row.id}-${index}`} className="border-t border-black/10 py-3 pr-4">
+                      {index === 0 && row.href ? (
+                        <Link className={buttonClass("outline", "sm")} href={row.href}>
+                          <RecordCell list="applicants" header={headers[index] ?? ""} value={cell} />
+                        </Link>
+                      ) : <RecordCell list="applicants" header={headers[index] ?? ""} value={cell} />}
                     </td>
                   ))}
                 </tr>
@@ -153,16 +160,16 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
           />
         </label>
         <div className="flex flex-wrap gap-2">
-          <button className={quiet} type="button" onClick={onPreview} disabled={pending || picked.length === 0}>Preview counts</button>
-          <button className={pill} type="button" onClick={onConfirm} disabled={!ready || pending}>Confirm</button>
+          <Button variant="outline" type="button" onClick={onPreview} disabled={pending || picked.length === 0}>Preview counts</Button>
+          <Button variant="primary" type="button" onClick={onConfirm} disabled={!ready || pending}>Confirm</Button>
         </div>
         {counts && previewKey === key ? (
           <p className="text-sm text-black/70">
             {counts.apply} will apply, {counts.stale} are out of date, {counts.notAllowed} cannot move, {counts.notFound} were not found.
-            {languages.length > 0 ? ` ${languages.map((item) => `${item.language} ${item.apply}`).join(", ")}.` : ""}
+            {languages.length > 0 ? ` ${languages.map((item) => `${languageLabel(item.language)} ${item.apply}`).join(", ")}.` : ""}
           </p>
         ) : null}
-        {notice ? <p className="text-sm">{notice}</p> : null}
+        <ResultLine message={notice} tone="warn" />
         {results.length > 0 ? (
           <ul className="grid gap-1 text-sm">
             {results.map((row) => <li key={row.applicantId}>{RESULT[row.result] ?? row.result}</li>)}

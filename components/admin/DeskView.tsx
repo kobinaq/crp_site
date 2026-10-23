@@ -1,9 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
 import { AdminSelect } from "@/components/admin/AdminSelect";
-import { area, card, pill, quiet } from "@/components/admin/marks";
+import { Button } from "@/components/admin/Button";
+import { EmailLine } from "@/components/admin/EmailLine";
+import { RecordChrome } from "@/components/admin/RecordChrome";
+import { ResultLine } from "@/components/admin/ResultLine";
+import { When } from "@/components/admin/When";
+import { area, card } from "@/components/admin/marks";
+import { intakeLabel, languageLabel, trackLabel } from "@/lib/admin/labels";
 import type { DeskDetail } from "@/lib/desk/case";
 
 type DeskFormState =
@@ -33,42 +38,51 @@ const RESULT: Record<NonNullable<DeskFormState>["result"], string> = {
 
 export function DeskView({
   detail,
+  listHref,
+  backLabel,
+  previous,
+  next,
   noteId,
   noteAction,
   moveAction,
   assignAction,
 }: {
   detail: DeskDetail;
+  listHref: string;
+  backLabel: string;
+  previous: string | null;
+  next: string | null;
   noteId: string;
   noteAction: DeskAction;
   moveAction: DeskAction;
   assignAction: DeskAction;
 }) {
-  const back = detail.desk === "nomination" ? "/admin/records?list=nominations" : "/admin/records?list=partners";
-  const backLabel = detail.desk === "nomination" ? "Nominations" : "Partner inquiries";
   const options = detail.assignee && !detail.assignees.some((person) => person.id === detail.assignee?.id)
     ? [...detail.assignees, detail.assignee]
     : detail.assignees;
   return (
     <div className="grid gap-6">
-      <div>
-        <Link className={quiet} href={back}>{backLabel}</Link>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight">{detail.heading}</h1>
-        <p className="mt-2 text-sm text-black/70">{detail.statusLabel}</p>
-      </div>
+      <RecordChrome
+        backHref={listHref}
+        backLabel={backLabel}
+        title={detail.heading}
+        previous={previous}
+        next={next}
+        meta={<p className="text-sm font-semibold">{detail.statusLabel}</p>}
+      />
       <section className={card}>
         <h2 className="text-lg font-semibold">Record</h2>
         <dl className="mt-4 grid gap-4 desk:grid-cols-2">
           {detail.fields.map((item) => (
             <div key={item.label}>
               <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{item.label}</dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">{item.value || "Not given"}</dd>
+              <dd className="mt-1 whitespace-pre-wrap text-sm">{fieldValue(item.label, item.value)}</dd>
             </div>
           ))}
         </dl>
       </section>
       {detail.moves.length > 0 ? (
-        <section className={card}>
+        <section className={`${card} desk:sticky desk:top-36 desk:z-10`}>
           <h2 className="text-lg font-semibold">Status</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             {detail.moves.map((move) => (
@@ -88,7 +102,7 @@ export function DeskView({
           <div className="mt-4 grid gap-3">
             {detail.notes.map((note) => (
               <article key={note.id} className="rounded-3xl bg-cream px-4 py-3">
-                <p className="text-sm font-semibold">{note.authorName} · {note.createdAt}</p>
+                <p className="text-sm font-semibold">{note.authorName} · <When stamp={note.createdAt} /></p>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{note.body}</p>
               </article>
             ))}
@@ -98,6 +112,16 @@ export function DeskView({
       </section>
     </div>
   );
+}
+
+function fieldValue(label: string, value: string) {
+  if (!value) return "Not given";
+  if (label.toLowerCase().includes("email")) return <EmailLine email={value} />;
+  if (label === "Created") return <When stamp={value} />;
+  if (label === "Intake status") return intakeLabel(value);
+  if (label === "Track") return trackLabel(value);
+  if (label === "Locale" || label === "Language") return languageLabel(value);
+  return value;
 }
 
 function NoteForm({ detail, noteId, action }: { detail: DeskDetail; noteId: string; action: DeskAction }) {
@@ -116,8 +140,8 @@ function NoteForm({ detail, noteId, action }: { detail: DeskDetail; noteId: stri
         Note
         <textarea className={area} name="body" maxLength={4000} value={body} onChange={(event) => setBody(event.target.value)} />
       </label>
-      <button className={pill} type="submit" disabled={pending}>{pending ? "Saving" : "Save note"}</button>
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <Button variant="primary" type="submit" disabled={pending}>{pending ? "Saving" : "Save note"}</Button>
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }
@@ -137,8 +161,8 @@ function MoveButton({
       <input type="hidden" name="recordId" value={detail.recordId} />
       <input type="hidden" name="expected" value={detail.status} />
       <input type="hidden" name="to" value={move.to} />
-      <button className={quiet} type="submit" disabled={pending}>{pending ? "Saving" : move.label}</button>
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <Button variant={move.to === "closed" || move.to === "declined" ? "danger" : "solid"} type="submit" disabled={pending}>{pending ? "Saving" : move.label}</Button>
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }
@@ -165,8 +189,8 @@ function AssignForm({
           options={[{ value: "", label: "Unassigned" }, ...options.map((person) => ({ value: person.id, label: person.name || person.email }))]}
         />
       </label>
-      <button className={quiet} type="submit" disabled={pending}>{pending ? "Saving" : "Assign"}</button>
-      {state ? <p className="text-sm">{RESULT[state.result]}</p> : null}
+      <Button variant="solid" type="submit" disabled={pending}>{pending ? "Saving" : "Assign"}</Button>
+      <ResultLine message={state ? RESULT[state.result] : null} tone={state?.result === "saved" ? "ok" : "warn"} />
     </form>
   );
 }

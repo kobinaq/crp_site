@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { markReviewedCopy, updateCopy } from "@/app/admin/(console)/copy/actions";
 import { CopyEditor, HiddenScope } from "@/components/admin/CopyEditor";
-import { card, field, focusRing, pill, quiet } from "@/components/admin/marks";
+import { Button, buttonClass } from "@/components/admin/Button";
+import { card, field, focusRing } from "@/components/admin/marks";
 import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { lineDiff } from "@/lib/copy/diff";
 import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
@@ -59,9 +60,9 @@ export function CopyDesk({
         {error && ERRORS[error] ? <p className="mt-3 text-sm font-semibold text-magenta">{ERRORS[error]}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link className={scopeAll ? pill : quiet} href={deskHref({ all: true, review: needsReview, q: query })}>All catalogs</Link>
+        <Button variant={scopeAll ? "solid" : "outline"} href={deskHref({ all: true, review: needsReview, q: query })}>All catalogs</Button>
         {catalogIds().map((id) => (
-          <Link key={id} className={!scopeAll && id === catalog ? pill : quiet} href={deskHref({ catalog: id, review: needsReview, q: query })}>{CATALOGS[id].label}</Link>
+          <Button key={id} variant={!scopeAll && id === catalog ? "solid" : "outline"} href={deskHref({ catalog: id, review: needsReview, q: query })}>{CATALOGS[id].label}</Button>
         ))}
       </div>
       <form className="flex flex-wrap gap-2" action="/admin/copy">
@@ -70,10 +71,10 @@ export function CopyDesk({
         {selected ? <input type="hidden" name="key" value={selected.key} /> : null}
         <label className="sr-only" htmlFor="copy-filter">Filter copy</label>
         <input id="copy-filter" key={query} name="q" defaultValue={query} placeholder="Key or any language" autoComplete="off" className={`${field} max-w-md`} />
-        <SubmitButton className={quiet} pendingLabel="Filtering">Filter</SubmitButton>
-        <Link className={needsReview ? pill : quiet} href={deskHref({ catalog: scopeAll ? undefined : catalog, all: scopeAll, review: !needsReview, q: query, key: selected?.key })}>
+        <SubmitButton className={buttonClass("outline")} pendingLabel="Filtering">Filter</SubmitButton>
+        <Button variant={needsReview ? "solid" : "outline"} href={deskHref({ catalog: scopeAll ? undefined : catalog, all: scopeAll, review: !needsReview, q: query, key: selected?.key })}>
           {needsReview ? "Showing needs review" : "Needs review"}
-        </Link>
+        </Button>
       </form>
       {needsReview && staleCells.length > 0 ? (
         <form action={markReviewedCopy} className={`${card} grid gap-3`}>
@@ -88,7 +89,7 @@ export function CopyDesk({
             </span>
           ))}
           <HiddenScope catalog={catalog} scopeAll={scopeAll} query={query} needsReview={needsReview} copyKey={selected?.key} />
-          <SubmitButton className={pill} pendingLabel="Saving">Mark these reviewed</SubmitButton>
+          <SubmitButton className={buttonClass("primary")} pendingLabel="Saving">Mark these reviewed</SubmitButton>
         </form>
       ) : null}
       <div className="grid items-start gap-6 desk:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]">
@@ -168,7 +169,7 @@ function History({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="base" value={base} />
                 <input type="hidden" name="revision" value={item.revision} />
-                <ConfirmSubmit className={quiet} name="intent" value="restore" pendingLabel="Restoring" title="Restore this revision?" message="This language is published again from the revision you picked." confirmLabel="Restore">Restore</ConfirmSubmit>
+                <ConfirmSubmit className={buttonClass("outline")} name="intent" value="restore" pendingLabel="Restoring" title="Restore this revision?" message="This language is published again from the revision you picked." confirmLabel="Restore">Restore</ConfirmSubmit>
               </form>
             </li>
           );

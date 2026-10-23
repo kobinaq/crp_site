@@ -439,6 +439,9 @@ test("desk controls stay hidden when the viewer cannot use them, and the form do
       useLayoutEffect: () => {},
     },
     "next/link": (props) => ({ type: "a", props }),
+    "next/navigation": {
+      useRouter: () => ({ push() {}, refresh() {}, replace() {} }),
+    },
   });
   const { DeskView } = viewLoad("components/admin/DeskView.tsx");
   const detail = {
@@ -455,7 +458,7 @@ test("desk controls stay hidden when the viewer cannot use them, and the form do
     notes: [],
     fields: [{ label: "Intake status", value: "new" }],
   };
-  const actions = { noteAction() {}, moveAction() {}, assignAction() {} };
+  const actions = { noteAction() {}, moveAction() {}, assignAction() {}, listHref: "/admin/records?list=nominations", backLabel: "Back to nominations", previous: null, next: null };
   const reviewer = DeskView({ detail, noteId: "note-1", ...actions });
   const reviewerNames = fieldNames(reviewer);
   assert.equal(reviewerNames.includes("desk"), false);

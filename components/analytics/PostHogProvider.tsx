@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { hasConsent, onConsentChange } from "@/lib/consent";
 import { DEFAULT_POSTHOG_HOST, analyticsEnvironment, createAnalytics } from "@/lib/analytics";
 
@@ -18,8 +19,13 @@ let analytics: ReturnType<typeof createAnalytics> | null = null;
  * Must sit inside ConsentProvider. See lib/analytics.ts.
  */
 export function PostHogProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   useEffect(() => {
     if (!KEY) return;
+    if (pathname.startsWith("/admin")) {
+      if (analytics) void analytics.sync(false);
+      return;
+    }
     analytics ??= createAnalytics({
       key: KEY,
       host: HOST,
@@ -29,7 +35,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     const controller = analytics;
     if (hasConsent("analytics")) void controller.sync(true);
     return onConsentChange((consent) => void controller.sync(consent.choices.analytics));
-  }, []);
+  }, [pathname]);
 
   return <>{children}</>;
 }
