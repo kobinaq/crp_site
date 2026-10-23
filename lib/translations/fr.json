@@ -132,6 +132,11 @@
     "send": "Envoyer",
     "sent": "Nous avons bien reçu votre message.",
     "invalid": "Vérifiez les champs et réessayez.",
+    "nameInvalid": "Saisissez un nom de 2 à 200 caractères.",
+    "organizationInvalid": "L'organisation ne doit pas dépasser 200 caractères.",
+    "emailInvalid": "Saisissez une adresse e-mail valide.",
+    "mobileInvalid": "Saisissez un numéro mobile de 6 à 15 chiffres.",
+    "messageInvalid": "Écrivez un message de 3 à 4 000 caractères.",
     "turnstile": "La vérification n'a pas abouti. Réessayez.",
     "rateLimited": "Vous avez envoyé plusieurs messages. Réessayez plus tard.",
     "failed": "Le message n'a pas été envoyé. Réessayez."

@@ -126,6 +126,25 @@ test("public fields reject a short name, a long body, an unknown dial, and a sho
   assert.equal(model.parseContactBody("  hello "), "hello");
   assert.equal(model.parseContactBody("y".repeat(4000)).length, 4000);
 
+  // Code points, the way Postgres char_length counts, not UTF-16 units.
+  const astral = "\u{1F600}";
+  assert.equal(model.charLength(astral), 1);
+  assert.equal(model.charLength("e\u0301"), 2);
+  assert.equal(model.parseContactName(astral), null);
+  assert.equal(model.parseContactName(` ${astral} `), null);
+  assert.equal(model.parseContactName(astral + astral), astral + astral);
+  assert.equal(model.parseContactName(astral.repeat(200)), astral.repeat(200));
+  assert.equal(model.parseContactName(astral.repeat(201)), null);
+  assert.equal(model.parseContactName("Ada\u0000"), null);
+  assert.equal(model.parseContactBody(astral.repeat(4000)), astral.repeat(4000));
+  assert.equal(model.parseContactBody(astral.repeat(4001)), null);
+  assert.equal(model.parseContactBody(astral.repeat(2)), null);
+  assert.equal(model.parseContactBody(astral.repeat(3)), astral.repeat(3));
+  assert.deepEqual(model.parseOrganization(astral.repeat(200)), { ok: true, value: astral.repeat(200) });
+  assert.equal(model.parseOrganization(astral.repeat(201)).ok, false);
+  assert.equal(model.parseNoteBody(astral.repeat(4000)), astral.repeat(4000));
+  assert.equal(model.parseNoteBody(astral.repeat(4001)), null);
+
   assert.equal(model.parseDial("+999", dials), null);
   assert.equal(model.parseDial("1", dials), null);
   assert.equal(model.parseDial("+12345", ["+12345"]), null);

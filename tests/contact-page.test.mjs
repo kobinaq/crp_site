@@ -22,6 +22,11 @@ const copy = {
     turnstile: "The check did not complete. Try again.",
     rateLimited: "You've sent several messages. Try again later.",
     failed: "The message did not send. Try again.",
+    nameInvalid: "Enter a name of 2 to 200 characters.",
+    organizationInvalid: "Keep the organization to 200 characters or fewer.",
+    emailInvalid: "Enter a valid email address.",
+    mobileInvalid: "Enter a mobile number of 6 to 15 digits.",
+    messageInvalid: "Write a message of 3 to 4,000 characters.",
   },
 };
 
@@ -112,4 +117,43 @@ test("a thrown submit shows the failure line and remounts Turnstile", async () =
   tree = render();
   assert.equal(find(tree, (node) => node.props?.role === "alert").props.children, copy.contactPage.failed);
   assert.notEqual(find(tree, (node) => node.type === Turnstile).key, widgetKey);
+});
+
+test("an emoji-only name keeps Send disabled and shows the name error after blur", () => {
+  const { find, render } = page(async () => ({ ok: true }));
+  let tree = render();
+  fill(find, tree);
+  find(tree, (node) => node.props?.name === "name").props.onChange({ target: { value: "\u{1F600}" } });
+  tree = render();
+  assert.equal(find(tree, (node) => node.type === "button").props.disabled, true);
+  assert.equal(find(tree, (node) => node.props?.id === "contact-name-error"), undefined);
+  find(tree, (node) => node.props?.name === "name").props.onBlur();
+  tree = render();
+  const input = find(tree, (node) => node.props?.name === "name");
+  assert.equal(input.props["aria-invalid"], true);
+  assert.equal(input.props["aria-describedby"], "contact-name-error");
+  assert.equal(find(tree, (node) => node.props?.id === "contact-name-error").props.children, copy.contactPage.nameInvalid);
+
+  find(tree, (node) => node.props?.name === "name").props.onChange({ target: { value: "\u{1F600}\u{1F600}" } });
+  tree = render();
+  assert.equal(find(tree, (node) => node.props?.id === "contact-name-error"), undefined);
+  assert.equal(find(tree, (node) => node.type === "button").props.disabled, false);
+});
+
+test("a server field error shows under that field instead of the generic line", async () => {
+  const { find, render } = page(async () => ({ ok: false, reason: "invalid", fields: ["name", "message"] }));
+  let tree = render();
+  fill(find, tree);
+  tree = render();
+  await find(tree, (node) => node.type === "form").props.onSubmit(submitEvent());
+  tree = render();
+  assert.equal(find(tree, (node) => node.props?.role === "alert"), undefined);
+  assert.equal(find(tree, (node) => node.props?.id === "contact-name-error").props.children, copy.contactPage.nameInvalid);
+  assert.equal(find(tree, (node) => node.props?.id === "contact-message-error").props.children, copy.contactPage.messageInvalid);
+  assert.equal(find(tree, (node) => node.props?.name === "message").props["aria-invalid"], true);
+
+  find(tree, (node) => node.props?.name === "name").props.onChange({ target: { value: "Ada L" } });
+  tree = render();
+  assert.equal(find(tree, (node) => node.props?.id === "contact-name-error"), undefined);
+  assert.ok(find(tree, (node) => node.props?.id === "contact-message-error"));
 });
