@@ -6,9 +6,12 @@ import { useLayoutEffect, useRef } from "react";
  * Shrinks an element's font size (from its CSS size, never above it) until its
  * widest word fits its own width. Display headings use fixed type, so longer
  * translated words ("PARTENAIRE", "d'ambassadeurs") would otherwise run past
- * the edge instead of wrapping. Nothing changes while the text already fits.
+ * the edge instead of wrapping. Nothing changes while the text already fits
+ * (within 1%, so sub-pixel or tracking overhangs in the English stay as they are).
+ *
+ * `room` overrides the width to fit into; by default it is the element's own width.
  */
-export function useFitText<T extends HTMLElement>(text: string) {
+export function useFitText<T extends HTMLElement>(text: string, room?: (el: T) => number) {
   const ref = useRef<T>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -16,21 +19,26 @@ export function useFitText<T extends HTMLElement>(text: string) {
     const fit = () => {
       el.style.fontSize = "";
       if (!el.clientWidth) return; // display:none at this breakpoint
+      const width = room ? room(el) : el.clientWidth;
       let px = parseFloat(getComputedStyle(el).fontSize);
-      for (let i = 0; i < 6 && el.scrollWidth > el.clientWidth + 0.5; i++) {
-        px = Math.floor(px * Math.min(0.98, el.clientWidth / el.scrollWidth) * 10) / 10;
+      for (let i = 0; i < 6 && el.scrollWidth > width * 1.01; i++) {
+        px = Math.floor(px * Math.min(0.98, width / el.scrollWidth) * 10) / 10;
         el.style.fontSize = `${px}px`;
       }
     };
     fit();
     const observer = new ResizeObserver(fit);
     if (el.parentElement) observer.observe(el.parentElement);
+    if (room) window.addEventListener("resize", fit);
     let live = true;
     void document.fonts?.ready.then(() => live && fit());
     return () => {
       live = false;
       observer.disconnect();
+      if (room) window.removeEventListener("resize", fit);
     };
+    // `room` is a module-level function at each call site.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
   return ref;
 }
