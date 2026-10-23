@@ -9,6 +9,8 @@ import { DateField } from "../apply/DateField";
 import { FormShell } from "../apply/FormShell";
 import { FormRadioCard } from "../apply/FormRadioCard";
 import { ContinueButton } from "../apply/ContinueButton";
+import { NOMINATE_DRAFT, asCountry, asNullable, asOneOf, asText } from "@/lib/formDraft";
+import { useDraftState } from "@/lib/useFormDraft";
 import { FIELD, FIELD_M, PLACEHOLDER, PLACEHOLDER_M } from "../apply/fieldStyles";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,16 +36,17 @@ export function NomineeStep({
   initial?: Partial<NomineeData>;
 }) {
   const tr = useText();
-  const [name, setName] = useState(initial?.nomineeName ?? "");
-  const [email, setEmail] = useState(initial?.nomineeEmail ?? "");
-  const [dob, setDob] = useState(initial?.nomineeDob ?? "");
+  // Typed answers live in the session draft so they survive a language switch.
+  const [name, setName] = useDraftState(NOMINATE_DRAFT, "nominee.name", initial?.nomineeName ?? "", asText);
+  const [email, setEmail] = useDraftState(NOMINATE_DRAFT, "nominee.email", initial?.nomineeEmail ?? "", asText);
+  const [dob, setDob] = useDraftState(NOMINATE_DRAFT, "nominee.dob", initial?.nomineeDob ?? "", asText);
   const [emailTouched, setEmailTouched] = useState(false);
-  const [dialCountry, setDialCountry] = useState<Country>(GHANA);
-  const [mobile, setMobile] = useState("");
-  const [nationality, setNationality] = useState<Country | null>(null);
-  const [basedIn, setBasedIn] = useState<Country | null>(null);
+  const [dialCountry, setDialCountry] = useDraftState<Country>(NOMINATE_DRAFT, "nominee.dialCountry", GHANA, asCountry);
+  const [mobile, setMobile] = useDraftState(NOMINATE_DRAFT, "nominee.mobile", "", asText);
+  const [nationality, setNationality] = useDraftState<Country | null>(NOMINATE_DRAFT, "nominee.nationality", null, asNullable(asCountry));
+  const [basedIn, setBasedIn] = useDraftState<Country | null>(NOMINATE_DRAFT, "nominee.basedIn", null, asNullable(asCountry));
   // No default track (Figma 2308:9574): the nominee's program must be chosen explicitly.
-  const [track, setTrack] = useState<"in_person" | "online" | null>(initial?.track ?? null);
+  const [track, setTrack] = useDraftState<"in_person" | "online" | null>(NOMINATE_DRAFT, "nominee.track", initial?.track ?? null, asNullable(asOneOf(["in_person", "online"] as const)));
   const [trackError, setTrackError] = useState(false);
   const chooseTrack = (t: "in_person" | "online") => {
     setTrack(t);
