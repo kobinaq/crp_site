@@ -646,7 +646,7 @@ test("bulk confirm returns applied, stale, and not_allowed, and only the applied
   assert.deepEqual(tooMany, { ok: false, reason: "invalid" });
 });
 
-test("a reviewer can save scores, a note, and a recommendation, and confirm is forbidden", async () => {
+test("a reviewer can save scores, a note, and a recommendation, and confirm decisions as themselves", async () => {
   const reviewer = await insertUser("reviewer", "Rae Reviewer");
   const editor = await insertUser("editor", "Ed Editor");
   const applicant = await insertApplicant();
@@ -669,7 +669,8 @@ test("a reviewer can save scores, a note, and a recommendation, and confirm is f
   const { STATUSES, can } = { ...mod("lib/lifecycle.ts"), ...mod("lib/staff/roles.ts") };
   for (const status of STATUSES) assert.equal(needsDecision(status), status === "under_review" || status === "accepted");
   assert.equal(can("reviewer", "reviews.write"), true);
-  assert.equal(can("reviewer", "decisions.confirm"), false);
+  assert.equal(can("reviewer", "decisions.confirm"), true);
+  assert.equal(can("reviewer", "reviews.assign"), false);
   assert.equal(can("editor", "reviews.write"), false);
   assert.equal(can("editor", "reviews.assign"), false);
   assert.equal(can("editor", "decisions.confirm"), false);
@@ -715,11 +716,53 @@ test("a reviewer can save scores, a note, and a recommendation, and confirm is f
   form.set("field", "reviewDecision");
   form.set("value", "accept");
   form.set("to", "accepted");
-  const refused = await mod("app/admin/(console)/records/applicants/[id]/actions.ts").confirmDecisionAction(null, form);
-  assert.deepEqual(refused, { result: "forbidden" });
-  session.raw = "";
+  const actions = mod("app/admin/(console)/records/applicants/[id]/actions.ts");
+  const preview = await actions.previewDecisionAction({
+    applicantId: applicant.id,
+    move: { field: "reviewDecision", value: "accept", to: "accepted" },
+  });
+  assert.equal(preview.result, "ready");
+  assert.equal(preview.to, applicant.email);
+  await assert.rejects(actions.confirmDecisionAction(null, form), /redirect /);
   const after = await applicantRow(applicant.id);
-  assert.equal(after.status, "under_review");
-  assert.equal(after.version, before.version);
-  assert.equal((await jobs(applicant.id)).length, 0);
+  assert.equal(after.status, "accepted");
+  assert.equal(after.version, before.version + 1);
+  assert.equal((await jobs(applicant.id)).length, 1);
+  const [receipt] = await receipts(applicant.id);
+  assert.equal(receipt.origin, "staff");
+  assert.equal(receipt.staff_user_id, reviewer.id);
+  const events = await sql.query(
+    "select actor, actor_staff_id from application_events where applicant_id = $1 and to_status = 'accepted'",
+    [applicant.id],
+  );
+  assert.equal(events.rows[0].actor_staff_id, reviewer.id);
+  const audit = await sql.query(
+    "select actor_id from admin_events where kind = 'decision.confirmed' and detail->>'applicantId' = $1",
+    [applicant.id],
+  );
+  assert.deepEqual(audit.rows.map((row) => row.actor_id), [reviewer.id]);
+
+  // Interview outcome in bulk, with its preview, also as the reviewer.
+  const bulk = mod("app/admin/(console)/records/actions.ts");
+  const accepted = await applicantRow(applicant.id);
+  const move = { field: "interviewOutcome", value: "yes", to: "interview_yes" };
+  const seen = { applicantId: applicant.id, version: accepted.version, reviewCycle: accepted.review_cycle };
+  const bulkPreview = await bulk.previewBulkAction({ move, rows: [seen] });
+  assert.equal(bulkPreview.result, "ready");
+  assert.equal(bulkPreview.preview.counts.apply, 1);
+  const done = await bulk.confirmBulkAction({ move, rows: [{ ...seen, decisionId: randomUUID() }] });
+  assert.deepEqual(done.rows.map((row) => row.result), ["applied"]);
+  assert.equal((await applicantRow(applicant.id)).status, "interview_yes");
+  const interview = await sql.query(
+    "select actor_staff_id from application_events where applicant_id = $1 and to_status = 'interview_yes'",
+    [applicant.id],
+  );
+  assert.equal(interview.rows[0].actor_staff_id, reviewer.id);
+
+  // Reviewers still cannot assign reviewers.
+  const assign = new FormData();
+  assign.set("applicantId", applicant.id);
+  assign.set("assigneeId", reviewer.id);
+  assert.deepEqual(await actions.assignReviewAction(null, assign), { result: "forbidden" });
+  session.raw = "";
 });

@@ -22,11 +22,11 @@ export async function previewBulkAction(input: unknown): Promise<
   | { readonly result: "forbidden" | "invalid" }
   | { readonly result: "ready"; readonly preview: BulkPreview }
 > {
-  const admin = await assertStaffAction("decisions.confirm");
-  if (!admin) return { result: "forbidden" };
+  const decider = await assertStaffAction("decisions.confirm");
+  if (!decider) return { result: "forbidden" };
   const parsed = z.object({ move: moveSchema, rows: z.array(seenRow) }).safeParse(input);
   if (!parsed.success) return { result: "invalid" };
-  const preview = await previewBulk(getDb(), admin, parsed.data);
+  const preview = await previewBulk(getDb(), decider, parsed.data);
   if ("ok" in preview) return { result: "invalid" };
   return { result: "ready", preview };
 }
@@ -35,14 +35,14 @@ export async function confirmBulkAction(input: unknown): Promise<
   | { readonly result: "forbidden" | "invalid" }
   | { readonly result: "done"; readonly rows: { readonly applicantId: string; readonly result: string }[] }
 > {
-  const admin = await assertStaffAction("decisions.confirm");
-  if (!admin) return { result: "forbidden" };
+  const decider = await assertStaffAction("decisions.confirm");
+  if (!decider) return { result: "forbidden" };
   const parsed = z.object({
     move: moveSchema,
     rows: z.array(seenRow.extend({ decisionId: z.uuid() })),
   }).safeParse(input);
   if (!parsed.success) return { result: "invalid" };
-  const confirmed = await confirmBulk(getDb(), admin, parsed.data);
+  const confirmed = await confirmBulk(getDb(), decider, parsed.data);
   if ("ok" in confirmed) return { result: "invalid" };
   revalidatePath("/admin/records");
   return { result: "done", rows: confirmed.rows.map((row) => ({ applicantId: row.applicantId, result: row.result })) };

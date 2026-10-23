@@ -64,18 +64,18 @@ export async function previewDecisionAction(input: unknown): Promise<
   | { readonly result: "forbidden" | "invalid" | "not_found" | "not_allowed" }
   | { readonly result: "ready"; readonly to: string; readonly subject: string; readonly html: string; readonly toStatus: string }
 > {
-  const admin = await assertStaffAction("decisions.confirm");
-  if (!admin) return { result: "forbidden" };
+  const decider = await assertStaffAction("decisions.confirm");
+  if (!decider) return { result: "forbidden" };
   const parsed = z.object({ applicantId: z.uuid(), move: moveSchema }).safeParse(input);
   if (!parsed.success) return { result: "invalid" };
-  const preview = await previewDecision(getDb(), admin, parsed.data);
+  const preview = await previewDecision(getDb(), decider, parsed.data);
   if (!preview.ok) return { result: preview.reason };
   return { result: "ready", to: preview.to, subject: preview.subject, html: preview.html, toStatus: preview.toStatus };
 }
 
 export async function confirmDecisionAction(_previous: ConfirmFormState, formData: FormData): Promise<ConfirmFormState> {
-  const admin = await assertStaffAction("decisions.confirm");
-  if (!admin) return { result: "forbidden" };
+  const decider = await assertStaffAction("decisions.confirm");
+  if (!decider) return { result: "forbidden" };
   const applicantId = parseUserId(String(formData.get("applicantId") ?? ""));
   const version = whole(formData.get("version"));
   const reviewCycle = whole(formData.get("reviewCycle"));
@@ -100,7 +100,7 @@ export async function confirmDecisionAction(_previous: ConfirmFormState, formDat
   if (!applicantId || version === null || reviewCycle === null || !z.uuid().safeParse(decisionId).success || !move.success) {
     return { result: "invalid" };
   }
-  const outcome = await confirmDecision(getDb(), admin, {
+  const outcome = await confirmDecision(getDb(), decider, {
     applicantId,
     version,
     reviewCycle,
@@ -108,7 +108,7 @@ export async function confirmDecisionAction(_previous: ConfirmFormState, formDat
     move: move.data,
   });
   if (outcome.result === "applied") {
-    const review = await loadApplicant(getDb(), applicantId, admin, listQuery);
+    const review = await loadApplicant(getDb(), applicantId, decider, listQuery);
     redirect(review?.nextHref ?? recordsHref(listQuery));
   }
   return { result: outcome.result };

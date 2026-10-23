@@ -141,12 +141,12 @@ function actions() {
     ["copy markReviewedCopy", () => action("copy/actions.ts").markReviewedCopy(form()), ["admin", "editor"]],
     ["staff inviteAction", () => action("staff/actions.ts").inviteAction(null, form()), ["admin"]],
     ["staff changeStaffAction", () => action("staff/actions.ts").changeStaffAction(form()), ["admin"]],
-    ["records previewBulkAction", () => action("records/actions.ts").previewBulkAction({}), ["admin"]],
-    ["records confirmBulkAction", () => action("records/actions.ts").confirmBulkAction({}), ["admin"]],
+    ["records previewBulkAction", () => action("records/actions.ts").previewBulkAction({}), ["admin", "reviewer"]],
+    ["records confirmBulkAction", () => action("records/actions.ts").confirmBulkAction({}), ["admin", "reviewer"]],
     ["applicant saveReviewAction", () => action("records/applicants/[id]/actions.ts").saveReviewAction(null, form()), ["admin", "reviewer"]],
     ["applicant assignReviewAction", () => action("records/applicants/[id]/actions.ts").assignReviewAction(null, form()), ["admin"]],
-    ["applicant previewDecisionAction", () => action("records/applicants/[id]/actions.ts").previewDecisionAction({}), ["admin"]],
-    ["applicant confirmDecisionAction", () => action("records/applicants/[id]/actions.ts").confirmDecisionAction(null, form()), ["admin"]],
+    ["applicant previewDecisionAction", () => action("records/applicants/[id]/actions.ts").previewDecisionAction({}), ["admin", "reviewer"]],
+    ["applicant confirmDecisionAction", () => action("records/applicants/[id]/actions.ts").confirmDecisionAction(null, form()), ["admin", "reviewer"]],
     ["nomination addNominationNote", () => action("records/nominations/[id]/actions.ts").addNominationNote(null, form()), ["admin", "reviewer"]],
     ["nomination moveNomination", () => action("records/nominations/[id]/actions.ts").moveNomination(null, form()), ["admin"]],
     ["nomination assignNomination", () => action("records/nominations/[id]/actions.ts").assignNomination(null, form()), ["admin"]],
@@ -208,6 +208,25 @@ test("VideoAsk answers open for admins and reviewers; identity documents for adm
   }
 });
 
+test("reviewers see the decision controls; editors never reach them", async () => {
+  const outcome = {};
+  for (const role of ROLES) {
+    outcome[role] = await as(role, async () => {
+      const element = await page("records/applicants/[id]/page.tsx")(props({ id: ids.applicant }));
+      const records = await page("records/page.tsx")(props({}, { list: "applicants" }));
+      return {
+        canConfirm: element.props.canConfirm,
+        canAssign: element.props.canAssign,
+        bulk: records.props.canConfirm,
+        exportable: records.props.exportable,
+      };
+    });
+  }
+  assert.deepEqual(outcome.admin, { canConfirm: true, canAssign: true, bulk: true, exportable: true });
+  assert.deepEqual(outcome.reviewer, { canConfirm: true, canAssign: false, bulk: true, exportable: false });
+  assert.equal(outcome.editor, "not found");
+});
+
 test("nav, home and not-found offer each role only what it can open", () => {
   const { consoleAreas } = load("lib/admin/access.ts");
   const { readableLists } = load("lib/admin/records.ts");
@@ -226,7 +245,7 @@ test("the capability matrix", () => {
     "applicants.read": ["admin", "reviewer"],
     "reviews.write": ["admin", "reviewer"],
     "reviews.assign": ["admin"],
-    "decisions.confirm": ["admin"],
+    "decisions.confirm": ["admin", "reviewer"],
     "nominations.read": ["admin", "reviewer"],
     "nominations.note": ["admin", "reviewer"],
     "nominations.manage": ["admin"],
