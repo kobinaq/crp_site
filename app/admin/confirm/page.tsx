@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/admin/Button";
 import { AdminFrame, AuthCard } from "@/components/admin/marks";
-import { completeStaffSignIn } from "./actions";
+import { ConfirmForm } from "./form";
 
-export const metadata: Metadata = { title: "Finish signing in" };
+export const dynamic = "force-dynamic";
 
-export default async function ConfirmPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
-  const { token } = await searchParams;
-  if (!token) redirect("/admin/sign-in?error=link");
+export const metadata: Metadata = { title: "Finish signing in", referrer: "no-referrer" };
+
+// Links now carry the code after "#". Older "?token=" links (15 minutes at
+// most) are not honoured, so the code is never echoed back into a page or URL.
+export default async function ConfirmPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  if (params.token !== undefined) redirect("/admin/sign-in?error=link");
   return (
     <AdminFrame>
       <AuthCard title="Finish signing in">
-        <form action={completeStaffSignIn} className="mt-8">
-          <input type="hidden" name="token" value={token} />
-          <Button variant="primary" type="submit">Finish signing in</Button>
-        </form>
+        <ConfirmForm />
       </AuthCard>
     </AdminFrame>
   );

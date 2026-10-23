@@ -347,7 +347,8 @@ test("an admin invites an editor and cannot remove the last admin", async () => 
   const invited = await inviteStaff(db, actor, { email: editorEmail, role: "editor" });
   assert.equal(invited.kind, "invited");
   assert.equal(invited.mail.kind, "skipped");
-  assert.match(invited.mail.devLink, /\/admin\/confirm\?token=/);
+  assert.match(invited.mail.devLink, /\/admin\/confirm#token=[^&?]+$/);
+  assert.doesNotMatch(invited.mail.devLink, /\?/);
   const resent = await inviteStaff(db, actor, { email: editorEmail, role: "editor" });
   assert.equal(resent.kind, "resent");
   const wrongRole = await inviteStaff(db, actor, { email: editorEmail, role: "reviewer" });

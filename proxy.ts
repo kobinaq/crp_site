@@ -17,6 +17,10 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers } });
   response.headers.set("Content-Language", headers.get("x-site-locale")!);
   if (!isPublic) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (pathname === "/admin/confirm") {
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("Cache-Control", "private, no-store");
+  }
   return response;
 }
 export const config = { matcher: ["/((?!api(?:/|$)|_next/|.*\\.).*)"] };
