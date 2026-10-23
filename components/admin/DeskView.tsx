@@ -61,7 +61,7 @@ export function DeskView({
     ? [...detail.assignees, detail.assignee]
     : detail.assignees;
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <RecordChrome
         backHref={listHref}
         backLabel={backLabel}

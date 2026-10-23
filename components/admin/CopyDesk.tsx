@@ -54,7 +54,7 @@ export function CopyDesk({
   const staleTotal = rows.reduce((sum, row) => sum + row.cells.filter((cell) => cell.state.kind === "stale").length, 0);
   const missingCount = rows.filter((row) => missingLocales(row).length > 0).length;
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Website text</h1>
         {reviewCount > 0 || missingCount > 0 ? (

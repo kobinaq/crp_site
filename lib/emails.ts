@@ -276,7 +276,7 @@ export function staffSignInEmail(link: string, role: keyof typeof STAFF_ROLE | n
   const lines = [
     roleName ? `You are invited as ${roleName}.` : "Sign in to the admin.",
     "This link works once and expires in 15 minutes.",
-    escapeHtml(link),
+    `Button not working? Copy this link into your browser: ${escapeHtml(link)}`,
     "Didn't request this? Ignore this email.",
   ];
   const subject = roleName ? "You're invited to Climate Refugee Pavilion" : "Sign in to Climate Refugee Pavilion";

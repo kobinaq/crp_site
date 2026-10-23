@@ -35,7 +35,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const filtered = filtersAreOpen(data.filters);
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <h1 className="text-3xl font-semibold tracking-tight">Records</h1>
       <nav className="flex flex-wrap gap-2" aria-label="Lists">
         {RECORD_LISTS.map((list) => (

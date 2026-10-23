@@ -17,7 +17,7 @@ function when(value: Date): string {
 export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied: boolean; weeks: readonly WeekCount[] }) {
   const attention = attentionItems(data);
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
         {denied ? <p className="mt-3 text-sm font-semibold text-magenta">You don&apos;t have access to that page.</p> : null}

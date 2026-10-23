@@ -14,7 +14,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const page = await loadActivity(getDb(), parseActivityCursor(params.at, params.id));
   const next = page.next ? `/admin/activity?at=${encodeURIComponent(page.next.at)}&id=${encodeURIComponent(page.next.id)}` : null;
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Activity</h1>
       </div>
@@ -41,9 +41,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
             </table>
           </div>
         )}
-        <div className="mt-4">
-          {next ? <Button href={next} variant="outline">Older</Button> : <Button variant="outline" disabled>Older</Button>}
-        </div>
+        {next ? (
+          <div className="mt-4">
+            <Button href={next} variant="outline">Older</Button>
+          </div>
+        ) : null}
       </section>
     </div>
   );
