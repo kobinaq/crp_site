@@ -558,3 +558,28 @@ test("a dismissed notice comes back after the message clears and is set again", 
     await view.unmount();
   }
 });
+
+test("the applicant timeline uses status names", async () => {
+  const { ApplicantReviewView } = load("components/admin/ApplicantReviewView.tsx");
+  const review = {
+    ...applicantReview("ayat", 1, "ada"),
+    events: [{ at: "2026-10-22 18:40", actor: "Ada", from: "submitted", to: "under_review", reason: "Opened" }],
+  };
+  const view = await render(React.createElement(ApplicantReviewView, {
+    review,
+    listQuery: emptyList(),
+    canWrite: false,
+    canAssign: false,
+    canConfirm: false,
+    reviewers: [],
+    viewerId: "viewer",
+    noteId: "note",
+    decisionId: "decision",
+  }));
+  try {
+    assert.match(document.body.textContent ?? "", /Submitted to Under review/);
+    assert.doesNotMatch(document.body.textContent ?? "", /under_review/);
+  } finally {
+    await view.unmount();
+  }
+});

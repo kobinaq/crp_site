@@ -100,7 +100,7 @@ export function ApplicantReviewView({
                 {review.events.map((event, index) => (
                   <li key={`${event.at}-${index}`} className="rounded-3xl bg-cream px-4 py-3">
                     <p className="text-sm font-semibold"><When stamp={event.at} /> · {event.actor}</p>
-                    <p className="mt-1 text-sm">{event.from || "start"} to {event.to || "same"}</p>
+                    <p className="mt-1 text-sm">{statusName(event.from, "start")} to {statusName(event.to, "same")}</p>
                     <p className="mt-1 text-sm text-black/70">{event.reason}</p>
                   </li>
                 ))}
@@ -114,6 +114,12 @@ export function ApplicantReviewView({
       </div>
     </div>
   );
+}
+
+function statusName(value: string, empty: string): string {
+  if (!value) return empty;
+  if (Object.hasOwn(STATUS_LABEL, value)) return STATUS_LABEL[value as keyof typeof STATUS_LABEL];
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function words(value: string): string {
