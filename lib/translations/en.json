@@ -132,6 +132,11 @@
     "send": "Send",
     "sent": "We've received your message.",
     "invalid": "Check the fields and try again.",
+    "nameInvalid": "Enter a name of 2 to 200 characters.",
+    "organizationInvalid": "Keep the organization to 200 characters or fewer.",
+    "emailInvalid": "Enter a valid email address.",
+    "mobileInvalid": "Enter a mobile number of 6 to 15 digits.",
+    "messageInvalid": "Write a message of 3 to 4,000 characters.",
     "turnstile": "The check did not complete. Try again.",
     "rateLimited": "You've sent several messages. Try again later.",
     "failed": "The message did not send. Try again."
