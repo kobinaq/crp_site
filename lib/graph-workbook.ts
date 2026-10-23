@@ -58,6 +58,15 @@ function cellValue(value: unknown): Cell {
   return "";
 }
 
+// Excel treats a written string that starts with = + - or @ as a formula, so
+// applicant text such as "=HYPERLINK(...)" would run in reviewers' workbook.
+// A leading apostrophe stores it as plain text; Excel hides the apostrophe and
+// reads it back without it, so a later rewrite guards it again.
+export function workbookText(value: Cell): Cell {
+  if (typeof value !== "string") return value;
+  return /^[\s]*[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 function pad(values: Cell[], length: number): Cell[] {
   const copy = values.slice(0, length);
   while (copy.length < length) copy.push("");
@@ -214,7 +223,7 @@ export async function openGraphWorkbook(config: GraphConfig): Promise<{ workbook
             const start = block.start + 2;
             const end = start + height - 1;
             const address = `A${start}:${columnName(width)}${end}`;
-            const values = block.values.map((row) => pad(row, width).map((value) => value ?? ""));
+            const values = block.values.map((row) => pad(row, width).map((value) => workbookText(value ?? "")));
             await graphFetch(`${worksheetUrl(base, name)}/range(address='${address}')`, token, sessionId, {
               method: "PATCH",
               body: JSON.stringify({ values }),

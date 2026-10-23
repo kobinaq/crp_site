@@ -96,5 +96,18 @@ test("the confirm page sends no referrer and is never cached", () => {
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.equal(response.headers.get("cache-control"), "private, no-store");
   const other = proxy(new NextRequest("https://pavilion.example/admin/sign-in"));
-  assert.equal(other.headers.get("referrer-policy"), null);
+  assert.equal(other.headers.get("referrer-policy"), "same-origin");
+});
+
+test("every staff page refuses to be framed by another site", () => {
+  const { proxy } = load("proxy.ts");
+  const { NextRequest } = load("node_modules/next/server.js");
+  for (const path of ["/admin", "/admin/sign-in", "/admin/confirm", "/admin/records/applicants/x/media/document/y"]) {
+    const response = proxy(new NextRequest(`https://pavilion.example${path}`));
+    assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN", path);
+    assert.equal(response.headers.get("content-security-policy"), "frame-ancestors 'self'", path);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff", path);
+  }
+  const lookalike = proxy(new NextRequest("https://pavilion.example/administrator"));
+  assert.equal(lookalike.headers.get("x-frame-options"), null);
 });
