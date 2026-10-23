@@ -1,6 +1,6 @@
 "use client";
 
-import { locales, localePath, nativeLanguageNames } from "@/lib/locale";
+import { locales, localePath } from "@/lib/locale";
 import { t } from "@/lib/messages";
 import { useLanguage } from "./LanguageProvider";
 

@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { detailHref, recordsHref } from "@/lib/admin/return";
 import { weeklyIntake, type WeekCount } from "@/lib/admin/weeks";
-import { listMessages } from "@/lib/contact/messages";
+import { adjacentMessageIds, listMessages } from "@/lib/contact/messages";
 import { CONTACT_LIST, MESSAGE_LIST_HEADERS, messageCells, messageStatusOptions } from "@/lib/contact/model";
 import { recordEvent } from "@/lib/admin/events";
 import {
@@ -146,15 +147,35 @@ export type ApplicantReview = {
 
 export type ReviewerOption = { readonly id: string; readonly name: string; readonly email: string };
 
-export function applicantHref(id: string, queue: "" | QueueName): string {
-  if (!queue) return `/admin/records/applicants/${id}`;
-  return `/admin/records/applicants/${id}?queue=${encodeURIComponent(queue)}`;
+export function queueListHref(queue: "" | QueueName): string {
+  return recordsHref({
+    list: "applicants",
+    q: "",
+    status: "",
+    track: "",
+    language: "",
+    cycle: "",
+    age: "",
+    attention: "",
+    page: 1,
+    queue,
+  });
 }
 
-export function queueListHref(queue: "" | QueueName): string {
-  const params = new URLSearchParams({ list: "applicants" });
-  if (queue) params.set("queue", queue);
-  return `/admin/records?${params.toString()}`;
+function scopeQuery(scope: "" | QueueName | RecordQuery): RecordQuery {
+  if (typeof scope === "object") return { ...scope, list: "applicants" };
+  return {
+    list: "applicants",
+    q: "",
+    status: "",
+    track: "",
+    language: "",
+    cycle: "",
+    age: "",
+    attention: "",
+    page: 1,
+    queue: scope,
+  };
 }
 
 type Sheet = { readonly headers: readonly string[]; readonly rows: readonly (readonly string[])[] };
@@ -290,7 +311,7 @@ export async function loadApplicant(
   db: Db,
   id: string,
   viewer: { readonly id: string; readonly role?: string },
-  queue: "" | QueueName,
+  scope: "" | QueueName | RecordQuery = "",
 ): Promise<ApplicantReview | null> {
   const [row] = await db
     .select({
@@ -331,7 +352,8 @@ export async function loadApplicant(
     .leftJoin(users, eq(users.id, applicants.assignedStaffId))
     .where(eq(applicants.id, id));
   if (!row) return null;
-  const [events, positions, notes, conflictRows, previous, next] = await Promise.all([
+  const query = scopeQuery(scope);
+  const [events, positions, notes, conflictRows, neighbors] = await Promise.all([
     db
       .select({
         createdAt: applicationEvents.createdAt,
@@ -380,8 +402,7 @@ export async function loadApplicant(
       .from(sheetConflicts)
       .where(and(eq(sheetConflicts.applicantId, id), eq(sheetConflicts.reviewCycle, row.reviewCycle)))
       .orderBy(desc(sheetConflicts.updatedAt)),
-    neighborId(db, row, viewer, queue, "prev"),
-    neighborId(db, row, viewer, queue, "next"),
+    adjacentDetailHrefs(db, query, { id: row.id, createdAt: row.createdAt }, viewer),
   ]);
   const applicantId = parseApplicantId(row.id);
   const answers = applicantId ? await loadAnswerViews(db, applicantId) : [];
@@ -438,8 +459,8 @@ export async function loadApplicant(
     })),
     conflicts: conflictRows,
     offeredMoves: offeredMoves(row),
-    prevHref: previous ? applicantHref(previous, queue) : null,
-    nextHref: next ? applicantHref(next, queue) : null,
+    prevHref: neighbors.previous,
+    nextHref: neighbors.next,
     events: events.map((event) => ({
       at: stamp(event.createdAt),
       actor: event.staffName || event.staffEmail || event.actor,
@@ -511,7 +532,7 @@ async function messageRows(db: Store, query: RecordQuery, viewer: { readonly rol
     total: listed.total,
     rows: listed.rows.map((row) => ({
       id: row.id,
-      href: row.href,
+      href: row.href ? detailHref(row.href, query) : null,
       cells: messageCells(row, stamp(row.createdAt)),
     })),
   };
@@ -543,24 +564,65 @@ function queueFilter(query: RecordQuery, viewer: { readonly id: string }): SQL |
   return and(eq(applicants.assignedStaffId, viewer.id), needs);
 }
 
-async function neighborId(
+export async function adjacentDetailHrefs(
   db: Db,
-  current: { id: string; createdAt: Date },
+  query: RecordQuery,
+  current: { readonly id: string; readonly createdAt: Date },
   viewer: { readonly id: string },
-  queue: "" | QueueName,
+): Promise<{ readonly previous: string | null; readonly next: string | null }> {
+  const path = detailPath(query.list);
+  if (!path) return { previous: null, next: null };
+  if (query.list === "messages") {
+    const ids = await adjacentMessageIds(db, { q: query.q, status: query.status }, current);
+    return {
+      previous: ids.previous ? detailHref(`${path}/${ids.previous}`, query) : null,
+      next: ids.next ? detailHref(`${path}/${ids.next}`, query) : null,
+    };
+  }
+  const [previous, next] = await Promise.all([
+    stepId(db, query, current, viewer, "prev"),
+    stepId(db, query, current, viewer, "next"),
+  ]);
+  return {
+    previous: previous ? detailHref(`${path}/${previous}`, query) : null,
+    next: next ? detailHref(`${path}/${next}`, query) : null,
+  };
+}
+
+function detailPath(list: RecordList): string | null {
+  if (list === "applicants") return "/admin/records/applicants";
+  if (list === "nominations") return "/admin/records/nominations";
+  if (list === "partners") return "/admin/records/partners";
+  if (list === "messages") return "/admin/records/messages";
+  return null;
+}
+
+async function stepId(
+  db: Db,
+  query: RecordQuery,
+  current: { readonly id: string; readonly createdAt: Date },
+  viewer: { readonly id: string },
   direction: "prev" | "next",
 ): Promise<string | null> {
-  const where = applicantWhere({
-    list: "applicants", q: "", status: "", track: "", language: "", cycle: "", age: "", attention: "", page: 1, queue,
-  }, viewer);
+  if (query.list === "applicants") return columnStep(db, applicants, applicantWhere(query, viewer), current, direction);
+  if (query.list === "nominations") return columnStep(db, nominations, nominationWhere(query), current, direction);
+  if (query.list === "partners") return columnStep(db, partnerInquiries, partnerWhere(query), current, direction);
+  return null;
+}
+
+async function columnStep(
+  db: Db,
+  table: typeof applicants | typeof nominations | typeof partnerInquiries,
+  where: SQL | "empty",
+  current: { readonly id: string; readonly createdAt: Date },
+  direction: "prev" | "next",
+): Promise<string | null> {
   if (where === "empty") return null;
   const closer = direction === "prev"
-    ? or(sql`${applicants.createdAt} > ${current.createdAt}`, and(eq(applicants.createdAt, current.createdAt), sql`${applicants.id} > ${current.id}`))
-    : or(sql`${applicants.createdAt} < ${current.createdAt}`, and(eq(applicants.createdAt, current.createdAt), sql`${applicants.id} < ${current.id}`));
-  const order = direction === "prev"
-    ? [asc(applicants.createdAt), asc(applicants.id)]
-    : [desc(applicants.createdAt), desc(applicants.id)];
-  const [row] = await db.select({ id: applicants.id }).from(applicants).where(and(where, closer)).orderBy(...order).limit(1);
+    ? or(sql`${table.createdAt} > ${current.createdAt}`, and(eq(table.createdAt, current.createdAt), sql`${table.id} > ${current.id}`))
+    : or(sql`${table.createdAt} < ${current.createdAt}`, and(eq(table.createdAt, current.createdAt), sql`${table.id} < ${current.id}`));
+  const order = direction === "prev" ? [asc(table.createdAt), asc(table.id)] : [desc(table.createdAt), desc(table.id)];
+  const [row] = await db.select({ id: table.id }).from(table).where(and(where, closer)).orderBy(...order).limit(1);
   return row?.id ?? null;
 }
 
@@ -637,7 +699,7 @@ async function applicantRows(db: Store, query: RecordQuery, viewer: { readonly i
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: applicantHref(row.id, query.queue),
+      href: detailHref(`/admin/records/applicants/${row.id}`, query),
       version: row.version,
       reviewCycle: row.reviewCycle,
       cells: [row.fullName, row.email, row.track, row.language, STATUS_LABEL[row.status], row.assigneeName || row.assigneeEmail || "", String(row.reviewCycle), stamp(row.createdAt)],
@@ -731,7 +793,7 @@ async function nominationRows(db: Store, query: RecordQuery, viewer: { readonly 
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: can(viewer.role ?? "", "nominations.read") ? `/admin/records/nominations/${row.id}` : null,
+      href: can(viewer.role ?? "", "nominations.read") ? detailHref(`/admin/records/nominations/${row.id}`, query) : null,
       cells: [row.nominatorName, row.nomineeName, row.nomineeEmail, textOf(row.track), row.staffLabel, row.assignee, stamp(row.createdAt)],
     })),
   };
@@ -917,7 +979,7 @@ async function partnerRows(db: Store, query: RecordQuery, viewer: { readonly rol
     total: Number(totals[0]?.count ?? 0),
     rows: rows.map((row) => ({
       id: row.id,
-      href: can(viewer.role ?? "", "partners.read") ? `/admin/records/partners/${row.id}` : null,
+      href: can(viewer.role ?? "", "partners.read") ? detailHref(`/admin/records/partners/${row.id}`, query) : null,
       cells: [row.name, row.email, row.organization, row.support, row.staffLabel, row.assignee, stamp(row.createdAt)],
     })),
   };

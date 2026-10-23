@@ -1,17 +1,20 @@
-import Link from "next/link";
 import { DecisionPanel } from "@/components/admin/DecisionPanel";
 import { DocumentReveal, PrivateMedia } from "@/components/admin/PrivateMedia";
+import { EmailLine } from "@/components/admin/EmailLine";
+import { RecordChrome } from "@/components/admin/RecordChrome";
 import { ReviewEditor } from "@/components/admin/ReviewEditor";
-import { ReviewKeys } from "@/components/admin/ReviewKeys";
+import { When } from "@/components/admin/When";
+import { buttonClass } from "@/components/admin/Button";
 import { card } from "@/components/admin/marks";
 import { STATUS_LABEL } from "@/lib/admin/dashboard";
-import { queueListHref, type ApplicantReview, type ReviewerOption } from "@/lib/admin/records";
+import { cycleLabel, languageLabel, trackLabel } from "@/lib/admin/labels";
+import { recordsHref } from "@/lib/admin/return";
+import type { ApplicantReview, RecordQuery, ReviewerOption } from "@/lib/admin/records";
 import type { AnswerView } from "@/lib/holdings";
-import type { QueueName } from "@/lib/review/queue";
 
 export function ApplicantReviewView({
   review,
-  queue,
+  listQuery,
   canWrite,
   canAssign,
   canConfirm,
@@ -21,7 +24,7 @@ export function ApplicantReviewView({
   decisionId,
 }: {
   review: ApplicantReview;
-  queue: "" | QueueName;
+  listQuery: RecordQuery;
   canWrite: boolean;
   canAssign: boolean;
   canConfirm: boolean;
@@ -30,36 +33,39 @@ export function ApplicantReviewView({
   noteId: string;
   decisionId: string;
 }) {
+  const cycle = cycleLabel(review.reviewCycle);
   return (
     <div className="grid gap-6">
-      <ReviewKeys previous={review.prevHref} next={review.nextHref} />
-      <div>
-        <Link className="text-sm font-semibold underline" href={queueListHref(queue)}>Applicants</Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{review.fullName}</h1>
-        <p className="mt-1 text-sm text-black/70">{review.email}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Pill label={review.statusLabel} />
-          <Pill label={review.track} />
-          <Pill label={review.language} />
-          <Pill label={`Cycle ${review.reviewCycle}`} />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
-          {review.prevHref ? <Link className="rounded-full underline outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" href={review.prevHref}>Previous</Link> : <span className="text-black/40">Previous</span>}
-          {review.nextHref ? <Link className="rounded-full underline outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" href={review.nextHref}>Next</Link> : <span className="text-black/40">Next</span>}
-        </div>
-      </div>
+      <RecordChrome
+        backHref={recordsHref(listQuery)}
+        backLabel="Back to applicants"
+        title={review.fullName}
+        previous={review.prevHref}
+        next={review.nextHref}
+        meta={(
+          <>
+            <EmailLine email={review.email} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Pill label={review.statusLabel} />
+              <Pill label={trackLabel(review.track)} />
+              <Pill label={languageLabel(review.language)} />
+              {cycle ? <Pill label={cycle} /> : null}
+            </div>
+          </>
+        )}
+      />
       <div className="grid items-start gap-6 desk:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="order-2 grid gap-6 desk:order-1">
           <section className="grid gap-4 desk:grid-cols-2">
             <article className={card}>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">VideoAsk</h2>
-              <p className="mt-2 text-2xl font-semibold">{review.videoAsk}</p>
-              <p className="mt-1 text-sm text-black/70">{review.round1CompletedAt || "No completion time"}</p>
+              <p className="mt-2 text-2xl font-semibold">{review.videoAsk === "complete" ? "Complete" : "Not complete"}</p>
+              <p className="mt-1 text-sm text-black/70">{review.round1CompletedAt ? <When stamp={review.round1CompletedAt} /> : "No completion time"}</p>
             </article>
             <article className={card}>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Identity</h2>
-              <p className="mt-2 text-2xl font-semibold">{review.identity}</p>
-              <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt || "Not checked"}</p>
+              <p className="mt-2 text-2xl font-semibold">{words(review.identity)}</p>
+              <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt ? <When stamp={review.identityCheckedAt} /> : "Not checked"}</p>
               {review.documents.length === 0 ? <p className="mt-3 text-sm text-black/60">No document on file.</p> : review.documents.map((document) => (
                 <DocumentReveal key={`${review.id}:${document.documentId}`} applicantId={review.id} view={document} />
               ))}
@@ -82,7 +88,7 @@ export function ApplicantReviewView({
               <Fact term="Skills" value={review.skills} />
               <Fact term="Can travel" value={review.canTravel} />
               <Fact term="Valid passport" value={review.hasValidPassport} />
-              <Fact term="Submitted" value={review.createdAt} />
+              <Fact term="Submitted" value={review.createdAt} when />
               <Fact term="Documents" value={review.docsStatus} />
               <Fact term="Online offered" value={review.onlineOfferedAt} />
             </dl>
@@ -93,7 +99,7 @@ export function ApplicantReviewView({
               <ol className="mt-4 grid gap-3">
                 {review.events.map((event, index) => (
                   <li key={`${event.at}-${index}`} className="rounded-3xl bg-cream px-4 py-3">
-                    <p className="text-sm font-semibold">{event.at} · {event.actor}</p>
+                    <p className="text-sm font-semibold"><When stamp={event.at} /> · {event.actor}</p>
                     <p className="mt-1 text-sm">{event.from || "start"} to {event.to || "same"}</p>
                     <p className="mt-1 text-sm text-black/70">{event.reason}</p>
                   </li>
@@ -102,12 +108,17 @@ export function ApplicantReviewView({
             )}
           </section>
         </div>
-        <aside className={`${card} order-1 desk:sticky desk:top-6 desk:order-2 desk:max-h-[calc(100dvh-18rem)] desk:overflow-y-auto`}>
-          <DecisionPanel review={review} queue={queue} canConfirm={canConfirm} decisionId={decisionId} statusLabel={STATUS_LABEL} />
+        <aside className={`${card} order-1 desk:sticky desk:top-36 desk:order-2 desk:max-h-[calc(100dvh-12rem)] desk:overflow-y-auto`}>
+          <DecisionPanel review={review} listQuery={listQuery} canConfirm={canConfirm} decisionId={decisionId} statusLabel={STATUS_LABEL} />
         </aside>
       </div>
     </div>
   );
+}
+
+function words(value: string): string {
+  if (!value || value === "none") return "Not started";
+  return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function Pill({ label }: { label: string }) {
@@ -144,11 +155,18 @@ function AnswerBlock({ applicantId, view }: { applicantId: string; view: AnswerV
   );
 }
 
-function Fact({ term, value }: { term: string; value: string }) {
+function Fact({ term, value, when = false }: { term: string; value: string; when?: boolean }) {
+  const shown = when && value ? <When stamp={value} /> : value || "Not given";
+  const body = term === "Phone" && value ? (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>{value}</span>
+      <a className={buttonClass("outline", "sm")} href={`tel:${value.replace(/\s+/g, "")}`}>Call</a>
+    </span>
+  ) : shown;
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{term}</dt>
-      <dd className="mt-1 text-sm">{value || "Not given"}</dd>
+      <dd className="mt-1 text-sm">{body}</dd>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { quiet } from "@/components/admin/marks";
+import { Button } from "@/components/admin/Button";
 import { isStaffStreamPath, type AnswerView, type DocumentView } from "@/lib/holdings";
 
 type ClipView = Extract<AnswerView, { readonly kind: "clip" }>;
@@ -71,7 +71,7 @@ export function PrivateMedia({ applicantId, view }: { applicantId: string; view:
   const label = view.medium === "video" ? "Play video" : "Play audio";
   return (
     <div className="mt-3">
-      {shown.src ? null : <button className={quiet} type="button" onClick={() => open()}>{label}</button>}
+      {shown.src ? null : <Button variant="outline" type="button" onClick={() => open()}>{label}</Button>}
       {shown.src && view.medium === "video" ? (
         <video ref={bindMedia(shown.src)} controls playsInline preload="none" onError={onError} />
       ) : null}
@@ -120,7 +120,7 @@ export function DocumentReveal({ applicantId, view }: { applicantId: string; vie
   const image = view.contentType.startsWith("image/");
   return (
     <div className="mt-4">
-      <button className={quiet} type="button" onClick={() => open()}>{`Show document ${view.kind}`}</button>
+      <Button variant="outline" type="button" onClick={() => open()}>{`Show document ${view.kind}`}</Button>
       {shown.src && image ? (
         // The image optimizer would request this stream without the staff cookie.
         // eslint-disable-next-line @next/next/no-img-element

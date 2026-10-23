@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { updateCopy } from "@/app/admin/(console)/copy/actions";
-import { area, card, pill, quiet } from "@/components/admin/marks";
+import { Button, buttonClass } from "@/components/admin/Button";
+import { languageLabel } from "@/lib/admin/labels";
+import { area, card } from "@/components/admin/marks";
 import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { previewPath } from "@/lib/copy/preview";
 import {
@@ -91,11 +93,11 @@ export function CopyEditor({
               <input type="hidden" name="base" value={cell.revision} />
               <input type="hidden" name="digest" value={row.digest} />
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold uppercase">{cell.locale}</h3>
+                <h3 className="text-lg font-semibold">{languageLabel(cell.locale)}</h3>
                 <StateChip kind={cell.state.kind} />
                 {cell.override ? <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">Published</span> : <span className="rounded-full border border-black/15 px-2 py-1 text-xs">File</span>}
                 {cell.draft !== null || (live[id] && live[id].revision === cell.revision) ? <span className="rounded-full bg-orange px-2 py-1 text-xs font-semibold">Draft</span> : null}
-                {preview ? <a className="text-sm font-semibold underline" href={preview}>Preview</a> : null}
+                {preview ? <Button href={preview} variant="outline" size="sm">Preview</Button> : null}
               </div>
               <label className="sr-only" htmlFor={fieldId}>Value in {cell.locale}</label>
               <textarea
@@ -111,10 +113,11 @@ export function CopyEditor({
                 }}
               />
               <div className="flex flex-wrap gap-2">
-                <SubmitButton className={quiet} name="intent" value="draft" pendingLabel="Saving">Save draft</SubmitButton>
-                <SubmitButton className={pill} name="intent" value="publish" pendingLabel="Publishing">Publish</SubmitButton>
+                <SubmitButton className={buttonClass("solid")} name="intent" value="draft" pendingLabel="Saving">Save draft</SubmitButton>
+                <SubmitButton className={buttonClass("primary")} name="intent" value="publish" pendingLabel="Publishing">Publish</SubmitButton>
                 <ConfirmSubmit
-                  className={quiet}
+                  className={buttonClass("danger")}
+                  confirmVariant="danger"
                   name="intent"
                   value="reset"
                   pendingLabel="Resetting"
@@ -124,7 +127,7 @@ export function CopyEditor({
                 >
                   Reset to file
                 </ConfirmSubmit>
-                {cell.state.kind === "stale" ? <SubmitButton className={quiet} name="intent" value="mark" pendingLabel="Saving">Mark reviewed</SubmitButton> : null}
+                {cell.state.kind === "stale" ? <SubmitButton className={buttonClass("outline")} name="intent" value="mark" pendingLabel="Saving">Mark reviewed</SubmitButton> : null}
               </div>
             </form>
           );

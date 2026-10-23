@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { RecordsView } from "@/components/admin/RecordsView";
 import { loadRecords, parseRecordQuery } from "@/lib/admin/records";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/staff/gate";
 import { can } from "@/lib/staff/roles";
+
+export const metadata: Metadata = { title: "Records" };
 
 export default async function RecordsPage({
   searchParams,

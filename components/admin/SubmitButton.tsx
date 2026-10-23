@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { pill, quiet } from "@/components/admin/marks";
+import { buttonClass, type ButtonVariant } from "@/components/admin/Button";
 
 export function SubmitButton({
   className,
@@ -34,6 +34,7 @@ export function ConfirmSubmit({
   title,
   message,
   confirmLabel,
+  confirmVariant = "primary",
 }: {
   className?: string;
   children: string;
@@ -43,6 +44,7 @@ export function ConfirmSubmit({
   title: string;
   message: string;
   confirmLabel: string;
+  confirmVariant?: ButtonVariant;
 }) {
   const { pending } = useFormStatus();
   const [open, setOpen] = useState(false);
@@ -89,10 +91,10 @@ export function ConfirmSubmit({
             <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
             <p id={bodyId} className="mt-2 text-sm leading-6 text-black/70">{message}</p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <button ref={cancelRef} type="button" className={quiet} onClick={() => { setOpen(false); buttonRef.current?.focus(); }}>Cancel</button>
+              <button ref={cancelRef} type="button" className={buttonClass("outline")} onClick={() => { setOpen(false); buttonRef.current?.focus(); }}>Cancel</button>
               <button
                 type="button"
-                className={pill}
+                className={buttonClass(confirmVariant)}
                 onClick={() => {
                   if (buttonRef.current) buttonRef.current.dataset.confirmed = "yes";
                   setOpen(false);

@@ -253,7 +253,7 @@ async function applicantReview() {
   const query = parseRecordQuery({ list: "applicants", q: "nia", status: "submitted", track: "in_person", language: "fr", cycle: "2" });
   const listed = await loadRecords(database, query, viewer);
   assert.equal(listed.total, 1);
-  assert.equal(listed.rows[0].href, `/admin/records/applicants/${id}`);
+  assert.equal(listed.rows[0].href, `/admin/records/applicants/${id}?q=nia&status=submitted&track=in_person&language=fr&cycle=2`);
   assert.equal(JSON.stringify(listed.rows).includes("secret.example"), false);
   assert.equal(JSON.stringify(listed.rows).includes("1990-01-02"), false);
   const missed = await loadRecords(database, parseRecordQuery({ list: "applicants", status: "accepted" }), viewer);

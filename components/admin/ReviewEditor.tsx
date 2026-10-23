@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 import { assignReviewAction, saveReviewAction, type AssignFormState, type ReviewFormState } from "@/app/admin/(console)/records/applicants/[id]/actions";
 import { AdminSelect } from "@/components/admin/AdminSelect";
-import { area, card, field, pill, quiet } from "@/components/admin/marks";
+import { Button } from "@/components/admin/Button";
+import { area, card, field } from "@/components/admin/marks";
 import type { ApplicantReview, ReviewerOption } from "@/lib/admin/records";
 import { RECOMMENDATIONS, RUBRIC, isRecommendation, retiredScoreKeys } from "@/lib/review/rubric";
 
@@ -151,7 +152,7 @@ function ScoreForm({
         Note
         <textarea className={area} name="note" maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} />
       </label>
-      <button className={pill} type="submit" disabled={pending}>{pending ? "Saving" : "Save"}</button>
+      <Button variant="primary" type="submit" disabled={pending}>{pending ? "Saving" : "Save"}</Button>
       {state ? <p className="text-sm">{SAVE[state.result]}</p> : null}
     </form>
   );
@@ -176,7 +177,7 @@ function AssignForm({ review, options }: { review: ApplicantReview; options: rea
           options={[{ value: "", label: "Unassigned" }, ...options.map((person) => ({ value: person.id, label: person.name || person.email }))]}
         />
       </label>
-      <button className={quiet} type="submit" disabled={pending}>{pending ? "Saving" : "Assign"}</button>
+      <Button variant="solid" type="submit" disabled={pending}>{pending ? "Saving" : "Assign"}</Button>
       {state ? <p className="text-sm">{ASSIGN[state.result]}</p> : null}
     </form>
   );

@@ -165,6 +165,7 @@ export type DeskDetail = {
   readonly assignees: readonly { readonly id: string; readonly name: string; readonly email: string }[];
   readonly notes: readonly { readonly id: string; readonly authorName: string; readonly body: string; readonly createdAt: string }[];
   readonly fields: readonly { readonly label: string; readonly value: string }[];
+  readonly createdAt: Date;
 };
 
 const INTAKE_TABLE = {
@@ -319,6 +320,7 @@ export async function loadDetail(db: Db, actor: Staff, desk: DeskId, recordId: s
     assignees: await managerChoices(db, desk, actor),
     notes: await noteRows(db, desk, recordId),
     fields: intake.fields,
+    createdAt: intake.createdAt,
   };
 }
 
@@ -502,7 +504,7 @@ async function noteRows(db: Store, desk: DeskId, recordId: string) {
   }));
 }
 
-async function nominationFields(db: Store, recordId: string): Promise<{ heading: string; fields: DeskDetail["fields"] } | null> {
+async function nominationFields(db: Store, recordId: string): Promise<{ heading: string; createdAt: Date; fields: DeskDetail["fields"] } | null> {
   const [row] = await db
     .select({
       nominatorName: nominations.nominatorName,
@@ -525,6 +527,7 @@ async function nominationFields(db: Store, recordId: string): Promise<{ heading:
   if (!row) return null;
   return {
     heading: row.nomineeName,
+    createdAt: row.createdAt,
     fields: [
       ["Nominator name", row.nominatorName],
       ["Nominator email", row.nominatorEmail],
@@ -544,7 +547,7 @@ async function nominationFields(db: Store, recordId: string): Promise<{ heading:
   };
 }
 
-async function partnerFields(db: Store, recordId: string): Promise<{ heading: string; fields: DeskDetail["fields"] } | null> {
+async function partnerFields(db: Store, recordId: string): Promise<{ heading: string; createdAt: Date; fields: DeskDetail["fields"] } | null> {
   const [row] = await db
     .select({
       name: partnerInquiries.name,
@@ -562,6 +565,7 @@ async function partnerFields(db: Store, recordId: string): Promise<{ heading: st
   if (!row) return null;
   return {
     heading: row.organization,
+    createdAt: row.createdAt,
     fields: [
       ["Name", row.name],
       ["Email", row.email],

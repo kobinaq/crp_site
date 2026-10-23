@@ -12,7 +12,16 @@ const load = loader({
   "next/link": {
     __esModule: true,
     default(props) {
-      return React.createElement("a", { href: props.href }, props.children);
+      const { href, children, ...rest } = props;
+      return React.createElement("a", { href, ...rest }, children);
+    },
+  },
+  "next/navigation": {
+    useRouter() {
+      return { push() {}, refresh() {}, replace() {} };
+    },
+    usePathname() {
+      return "/admin/records";
     },
   },
 });
@@ -61,7 +70,7 @@ test("the messages list has a status filter, no attention filter, and no CSV", (
   const view = render(React.createElement(RecordsView, { data, exportable: true, canConfirm: true }));
   try {
     assert.match(view.host.textContent, /Messages/);
-    assert.match(view.host.textContent, /Nothing matches these filters/);
+    assert.match(view.host.textContent, /No messages yet/);
     assert.equal(view.host.textContent.includes("Attention"), false);
     assert.equal(view.host.textContent.includes("Download CSV"), false);
     assert.equal(view.host.querySelector("a[href='/admin/records?list=messages']") !== null, true);
@@ -89,8 +98,9 @@ test("the dashboard card counts new messages and links to that list", () => {
   const view = render(React.createElement(DashboardView, { data, denied: false, weeks: [] }));
   try {
     const link = view.host.querySelector("a[href='/admin/records?list=messages&status=new']");
-    assert.equal(link.textContent, "4");
+    assert.equal(link.textContent, "Open messages");
     assert.match(view.host.textContent, /New messages/);
+    assert.match(view.host.textContent, /4/);
   } finally {
     view.cleanup();
   }
@@ -117,11 +127,19 @@ test("mark spam asks for confirmation and the other verbs submit directly", () =
   };
   const view = render(React.createElement(MessageView, {
     detail,
+    listHref: "/admin/records?list=messages",
+    previous: null,
+    next: null,
     noteId: "00000000-0000-4000-8000-000000000011",
     action: async () => ({ result: "saved" }),
   }));
   try {
     assert.match(view.host.textContent, /Hello there/);
+    assert.equal(view.host.querySelector("a[aria-label='Back to messages']")?.getAttribute("href"), "/admin/records?list=messages");
+    const previous = [...view.host.querySelectorAll("button")].find((button) => button.textContent?.includes("Previous"));
+    assert.equal(previous?.disabled, true);
+    assert.equal(view.host.querySelector("a[href='mailto:ada@example.com']")?.textContent, "Email");
+    assert.match(view.host.textContent, /English/);
     assert.equal(view.host.querySelector("[role='alertdialog']"), null);
     const spam = [...view.host.querySelectorAll("button")].find((button) => button.textContent === "Mark spam");
     const archive = [...view.host.querySelectorAll("button")].find((button) => button.textContent === "Archive");
