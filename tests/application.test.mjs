@@ -1263,7 +1263,7 @@ for (const kind of ["waitlist", "interest"]) {
     assert.equal(jobs.length, 1);
     assert.equal(jobs[0].payload.template, kind);
     assert.match(jobs[0].payload.html, /<html lang="pt"/);
-    assert.equal(jobs[0].payload.subject, kind === "waitlist" ? "Já está na lista" : "Recebemos o seu interesse");
+    assert.equal(jobs[0].payload.subject, kind === "waitlist" ? "Já está na lista" : "O seu interesse foi registado");
     assert.doesNotMatch(jobs[0].payload.html, /\/api\/capture\/confirm/);
 
     // A repeat changes nothing and is not re-mailed.
@@ -1312,8 +1312,8 @@ test("nominations are saved on submit and acknowledged once, in the site languag
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0].payload.template, "nomination");
   assert.match(jobs[0].payload.html, /<html lang="es"/);
-  assert.match(jobs[0].payload.html, /Gracias por nominar a Mateo &lt;b&gt;/);
-  assert.equal(jobs[0].payload.subject, "Hemos recibido tu nominación");
+  assert.match(jobs[0].payload.html, /Gracias por proponer a Mateo &lt;b&gt;/);
+  assert.equal(jobs[0].payload.subject, "Hemos recibido tu propuesta");
   assert.deepEqual(await h.actions.submitNomination(input), { ok: true });
   jobs = await ackJobs(nominatorEmail);
   assert.equal(jobs.length, 1, "a repeated nomination is not re-mailed");

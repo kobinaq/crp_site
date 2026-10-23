@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "@/components/LocaleLink";
+import { useText } from "@/lib/ui-text";
 
 type LogoProps = {
   size?: "sm" | "lg";
@@ -19,6 +22,7 @@ export function Logo({
   imgClassName,
   tone = "dark",
 }: LogoProps) {
+  const tr = useText();
   const heightClass =
     imgClassName ??
     (size === "lg"
@@ -28,7 +32,7 @@ export function Logo({
   return (
     <Link
       href="/"
-      aria-label="Climate Refugee Pavilion home"
+      aria-label={tr("Climate Refugee Pavilion home")}
       className={`inline-flex cursor-pointer opacity-100 transition-opacity duration-300 hover:opacity-70 ${className}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

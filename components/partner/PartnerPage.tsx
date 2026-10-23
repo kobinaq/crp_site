@@ -6,6 +6,7 @@ import Link from "@/components/LocaleLink";
 import { useCopy } from "../LanguageProvider";
 import { trail } from "@/lib/fonts";
 import { partnerImages } from "@/lib/partner-assets";
+import { useFitText } from "@/lib/useFitText";
 
 function ReachOutLink({
   href = "/partner/reach-out",
@@ -64,6 +65,7 @@ function WayTile({
 function PartnerHero({ title }: { title: string }) {
   const frame = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const mobileTitleRef = useFitText<HTMLHeadingElement>(title);
 
   useEffect(() => {
     const el = frame.current;
@@ -87,6 +89,7 @@ function PartnerHero({ title }: { title: string }) {
           sizes="100vw"
         />
         <h1
+          ref={mobileTitleRef}
           className={`${trail.className} relative z-10 w-full text-center text-[90px] uppercase leading-[0.9] tracking-[3.6px] text-white`}
         >
           {title}
@@ -214,6 +217,7 @@ function CtaCard({
   /** Mobile photo box (Figma 2282:12411); desktop keeps 612px tall at 163px. */
   imageClass?: string;
 }) {
+  const titleRef = useFitText<HTMLParagraphElement>(title);
   return (
     <div
       className="relative flex h-[371px] flex-none flex-col items-start justify-between overflow-hidden rounded-[64px] p-8 desk:h-full desk:flex-1"
@@ -238,6 +242,7 @@ function CtaCard({
         className={`pointer-events-none absolute ${glowClass}`}
       />
       <p
+        ref={titleRef}
         className={`relative z-10 w-full text-[40px] leading-none tracking-[-1.6px] desk:text-[64px] desk:leading-[0.8] desk:tracking-[-2.56px] ${titleClass}`}
       >
         {title}

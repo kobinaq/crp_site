@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useFitRow } from "@/lib/useFitText";
 import {
   motion,
   useReducedMotion,
@@ -73,6 +74,7 @@ function BringingTogether() {
   }, [index, groups]);
 
   const label = `${copy.pavilion.bringing} ${groups.join(", ")} ${copy.pavilion.together}`;
+  const mobileRowRef = useFitRow<HTMLDivElement>(label);
   const motionOn = sliding && reduceMotion !== true;
 
   const pauseHandlers = {
@@ -115,7 +117,7 @@ function BringingTogether() {
       </div>
       <p className="whitespace-nowrap text-[32px] tracking-[-1.28px] text-black/72">{copy.pavilion.together}</p>
     </div>
-    <div className="flex items-center gap-[8px] text-center leading-[0.9] desk:hidden">
+    <div ref={mobileRowRef} className="flex items-center gap-[8px] text-center leading-[0.9] desk:hidden">
       <p className={`${ACTIVE_TEXT} text-black/72`}>{copy.pavilion.bringing}</p>
 
       <span className="sr-only">{label}</span>
@@ -236,7 +238,8 @@ export function PavilionPanel() {
             <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[63px] pt-[96px] desk:pb-[97px] desk:pt-[96px]">
               <div className="flex flex-col items-center">
                 <DisplayWordmark
-                  word="Pavilion"
+                  kicker={copy.pavilion.kicker}
+                  word={copy.pavilion.word}
                   size="xl"
                   className="gap-[15.641px]"
                 />

@@ -5,8 +5,14 @@ import { eq } from "drizzle-orm";
 import { applicants, getDb } from "@/lib/db";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 import { nextStepUrl } from "@/lib/application";
+import { requestLocale } from "@/lib/request-locale";
 
-export const metadata = { title: "Continue your application", robots: { index: false, follow: false }, referrer: "no-referrer" as const };
+// Applications run in English, French or Spanish only, so Portuguese visitors get the English title.
+const TITLE = { en: "Continue your application", fr: "Poursuivre votre candidature", es: "Continuar con tu solicitud" } as const;
+export async function generateMetadata() {
+  const locale = await requestLocale();
+  return { title: locale === "fr" || locale === "es" ? TITLE[locale] : TITLE.en, robots: { index: false, follow: false }, referrer: "no-referrer" as const };
+}
 export default async function ContinueApplicationPage() {
   const session = verifySession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) redirect("/apply");

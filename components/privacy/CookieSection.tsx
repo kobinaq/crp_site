@@ -37,7 +37,7 @@ export function CookieSection() {
           <ul className="flex flex-col">
             {COOKIE_INVENTORY.filter((item) => item.category === category).map((item) => (
               <li key={item.name} className="grid gap-2 border-b border-black/12 py-3 desk:grid-cols-[180px_1fr_120px] desk:gap-4">
-                <span className={`${BODY} font-medium text-black [overflow-wrap:anywhere]`}>{item.name}</span>
+                <span className={`${BODY} font-medium text-black [overflow-wrap:anywhere]`}>{item.label ? tr(item.label) : item.name}</span>
                 <span className={BODY}>{tr(item.purpose)}</span>
                 <span className={`${BODY} desk:text-right`}>
                   <span className={`${LABEL} desk:hidden`}>{tr("Duration")}: </span>

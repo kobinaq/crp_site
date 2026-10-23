@@ -1,4 +1,7 @@
+"use client";
+
 import { trail } from "@/lib/fonts";
+import { useFitText } from "@/lib/useFitText";
 
 type DisplayWordmarkProps = {
   word: string;
@@ -7,12 +10,17 @@ type DisplayWordmarkProps = {
   size?: "md" | "xl" | "platform" | "section";
 };
 
+/** The English wordmarks bleed up to 6px past each screen edge on phones; translations may too, no more. */
+const screenWidth = () => document.documentElement.clientWidth + 12;
+
 export function DisplayWordmark({
   word,
   kicker = "The",
   className = "",
   size = "md",
 }: DisplayWordmarkProps) {
+  // Translated words can be longer than the English ("PLATEFORME", "CONTENIDOS").
+  const wordRef = useFitText<HTMLSpanElement>(word, screenWidth);
   let theClass: string;
   let wordClass: string;
   switch (size) {
@@ -48,7 +56,7 @@ export function DisplayWordmark({
   return (
     <div className={`flex flex-col items-center text-center ${stackGap} ${className}`}>
       <span className={theClass}>{kicker}</span>
-      <span aria-label={word} className={wordClass}>
+      <span ref={wordRef} aria-label={word} className={wordClass}>
         {word}
       </span>
     </div>

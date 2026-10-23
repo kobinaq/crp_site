@@ -10,7 +10,7 @@
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
     "playHome": "Reproduzir a série Home",
-    "joinWaitlist": "Aderir à lista de espera",
+    "joinWaitlist": "Inscrever-me na lista de espera",
     "email": "Endereço de e-mail",
     "emailInvalid": "Introduza um endereço de e-mail válido",
     "partnerUp": "Ser parceiro",
@@ -76,7 +76,7 @@
     "youthDates": "9–20 nov.",
     "youthTitle": "Programa juvenil totalmente financiado na Turquia",
     "partnerTitle": "Ser parceiro",
-    "ticker": "Tornando a mobilidade climática impossível de ignorar"
+    "ticker": "Tornar a mobilidade climática impossível de ignorar"
   },
   "partnerPage": {
     "heroTitle": "Seja nosso parceiro",
@@ -96,7 +96,7 @@
     ],
     "ambassador": "Apoiar um programa de embaixadores",
     "storyline": "Apoiar uma história específica",
-    "speaker": "Candidatar-me como orador",
+    "speaker": "Candidatar-me como orador(a)",
     "learnMore": "Saiba mais",
     "reachOutForm": {
       "title": "Sobre si",
@@ -112,13 +112,13 @@
       "continue": "Continuar",
       "sent": "Entraremos em contacto.",
       "sponsorshipDetails": "Detalhes do apoio",
-      "supportOptions": ["Toda a organização", "Um programa de embaixadores", "Uma história específica", "Candidatar-me como orador"],
+      "supportOptions": ["Toda a organização", "Um programa de embaixadores", "Uma história específica", "Candidatar-me como orador(a)"],
       "sponsorshipOptions": ["Apoio financeiro", "Apoio em espécie"]
     }
   },
   "contactPage": {
     "title": "Contacte-nos",
-    "email": "email@gmail.com",
+    "email": "name@example.com",
     "emailLabel": "E-mail",
     "addressLabel": "Morada",
     "phoneLabel": "Telefone",
@@ -154,13 +154,15 @@
     "photoAlt": "Pessoas e cães a atravessar um campo ao anoitecer"
   },
   "pavilion": {
+    "kicker": "O",
+    "word": "Pavilhão",
     "location": "COP31, Antalya e online",
     "locationPlace": "COP31, Antalya",
     "locationOnline": "e online",
     "headlineMobile": "Onde as pessoas se reúnem para compreender a mobilidade climática e construir soluções",
     "headline": "Junte-se a quem procura compreender a mobilidade climática e construir soluções",
     "bringing": "Reunimos",
-    "together": "para agir em conjunto",
+    "together": "para agir",
     "photoAlt": "Vista aérea do recinto do pavilhão da COP31 em Antalya",
     "groups": [
       "comunidades",
@@ -174,6 +176,8 @@
     ]
   },
   "platform": {
+    "kicker": "A",
+    "word": "Plataforma",
     "subtitle": "Reunimos conhecimentos de comunidades, especialistas e decisores de todo o mundo",
     "comingSoon": "Em breve",
     "groups": {
@@ -187,12 +191,13 @@
       },
       "ambassadors": {
         "label": "Embaixadores",
-        "blurb": "Quem conclui os nossos programas torna-se embaixador da iniciativa."
+        "blurb": "Quem conclui os nossos programas torna-se embaixador(a) da iniciativa."
       }
     }
   },
   "content": {
-    "kicker": "Os nossos conteúdos",
+    "word": "Conteúdos",
+    "kicker": "Os nossos",
     "subtitle": "Histórias e conhecimentos que ajudam a compreender a mobilidade climática",
     "homeCaption": "H.O.M.E é uma série de histórias em desenvolvimento sobre mobilidade climática em todo o mundo",
     "featuredAlt": "Um grupo de amigos reunidos",
@@ -218,7 +223,7 @@
     "programDates": "14 out. – 16 nov."
   },
   "waitlist": {
-    "title": "Adira à lista de espera",
+    "title": "Inscreva-se na lista de espera",
     "emailPlaceholder": "E-mail",
     "allSet": "E-mail enviado",
     "checkEmail": "Recebemos os seus dados",
@@ -234,7 +239,7 @@
     "sections": [
       { "title": "A nossa oferta", "links": ["Início", "Sobre nós", "Programas"] },
       { "title": "Informação legal", "links": ["Política de privacidade", "Termos e condições"] },
-      { "title": "Fale connosco", "links": ["Contacte-nos", "Seja nosso parceiro", "Envolva-se"] }
+      { "title": "Fale connosco", "links": ["Contacte-nos", "Seja nosso parceiro", "Participar"] }
     ],
     "getInTouch": "Mantenha-se em contacto",
     "copyright": "© {year} Climate Refugee Pavilion. Todos os direitos reservados.",
@@ -400,12 +405,12 @@
         {
           "date": "14 OUT. – 16 NOV.",
           "label": "Decisão",
-          "body": "Enviaremos a decisão por e-mail. Se não for selecionado nesta edição, partilharemos outras formas de participar."
+          "body": "Enviaremos a decisão por e-mail. Se não for selecionado(a) nesta edição, partilharemos outras formas de participar."
         },
         {
           "date": "14 OUT. – 16 NOV.",
           "label": "Entrevista e documentos",
-          "body": "Se for selecionado, organizaremos uma chamada individual. Depois, receberá por e-mail as instruções para enviar o passaporte e assinar o consentimento de viagem."
+          "body": "Se for selecionado(a), organizaremos uma chamada individual. Depois, receberá por e-mail as instruções para enviar o passaporte e assinar o consentimento de viagem."
         },
         {
           "date": "14 OUT. – 16 NOV.",
@@ -440,7 +445,7 @@
         },
         {
           "q": "Como funciona o processo de candidatura?",
-          "a": "Envia a candidatura, participa numa primeira entrevista se for pré-selecionado e recebe uma decisão por e-mail. Se for selecionado, segue-se uma chamada individual, o envio de documentos e o consentimento de viagem, antes da confirmação da modalidade."
+          "a": "Envia a candidatura, participa numa primeira entrevista se for pré-selecionado(a) e recebe uma decisão por e-mail. Se for selecionado(a), segue-se uma chamada individual, o envio de documentos e o consentimento de viagem, antes da confirmação da modalidade."
         },
         {
           "q": "Que atividades vou realizar?",
@@ -448,7 +453,7 @@
         },
         {
           "q": "O que acontece depois de me candidatar?",
-          "a": "Enviaremos a decisão por e-mail. Se for selecionado, concluirá as entrevistas e a documentação, participará nas 3 semanas de formação e continuará ligado através de projetos e da rede após a cimeira. Caso contrário, partilharemos outras formas de participar."
+          "a": "Enviaremos a decisão por e-mail. Se for selecionado(a), concluirá as entrevistas e a documentação, participará nas 3 semanas de formação e continuará ligado(a) através de projetos e da rede após a cimeira. Caso contrário, partilharemos outras formas de participar."
         },
         {
           "q": "Quem posso contactar se tiver dúvidas?",
@@ -475,7 +480,7 @@
     "title": "Programa de Jovens Embaixadores",
     "subtitle": "Unimos vozes de todo o mundo",
     "location": "COP31, Antalya, Turquia",
-    "headline": "Como embaixador, irá acompanhar-nos no caminho para a proteção jurídica dos refugiados climáticos.",
+    "headline": "Como embaixador(a), irá acompanhar-nos no caminho para a proteção jurídica dos refugiados climáticos.",
     "body": "Representará a sua comunidade, abrirá conversas sobre mobilidade climática e conhecerá participantes de todo o mundo. Juntos, reforçaremos as suas competências, daremos voz às suas ideias e contribuiremos para soluções de mobilidade climática.",
     "benefits": {
       "travel": "Viagem, visto, alojamento e ajudas de custo totalmente pagos",
@@ -496,7 +501,7 @@
     "programDetails": "Informações sobre o programa",
     "namePlaceholder": "nome",
     "emailPlaceholder": "E-mail",
-    "more": "Mais\nnovi-\ndades\nem breve",
+    "more": "Novi\ndades\nem\nbreve",
     "heroAlt": "Costa de Antalya com os montes Tauro do outro lado da baía",
     "dates": "14 out. – 16 nov.",
     "readMore": "mais"
@@ -532,7 +537,7 @@
     },
     "partner": {
       "title": "Seja nosso parceiro — Climate Refugee Pavilion",
-      "description": "Apoie programas de embaixadores e histórias sobre mobilidade climática ou participe como orador no Climate Refugee Pavilion."
+      "description": "Apoie programas de embaixadores e histórias sobre mobilidade climática ou participe como orador(a) no Climate Refugee Pavilion."
     },
     "apply": {
       "title": "Candidaturas ao Programa de Jovens Embaixadores",

@@ -310,7 +310,8 @@ export function PlatformSection() {
         <ComingSoonBadge className="absolute top-[32px] right-0 z-40 w-[81px] desk:!hidden" />
         <div className="relative z-20 flex w-full flex-col items-center gap-[11px] px-0 pt-[96px] text-center leading-[0.9] desk:max-w-[955px] desk:gap-0 desk:px-0 desk:pt-[96px]">
           <DisplayWordmark
-            word="Platform"
+            kicker={copy.platform.kicker}
+            word={copy.platform.word}
             size="platform"
             className="relative z-0 shrink-0"
           />

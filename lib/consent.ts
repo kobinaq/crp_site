@@ -138,6 +138,8 @@ export function clearAnalyticsStorage() {
 
 export type InventoryItem = {
   name: string;
+  /** Readable name shown instead of `name` (English source; translated through ui-*.json). */
+  label?: string;
   /** English source string; translated through ui-*.json. */
   purpose: string;
   duration: string;
@@ -151,6 +153,6 @@ export const COOKIE_INVENTORY: InventoryItem[] = [
   { name: "crp_session", kind: "cookie", category: "necessary", duration: "12 hours", purpose: "Lets you continue your application after you confirm your email." },
   { name: "Cloudflare Turnstile", kind: "third-party", category: "necessary", duration: "Session", purpose: "Checks that forms are sent by a person, not a bot. Loaded only on forms." },
   { name: "crp-locale", kind: "cookie", category: "functional", duration: "12 months", purpose: "Remembers the language you chose." },
-  { name: "ph_<project_key>_posthog", kind: "cookie", category: "analytics", duration: "About 1 year", purpose: "PostHog: an anonymous ID and session, used for anonymous usage statistics that help us improve the site." },
+  { name: "ph_<project_key>_posthog", label: "PostHog analytics cookie (ph_…_posthog)", kind: "cookie", category: "analytics", duration: "About 1 year", purpose: "PostHog: an anonymous ID and session, used for anonymous usage statistics that help us improve the site." },
   { name: "ph_*", kind: "localStorage", category: "analytics", duration: "Until you withdraw consent", purpose: "PostHog local storage: settings and queued anonymous usage statistics, kept with the cookie above." },
 ];

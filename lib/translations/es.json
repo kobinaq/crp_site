@@ -25,10 +25,10 @@
     "prevTestimonial": "Testimonio anterior",
     "nextTestimonial": "Siguiente testimonio",
     "platformGroups": "Grupos de la plataforma",
-    "youthAmbassadorCard": "Mostrar interés en el Programa de Jóvenes Embajadores, de 19 a 26 años",
+    "youthAmbassadorCard": "Manifestar interés en el Programa de Jóvenes Embajadores, de 19 a 26 años",
     "programDetails": "Información del programa para personas de 19 a 26 años",
     "moreComingSoon": "Próximamente, más novedades",
-    "expressInterest": "Mostrar interés",
+    "expressInterest": "Manifestar interés",
     "closeExpressInterest": "Cerrar el formulario de interés",
     "closeTeamMember": "Cerrar la ficha del miembro",
     "submitInterest": "Enviar mi interés"
@@ -76,7 +76,7 @@
     "youthDates": "9–20 nov.",
     "youthTitle": "Programa juvenil con financiación completa en Turquía",
     "partnerTitle": "Colaborar",
-    "ticker": "Hacemos imposible ignorar la movilidad climática"
+    "ticker": "Hacemos que la movilidad climática sea imposible de ignorar"
   },
   "partnerPage": {
     "heroTitle": "Colabora con nosotros",
@@ -118,7 +118,7 @@
   },
   "contactPage": {
     "title": "Contacta con nosotros",
-    "email": "email@gmail.com",
+    "email": "name@example.com",
     "emailLabel": "Correo",
     "addressLabel": "Dirección",
     "phoneLabel": "Teléfono",
@@ -154,13 +154,15 @@
     "photoAlt": "Personas y perros caminando por un campo al atardecer"
   },
   "pavilion": {
+    "kicker": "El",
+    "word": "Pabellón",
     "location": "COP31, Antalya y en línea",
     "locationPlace": "COP31, Antalya",
     "locationOnline": "y en línea",
     "headlineMobile": "Donde las personas se reúnen para comprender la movilidad climática y construir soluciones",
     "headline": "Únete a quienes se reúnen para comprender la movilidad climática y construir soluciones",
-    "bringing": "Reuniendo a",
-    "together": "para actuar juntos",
+    "bringing": "Unimos a",
+    "together": "para actuar",
     "photoAlt": "Vista aérea del recinto del pabellón de la COP31 en Antalya",
     "groups": [
       "comunidades",
@@ -174,6 +176,8 @@
     ]
   },
   "platform": {
+    "kicker": "La",
+    "word": "Plataforma",
     "subtitle": "Reunimos conocimientos de comunidades, especialistas y responsables de decisiones de todo el mundo",
     "comingSoon": "Próximamente",
     "groups": {
@@ -192,7 +196,8 @@
     }
   },
   "content": {
-    "kicker": "Nuestros contenidos",
+    "word": "Contenidos",
+    "kicker": "Nuestros",
     "subtitle": "Historias y conocimientos que ayudan a comprender la movilidad climática",
     "homeCaption": "H.O.M.E es una serie de historias en desarrollo sobre la movilidad climática en todo el mundo",
     "featuredAlt": "Un grupo de amigos reunidos",
@@ -234,7 +239,7 @@
     "sections": [
       { "title": "Nuestra oferta", "links": ["Inicio", "Sobre nosotros", "Programas"] },
       { "title": "Información legal", "links": ["Política de privacidad", "Términos y condiciones"] },
-      { "title": "Contáctanos", "links": ["Contacto", "Asóciate con nosotros", "Participa"] }
+      { "title": "Contáctanos", "links": ["Contacto", "Colabora con nosotros", "Participar"] }
     ],
     "getInTouch": "Mantente en contacto",
     "copyright": "© {year} Climate Refugee Pavilion. Todos los derechos reservados.",
@@ -490,7 +495,7 @@
     "antalya": "1 semana en Antalya",
     "ages1518": "De 15 a 18 años",
     "ages2734": "De 27 a 34 años",
-    "interest": "Mostrar interés",
+    "interest": "Manifestar interés",
     "applyNow": "Presentar solicitud",
     "nominate": "Proponer a alguien",
     "programDetails": "Información del programa",

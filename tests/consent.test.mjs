@@ -82,7 +82,7 @@ test('inventory covers every cookie the code sets, with translated copy',()=>{
  assert.ok(COOKIE_INVENTORY.filter((item)=>item.name.startsWith('ph_')).every((item)=>item.category==='analytics'));
  for(const locale of ['en','fr','es','pt']){
   const ui=JSON.parse(readFileSync(`lib/translations/ui-${locale}.json`,'utf8'));
-  for(const item of COOKIE_INVENTORY)for(const text of [item.purpose,item.duration])assert.ok(ui[text],`${locale}: ${text}`);
+  for(const item of COOKIE_INVENTORY)for(const text of [item.purpose,item.duration,...(item.label?[item.label]:[])])assert.ok(ui[text],`${locale}: ${text}`);
   for(const text of ['Analytics','Helps us see how people use the site so we can improve it','About 1 year'])assert.ok(ui[text],`${locale}: ${text}`);
  }
 });

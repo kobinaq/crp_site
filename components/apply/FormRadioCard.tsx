@@ -17,7 +17,7 @@ export function FormRadioCard({
   label: string;
   selected: boolean;
   onSelect: () => void;
-  /** Phones only (Figma 2308:9574): 102px card, 40px radius, 24px radio. Content is top-aligned (24px
+  /** Phones only (Figma 2308:9574): 102px card, 32px radius (2308:9686), 24px radio. Content is top-aligned (24px
    *  top, base 12px gap, as 2308:9686) so radios line up when only one label wraps (FR/ES/PT). */
   mobileTall?: boolean;
 }) {
@@ -28,7 +28,7 @@ export function FormRadioCard({
       aria-pressed={selected}
       className={`flex min-w-0 flex-1 flex-col items-start justify-center gap-3 rounded-[32px] p-6 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 ${
         mobileTall
-          ? "max-desk:h-[102px] max-desk:justify-start max-desk:rounded-[40px] max-desk:px-6 max-desk:pt-6 max-desk:pb-0"
+          ? "max-desk:h-[102px] max-desk:justify-start max-desk:px-6 max-desk:pt-6 max-desk:pb-0"
           : ""
       } max-[380px]:px-4 ${
         selected ? "bg-black text-white focus-visible:outline-lime" : "bg-cream text-black focus-visible:outline-black"

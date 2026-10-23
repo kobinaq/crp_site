@@ -118,7 +118,7 @@
   },
   "contactPage": {
     "title": "Contactez-nous",
-    "email": "email@gmail.com",
+    "email": "name@example.com",
     "emailLabel": "E-mail",
     "addressLabel": "Adresse",
     "phoneLabel": "Téléphone",
@@ -149,24 +149,26 @@
     "photoAlt": "Des personnes qui discutent dans un pavillon, en intérieur"
   },
   "heroExtension": {
-    "title": "Nous créons les moyens de distinguer l’essentiel au milieu du bruit",
+    "title": "Nous aidons à distinguer l’essentiel dans le bruit ambiant",
     "subtitle": "Transformer les savoirs locaux en action mondiale",
     "photoAlt": "Des personnes et des chiens qui marchent dans un champ au crépuscule"
   },
   "pavilion": {
+    "kicker": "Le",
+    "word": "Pavillon",
     "location": "COP31, Antalya et en ligne",
     "locationPlace": "COP31, Antalya",
     "locationOnline": "et en ligne",
     "headlineMobile": "Là où l’on se réunit pour comprendre la mobilité climatique et façonner des solutions",
     "headline": "Rejoignez celles et ceux qui se réunissent pour comprendre la mobilité climatique et façonner des solutions",
-    "bringing": "Rassemblant",
-    "together": "ensemble",
+    "bringing": "Réunir les",
+    "together": "pour agir",
     "photoAlt": "Vue aérienne du site du pavillon COP31 à Antalya",
     "groups": [
       "communautés",
-      "Peuples autochtones",
+      "peuples autochtones",
       "scientifiques",
-      "ong",
+      "ONG",
       "jeunes",
       "gouvernements",
       "ingénieurs",
@@ -174,7 +176,9 @@
     ]
   },
   "platform": {
-    "subtitle": "Recueillir les perspectives des communautés, des experts et des décideurs du monde entier",
+    "kicker": "La",
+    "word": "Plateforme",
+    "subtitle": "Nous recueillons les points de vue des communautés, des expert·e·s et des décideur·euse·s du monde entier",
     "comingSoon": "Bientôt",
     "groups": {
       "beacons": {
@@ -187,12 +191,13 @@
       },
       "ambassadors": {
         "label": "Ambassadeurs",
-        "blurb": "Les personnes qui terminent nos programmes deviennent nos ambassadeurs."
+        "blurb": "Les personnes qui terminent nos programmes deviennent nos ambassadeur·rice·s."
       }
     }
   },
   "content": {
-    "kicker": "Notre",
+    "word": "Contenus",
+    "kicker": "Nos",
     "subtitle": "Des récits et des savoirs qui rendent la mobilité climatique plus facile à comprendre",
     "homeCaption": "H.O.M.E. est une série de récits en cours sur la mobilité climatique dans le monde",
     "featuredAlt": "Des amis réunis",
@@ -279,7 +284,7 @@
       "stats": [
         {
           "value": "20",
-          "label": "ambassadeurs"
+          "label": "ambassadeur·rice·s"
         },
         {
           "value": "8-10",
@@ -287,7 +292,7 @@
         },
         {
           "value": "10-12",
-          "label": "à la COP 31"
+          "label": "à la COP31"
         }
       ],
       "online": "3 semaines de formation en ligne",
@@ -353,7 +358,7 @@
         {
           "title": "4 semaines",
           "badge": "En ligne",
-          "description": "Avant la COP, vous vous formerez au récit, aux politiques, à la négociation et aux médias. Tous les ambassadeurs ne voyagent pas à la COP31 — certain·e·s restent uniquement en ligne, tout en restant pleinement intégré·e·s aux projets du pavillon et au réseau que nous construisons ensemble."
+          "description": "Avant la COP, vous vous formerez au récit, aux politiques, à la négociation et aux médias. Tous les ambassadeur·rice·s ne voyagent pas à la COP31 — certain·e·s restent uniquement en ligne, tout en restant pleinement intégré·e·s aux projets du pavillon et au réseau que nous construisons ensemble."
         },
         {
           "title": "1 semaine à Antalya",
@@ -428,11 +433,11 @@
         },
         {
           "q": "Dois-je voyager à la COP31 pour participer ?",
-          "a": "Non. Tous les ambassadeurs ne voyagent pas à la COP31 — certain·e·s restent uniquement en ligne, tout en restant pleinement intégré·e·s aux projets du pavillon et au réseau que nous construisons ensemble."
+          "a": "Non. Tous les ambassadeur·rice·s ne voyagent pas à la COP31 — certain·e·s restent uniquement en ligne, tout en restant pleinement intégré·e·s aux projets du pavillon et au réseau que nous construisons ensemble."
         },
         {
           "q": "Que couvre la bourse ?",
-          "a": "Pour les ambassadeurs voyageurs : vols, visa, hébergement et repas sont pris en charge. Vous recevez aussi une accréditation officielle CCNUCC et l'accès au pavillon dans la zone bleue, plus un mentorat tout au long du parcours."
+          "a": "Pour les ambassadeur·rice·s voyageur·euse·s : vols, visa, hébergement et repas sont pris en charge. Vous recevez aussi une accréditation officielle CCNUCC et l'accès au pavillon dans la zone bleue, plus un mentorat tout au long du parcours."
         },
         {
           "q": "Combien de temps prend la candidature ?",
@@ -440,11 +445,11 @@
         },
         {
           "q": "À quoi ressemble le processus de candidature ?",
-          "a": "Soumettez votre candidature, passez un entretien de premier tour si vous êtes présélectionné·e, recevez une décision par e-mail, puis — si vous êtes sélectionné·e — un appel individuel, l'envoi de documents et le consentement au voyage avant l'confirmation de votre modalité de participation."
+          "a": "Soumettez votre candidature, passez un entretien de premier tour si vous êtes présélectionné·e, recevez une décision par e-mail, puis — si vous êtes sélectionné·e — un appel individuel, l'envoi de documents et le consentement au voyage avant la confirmation de votre modalité de participation."
         },
         {
           "q": "Que vais-je concrètement faire ?",
-          "a": "Vous vous formerez avant la COP au récit, aux politiques, à la négociation et aux médias, puis aiderez à façonner le pavillon — en ligne et, pour les ambassadeurs voyageurs, pendant une semaine à Antalya — avec le mentorat de négociateurs, juristes, scientifiques et organisateurs."
+          "a": "Vous vous formerez avant la COP au récit, aux politiques, à la négociation et aux médias, puis aiderez à façonner le pavillon — en ligne et, pour les ambassadeur·rice·s voyageur·euse·s, pendant une semaine à Antalya — avec le mentorat de négociateurs, juristes, scientifiques et organisateurs."
         },
         {
           "q": "Que se passe-t-il après ma candidature ?",
