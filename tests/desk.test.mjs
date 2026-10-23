@@ -109,6 +109,8 @@ test("staff grants derive from one table and leave the editor set unchanged", ()
   assert.equal(can("admin", "partners.manage"), true);
   assert.equal(ROLE_CAPABILITIES.reviewer.includes("dashboard.read"), true);
   assert.equal(ROLE_CAPABILITIES.reviewer.includes("reviews.write"), true);
+  assert.equal(can("reviewer", "applicants.read"), true);
+  assert.equal(can("editor", "applicants.read"), false);
 });
 
 test("status moves follow the desk graph, including undo to new and a same-status no-op", () => {

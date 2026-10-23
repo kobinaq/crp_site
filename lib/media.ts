@@ -367,7 +367,7 @@ function sliceStream(source: ReadableStream<Uint8Array>, skip: number, take: num
 }
 
 export async function streamHolding(db: Db, input: StreamInput): Promise<StreamResult> {
-  if (!can(input.role, input.slot === "document" ? "identity.view" : "dashboard.read")) return { ok: false, status: 403 };
+  if (!can(input.role, input.slot === "document" ? "identity.view" : "applicants.read")) return { ok: false, status: 403 };
   const holding = await loadHolding(db, input.applicantId, input.slot, input.holdingId);
   const object = holding ? storedObject(holding) : null;
   if (!holding || !object) return { ok: false, status: 404 };

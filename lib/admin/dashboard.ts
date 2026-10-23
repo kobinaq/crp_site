@@ -12,6 +12,7 @@ import {
 } from "@/lib/db";
 import { deskColumns, loadDeskSummary, type DeskSummary } from "@/lib/desk/case";
 import type { Status } from "@/lib/lifecycle";
+import { can } from "@/lib/staff/roles";
 
 // Lifecycle order, including statuses the transition map does not currently reach.
 export const PIPELINE_ORDER = [
@@ -51,6 +52,7 @@ export const STATUS_LABEL: Record<Status, string> = {
 const RECENT = 20;
 
 export type Dashboard = {
+  access: DashboardAccess;
   pipeline: readonly { status: Status; label: string; count: number }[];
   applicantTotal: number;
   cycles: readonly { cycle: number; count: number }[];
@@ -72,72 +74,117 @@ function fill(keys: readonly string[], rows: readonly { key: string; count: unkn
   return keys.map((key) => ({ status: key, count: found.get(key) ?? 0 }));
 }
 
-export async function loadDashboard(db: Db): Promise<Dashboard> {
+export type DashboardAccess = {
+  readonly applicants: boolean;
+  readonly nominations: boolean;
+  readonly partners: boolean;
+  readonly signups: boolean;
+  readonly messages: boolean;
+};
+
+export function dashboardAccess(role: string): DashboardAccess {
+  return {
+    applicants: can(role, "applicants.read"),
+    nominations: can(role, "nominations.read"),
+    partners: can(role, "partners.read"),
+    signups: can(role, "signups.read"),
+    messages: can(role, "messages.read"),
+  };
+}
+
+export function hasDashboard(access: DashboardAccess): boolean {
+  return Object.values(access).some(Boolean);
+}
+
+function emptyDesk(desk: "nomination" | "partner"): DeskSummary {
+  return { desk, list: desk === "nomination" ? "nominations" : "partners", total: 0, needsAttention: 0, counts: [] };
+}
+
+// Only the sections the role may open are queried; the rest stay empty and hidden.
+export async function loadDashboard(db: Db, role: string): Promise<Dashboard> {
+  const access = dashboardAccess(role);
   return db.transaction(async (tx) => {
-    const statusRows = await tx.select({ key: applicants.status, count: count() }).from(applicants).groupBy(applicants.status);
-    const cycleRows = await tx
-      .select({ cycle: applicants.reviewCycle, count: count() })
-      .from(applicants)
-      .groupBy(applicants.reviewCycle)
-      .orderBy(applicants.reviewCycle);
-    const nominationCounts = await tx.select({ key: nominations.status, count: count() }).from(nominations).groupBy(nominations.status);
-    const waitlistCounts = await tx.select({ key: waitlist.status, count: count() }).from(waitlist).groupBy(waitlist.status);
-    const [interestTotal] = await tx.select({ count: count() }).from(interest);
-    const [partnerTotal] = await tx.select({ count: count() }).from(partnerInquiries);
-    const nominationDesk = await loadDeskSummary(tx, "nomination");
-    const partnerWorkflow = await loadDeskSummary(tx, "partner");
-    const newMessages = await countNewMessages(tx);
-    const recentNominations = await tx
-      .select({
-        id: nominations.id,
-        createdAt: nominations.createdAt,
-        nominatorName: nominations.nominatorName,
-        nomineeName: nominations.nomineeName,
-        status: deskColumns("nomination", sql`${nominations.id}`).label,
-      })
-      .from(nominations)
-      .orderBy(desc(nominations.createdAt))
-      .limit(RECENT);
-    const recentWaitlist = await tx
-      .select({ id: waitlist.id, createdAt: waitlist.createdAt, name: waitlist.name, email: waitlist.email, status: waitlist.status })
-      .from(waitlist)
-      .orderBy(desc(waitlist.createdAt))
-      .limit(RECENT);
-    const recentInterest = await tx
-      .select({
-        id: interest.id,
-        createdAt: interest.createdAt,
-        name: interest.name,
-        email: interest.email,
-        ageGroup: interest.ageGroup,
-        track: interest.track,
-      })
-      .from(interest)
-      .orderBy(desc(interest.createdAt))
-      .limit(RECENT);
-    const recentPartners = await tx
-      .select({
-        id: partnerInquiries.id,
-        createdAt: partnerInquiries.createdAt,
-        name: partnerInquiries.name,
-        email: partnerInquiries.email,
-        organization: partnerInquiries.organization,
-        support: partnerInquiries.support,
-      })
-      .from(partnerInquiries)
-      .orderBy(desc(partnerInquiries.createdAt))
-      .limit(RECENT);
+    const statusRows = access.applicants
+      ? await tx.select({ key: applicants.status, count: count() }).from(applicants).groupBy(applicants.status)
+      : [];
+    const cycleRows = access.applicants
+      ? await tx
+          .select({ cycle: applicants.reviewCycle, count: count() })
+          .from(applicants)
+          .groupBy(applicants.reviewCycle)
+          .orderBy(applicants.reviewCycle)
+      : [];
+    const nominationCounts = access.nominations
+      ? await tx.select({ key: nominations.status, count: count() }).from(nominations).groupBy(nominations.status)
+      : [];
+    const waitlistCounts = access.signups
+      ? await tx.select({ key: waitlist.status, count: count() }).from(waitlist).groupBy(waitlist.status)
+      : [];
+    const [interestTotal] = access.signups ? await tx.select({ count: count() }).from(interest) : [];
+    const [partnerTotal] = access.partners ? await tx.select({ count: count() }).from(partnerInquiries) : [];
+    const nominationDesk = access.nominations ? await loadDeskSummary(tx, "nomination") : emptyDesk("nomination");
+    const partnerWorkflow = access.partners ? await loadDeskSummary(tx, "partner") : emptyDesk("partner");
+    const newMessages = access.messages ? await countNewMessages(tx) : 0;
+    const recentNominations = access.nominations
+      ? await tx
+          .select({
+            id: nominations.id,
+            createdAt: nominations.createdAt,
+            nominatorName: nominations.nominatorName,
+            nomineeName: nominations.nomineeName,
+            status: deskColumns("nomination", sql`${nominations.id}`).label,
+          })
+          .from(nominations)
+          .orderBy(desc(nominations.createdAt))
+          .limit(RECENT)
+      : [];
+    const recentWaitlist = access.signups
+      ? await tx
+          .select({ id: waitlist.id, createdAt: waitlist.createdAt, name: waitlist.name, email: waitlist.email, status: waitlist.status })
+          .from(waitlist)
+          .orderBy(desc(waitlist.createdAt))
+          .limit(RECENT)
+      : [];
+    const recentInterest = access.signups
+      ? await tx
+          .select({
+            id: interest.id,
+            createdAt: interest.createdAt,
+            name: interest.name,
+            email: interest.email,
+            ageGroup: interest.ageGroup,
+            track: interest.track,
+          })
+          .from(interest)
+          .orderBy(desc(interest.createdAt))
+          .limit(RECENT)
+      : [];
+    const recentPartners = access.partners
+      ? await tx
+          .select({
+            id: partnerInquiries.id,
+            createdAt: partnerInquiries.createdAt,
+            name: partnerInquiries.name,
+            email: partnerInquiries.email,
+            organization: partnerInquiries.organization,
+            support: partnerInquiries.support,
+          })
+          .from(partnerInquiries)
+          .orderBy(desc(partnerInquiries.createdAt))
+          .limit(RECENT)
+      : [];
     const pipeline = PIPELINE_ORDER.map((status) => ({
       status,
       label: STATUS_LABEL[status],
       count: num(statusRows.find((row) => row.key === status)?.count),
     }));
     return {
+      access,
       pipeline,
       applicantTotal: pipeline.reduce((sum, row) => sum + row.count, 0),
       cycles: cycleRows.map((row) => ({ cycle: row.cycle, count: num(row.count) })),
-      nominations: { counts: fill(nominationStatus.enumValues, nominationCounts), recent: recentNominations },
-      waitlist: { counts: fill(waitlistStatus.enumValues, waitlistCounts), recent: recentWaitlist },
+      nominations: { counts: access.nominations ? fill(nominationStatus.enumValues, nominationCounts) : [], recent: recentNominations },
+      waitlist: { counts: access.signups ? fill(waitlistStatus.enumValues, waitlistCounts) : [], recent: recentWaitlist },
       interest: { total: num(interestTotal?.count), recent: recentInterest },
       partners: { total: num(partnerTotal?.count), recent: recentPartners },
       nominationDesk,

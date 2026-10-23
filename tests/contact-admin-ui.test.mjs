@@ -67,7 +67,7 @@ test("the messages list has a status filter, no attention filter, and no CSV", (
     statusOptions: [["new", "New"], ["read", "Read"], ["archived", "Archived"], ["spam", "Spam"]],
     weeks: [],
   };
-  const view = render(React.createElement(RecordsView, { data, exportable: true, canConfirm: true }));
+  const view = render(React.createElement(RecordsView, { data, lists: ["applicants", "nominations", "interest", "waitlist", "partners", "messages"], exportable: true, canConfirm: true }));
   try {
     assert.match(view.host.textContent, /Messages/);
     assert.match(view.host.textContent, /No messages yet/);
@@ -84,6 +84,7 @@ test("the messages list has a status filter, no attention filter, and no CSV", (
 test("the needs attention card counts new messages and links to that list", () => {
   const { DashboardView } = load("components/admin/DashboardView.tsx");
   const data = {
+    access: { applicants: true, nominations: true, partners: true, signups: true, messages: true },
     pipeline: [],
     applicantTotal: 0,
     cycles: [],
@@ -95,7 +96,7 @@ test("the needs attention card counts new messages and links to that list", () =
     partnerWorkflow: { desk: "partner", list: "partners", total: 0, needsAttention: 0, counts: [] },
     newMessages: 4,
   };
-  const view = render(React.createElement(DashboardView, { data, denied: false, weeks: [] }));
+  const view = render(React.createElement(DashboardView, { data, weeks: [] }));
   try {
     const link = view.host.querySelector("a[href='/admin/records?list=messages&status=new']");
     assert.equal(link.textContent, "4New messages");

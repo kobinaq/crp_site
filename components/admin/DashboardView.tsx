@@ -14,13 +14,13 @@ function when(value: Date): string {
   return value.toISOString().slice(0, 16).replace("T", " ");
 }
 
-export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied: boolean; weeks: readonly WeekCount[] }) {
+export function DashboardView({ data, weeks }: { data: Dashboard; weeks: readonly WeekCount[] }) {
   const attention = attentionItems(data);
+  const { access } = data;
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        {denied ? <p className="mt-3 text-sm font-semibold text-magenta">You don&apos;t have access to that page.</p> : null}
       </div>
       <section className={card} aria-labelledby="needs-attention">
         <h2 id="needs-attention" className="text-lg font-semibold">Needs attention</h2>
@@ -39,7 +39,7 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
           ))}
         </ul>
       </section>
-      <section className={card}>
+      {access.applicants ? <section className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold">Applicants</h2>
           <p className="text-sm text-black/60">{data.applicantTotal} in total</p>
@@ -64,39 +64,40 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
         ) : null}
         <h3 className="mt-6 text-base font-semibold">New applicants by week</h3>
         <WeekBars weeks={weeks} />
-      </section>
-      <section className="grid gap-6 desk:grid-cols-2">
-        <AttentionCard title="Nominations" summary={data.nominationDesk} />
-        <AttentionCard title="Partner inquiries" summary={data.partnerWorkflow} />
-        <CountCard title="Nominees invited to apply" href="/admin/records?list=nominations" rows={data.nominations.counts.map((row) => ({ ...row, label: intakeLabel(row.status) }))} />
-        <CountCard title="Waitlist" href="/admin/records?list=waitlist" rows={data.waitlist.counts.map((row) => ({ ...row, label: waitlistLabel(row.status), href: `/admin/records?list=waitlist&status=${row.status}` }))} />
-        <article className={card}>
+      </section> : null}
+      {access.nominations || access.partners || access.signups ? <section className="grid gap-6 desk:grid-cols-2">
+        {access.nominations ? <AttentionCard title="Nominations" summary={data.nominationDesk} /> : null}
+        {access.partners ? <AttentionCard title="Partner inquiries" summary={data.partnerWorkflow} /> : null}
+        {access.nominations ? <CountCard title="Nominees invited to apply" href="/admin/records?list=nominations" rows={data.nominations.counts.map((row) => ({ ...row, label: intakeLabel(row.status) }))} /> : null}
+        {access.signups ? <CountCard title="Waitlist" href="/admin/records?list=waitlist" rows={data.waitlist.counts.map((row) => ({ ...row, label: waitlistLabel(row.status), href: `/admin/records?list=waitlist&status=${row.status}` }))} /> : null}
+        {access.signups ? <article className={card}>
           <h2 className="text-lg font-semibold">Interest sign-ups</h2>
           <p className="mt-2 text-3xl font-semibold">{data.interest.total}</p>
           <Button className="mt-4" href="/admin/records?list=interest" variant="outline">Open list</Button>
-        </article>
-        <article className={card}>
+        </article> : null}
+        {access.partners ? <article className={card}>
           <h2 className="text-lg font-semibold">Partner inquiries in total</h2>
           <p className="mt-2 text-3xl font-semibold">{data.partners.total}</p>
           <Button className="mt-4" href="/admin/records?list=partners" variant="outline">Open list</Button>
-        </article>
-      </section>
-      <Table title="Latest nominations" empty="No nominations yet." headers={["Received", "Nominated by", "Nominee", "Status"]} rows={data.nominations.recent.map((row) => ({ href: `/admin/records/nominations/${row.id}`, name: row.nomineeName, cells: [when(row.createdAt), row.nominatorName, row.nomineeName, row.status] }))} />
-      <Table title="Latest partner inquiries" empty="No partner inquiries yet." headers={["Received", "Name", "Organization", "Support"]} rows={data.partners.recent.map((row) => ({ href: `/admin/records/partners/${row.id}`, name: row.name, cells: [when(row.createdAt), row.name, row.organization, row.support] }))} />
-      <Table title="Latest interest sign-ups" empty="No interest sign-ups yet." headers={["Received", "Name", "Email", "Age", "Track"]} rows={data.interest.recent.map((row) => ({ href: null, name: row.name ?? row.email, cells: [when(row.createdAt), row.name ?? "", row.email, ageLabel(row.ageGroup), row.track ? trackLabel(row.track) : ""] }))} />
-      <Table title="Latest waitlist sign-ups" empty="No waitlist sign-ups yet." headers={["Received", "Name", "Email", "Status"]} rows={data.waitlist.recent.map((row) => ({ href: null, name: row.name ?? row.email, cells: [when(row.createdAt), row.name ?? "", row.email, waitlistLabel(row.status)] }))} />
+        </article> : null}
+      </section> : null}
+      {access.nominations ? <Table title="Latest nominations" empty="No nominations yet." headers={["Received", "Nominated by", "Nominee", "Status"]} rows={data.nominations.recent.map((row) => ({ href: `/admin/records/nominations/${row.id}`, name: row.nomineeName, cells: [when(row.createdAt), row.nominatorName, row.nomineeName, row.status] }))} /> : null}
+      {access.partners ? <Table title="Latest partner inquiries" empty="No partner inquiries yet." headers={["Received", "Name", "Organization", "Support"]} rows={data.partners.recent.map((row) => ({ href: `/admin/records/partners/${row.id}`, name: row.name, cells: [when(row.createdAt), row.name, row.organization, row.support] }))} /> : null}
+      {access.signups ? <Table title="Latest interest sign-ups" empty="No interest sign-ups yet." headers={["Received", "Name", "Email", "Age", "Track"]} rows={data.interest.recent.map((row) => ({ href: null, name: row.name ?? row.email, cells: [when(row.createdAt), row.name ?? "", row.email, ageLabel(row.ageGroup), row.track ? trackLabel(row.track) : ""] }))} /> : null}
+      {access.signups ? <Table title="Latest waitlist sign-ups" empty="No waitlist sign-ups yet." headers={["Received", "Name", "Email", "Status"]} rows={data.waitlist.recent.map((row) => ({ href: null, name: row.name ?? row.email, cells: [when(row.createdAt), row.name ?? "", row.email, waitlistLabel(row.status)] }))} /> : null}
     </div>
   );
 }
 
 export function attentionItems(data: Dashboard): readonly { label: string; count: number; href: string }[] {
   const decide = data.pipeline.filter((row) => (NEEDS_DECISION_STATUSES as readonly string[]).includes(row.status)).reduce((sum, row) => sum + row.count, 0);
+  const { access } = data;
   return [
-    { label: "Applicants waiting for a decision", count: decide, href: "/admin/records?list=applicants&queue=needs" },
-    { label: "New messages", count: data.newMessages, href: messagesListHref(NEW_MESSAGE_STATUS) },
-    { label: "Nominations to follow up", count: data.nominationDesk.needsAttention, href: `/admin/records?list=${data.nominationDesk.list}&attention=needs` },
-    { label: "Partner inquiries to follow up", count: data.partnerWorkflow.needsAttention, href: `/admin/records?list=${data.partnerWorkflow.list}&attention=needs` },
-  ];
+    access.applicants ? { label: "Applicants waiting for a decision", count: decide, href: "/admin/records?list=applicants&queue=needs" } : null,
+    access.messages ? { label: "New messages", count: data.newMessages, href: messagesListHref(NEW_MESSAGE_STATUS) } : null,
+    access.nominations ? { label: "Nominations to follow up", count: data.nominationDesk.needsAttention, href: `/admin/records?list=${data.nominationDesk.list}&attention=needs` } : null,
+    access.partners ? { label: "Partner inquiries to follow up", count: data.partnerWorkflow.needsAttention, href: `/admin/records?list=${data.partnerWorkflow.list}&attention=needs` } : null,
+  ].filter((item) => item !== null);
 }
 
 function AttentionCard({ title, summary }: { title: string; summary: Dashboard["nominationDesk"] }) {

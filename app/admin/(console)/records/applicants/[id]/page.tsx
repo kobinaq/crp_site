@@ -17,7 +17,7 @@ export default async function ApplicantPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const staff = await requireStaff("dashboard.read");
+  const staff = await requireStaff("applicants.read");
   const { id } = await params;
   const listQuery = { ...parseRecordQuery(flat(await searchParams)), list: "applicants" as const };
   const parsed = parseUserId(id);
