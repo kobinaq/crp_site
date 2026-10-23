@@ -217,6 +217,17 @@ export function partnerEmail(name: string, locale: string | null | undefined, so
   };
 }
 
+export const CONTACT_EMAIL_TEMPLATE = "contact";
+
+export function contactEmail(name: string, locale: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  const greeting = ackLine(locale, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: ackLine(locale, sources, "contactSubject", "subject"),
+    html: render(language, [greeting, ackLine(locale, sources, "contact", "body")], null, shellFor(language, sources)),
+  };
+}
+
 export function applicationEmail(name: string, link: string | null, language: ApplicationLocale, sources: EmailSources): Email {
   const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
   const body = link ? appLine(language, sources, "confirm", "body") : appLine(language, sources, "waiting", "body");

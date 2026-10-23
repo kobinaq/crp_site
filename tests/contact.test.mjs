@@ -19,8 +19,10 @@ before(async () => {
   delete process.env.TURNSTILE_SECRET_KEY;
   sql = new pg.Client({ connectionString: db.url });
   await sql.connect();
-  real = loader();
+  const cache = { "next/cache": { unstable_cache: (fn) => fn, updateTag() {} } };
+  real = loader(cache);
   stored = loader({
+    ...cache,
     "@/lib/turnstile": { verifyTurnstile: async () => true },
   });
 });
@@ -113,6 +115,8 @@ test("a filled honeypot is success and stores nothing, and it skips Turnstile", 
     assert.deepEqual(await acceptReal(fields, "203.0.113.20"), { ok: true });
   });
   assert.equal(await countEmail(fields.email), 0);
+  const jobs = await sql.query("select count(*)::int as n from jobs where payload->>'to' = $1", [fields.email]);
+  assert.equal(jobs.rows[0].n, 0);
 });
 
 test("Turnstile rejection stores nothing", async () => {
@@ -163,8 +167,14 @@ test("a message is stored as new with read_at null", async () => {
   assert.equal(rows.rows[0].locale, "en");
   assert.equal(rows.rows[0].status, "new");
   assert.equal(rows.rows[0].read_at, null);
-
   const found = await sql.query("select id from contact_messages where email = $1", [storedEmail]);
+  const job = await sql.query("select payload from jobs where dedupe_key = $1", [`email:contact:${found.rows[0].id}`]);
+  assert.equal(job.rowCount, 1);
+  assert.equal(job.rows[0].payload.template, "contact");
+  assert.equal(job.rows[0].payload.to, storedEmail);
+  assert.equal(job.rows[0].payload.subject, "We've received your message");
+  assert.match(job.rows[0].payload.html, /We've received your message\./);
+  assert.doesNotMatch(job.rows[0].payload.html, /stored|retention/i);
   const user = await sql.query(
     "insert into users (email, role, name) values ($1, 'admin', 'Ada') returning id",
     [`admin-${randomUUID()}@example.org`],
@@ -189,4 +199,16 @@ test("the fifth message for an email is stored and the sixth is refused", async 
   assert.equal(await countEmail(skipped.email), 0);
   assert.deepEqual(await acceptStored(payload({ email: skipped.email }), "203.0.113.25"), { ok: true });
   assert.equal(await countEmail(skipped.email), 1);
+});
+
+test("a French receipt is queued without saying the message is stored", async () => {
+  const email = `fr-${randomUUID()}@example.com`;
+  assert.deepEqual(await acceptStored(payload({ email, locale: "fr", name: "Camille" }), "203.0.113.26"), { ok: true });
+  const row = await sql.query("select id from contact_messages where email = $1", [email]);
+  const job = await sql.query("select payload from jobs where dedupe_key = $1", [`email:contact:${row.rows[0].id}`]);
+  assert.equal(job.rowCount, 1);
+  assert.equal(job.rows[0].payload.subject, "Nous avons bien reçu votre message");
+  assert.match(job.rows[0].payload.html, /Nous avons bien reçu votre message\./);
+  assert.match(job.rows[0].payload.html, /lang="fr"/);
+  assert.doesNotMatch(job.rows[0].payload.html, /stored|retention/i);
 });

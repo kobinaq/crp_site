@@ -2,6 +2,9 @@ import { z } from "zod";
 import { COUNTRIES } from "@/lib/countries";
 import { normalizeEmail } from "@/lib/capture";
 import { contactMessages, type Db } from "@/lib/db";
+import { CONTACT_EMAIL_TEMPLATE, contactEmail } from "@/lib/emails";
+import { enqueueEmail } from "@/lib/jobs";
+import { loadEmailSources } from "@/lib/copy/read";
 import { isLocale, type Locale } from "@/lib/locale";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { rateLimit } from "@/lib/rate-limit";
@@ -9,6 +12,7 @@ import type { DeskId } from "@/lib/desk/case";
 import {
   CONTACT_LIMITS,
   CONTACT_RATE,
+  contactEmailDedupeKey,
   contactRateScopes,
   formatPhone,
   honeypotFilled,
@@ -21,6 +25,7 @@ import {
   type ContactAddress,
   type ContactIntake,
   type ContactSubmitResult,
+  type MessageId,
 } from "@/lib/contact/model";
 
 type DeskStaysClosed = Exclude<DeskId, "nomination" | "partner"> extends never ? true : never;
@@ -67,15 +72,23 @@ export async function acceptContactMessage(db: Db, raw: unknown, ip: string): Pr
     rateLimit(scopes.email, intake.email, CONTACT_RATE.perEmail, CONTACT_RATE.windowSeconds),
   ]);
   if (!ipOk || !emailOk) return { ok: false, reason: "rate_limited" };
+  const sources = await loadEmailSources();
   await db.transaction(async (tx) => {
-    await tx.insert(contactMessages).values({
+    const [row] = await tx.insert(contactMessages).values({
       name: intake.name,
       email: intake.email,
       organization: intake.organization,
       phone: intake.phone,
       body: intake.body,
       locale: intake.locale,
-    });
+    }).returning({ id: contactMessages.id });
+    const id = row.id as MessageId;
+    await enqueueEmail(
+      tx,
+      contactEmailDedupeKey(id),
+      { to: intake.email, ...contactEmail(intake.name, intake.locale, sources) },
+      CONTACT_EMAIL_TEMPLATE,
+    );
   });
   return { ok: true };
 }

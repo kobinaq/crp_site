@@ -129,7 +129,12 @@
     "emailField": "*E-mail",
     "mobile": "*Telemóvel",
     "message": "Escreva a sua mensagem aqui",
-    "send": "Enviar"
+    "send": "Enviar",
+    "sent": "Recebemos a sua mensagem.",
+    "invalid": "Verifique os campos e tente de novo.",
+    "turnstile": "A verificação não foi concluída. Tente de novo.",
+    "rateLimited": "Enviou várias mensagens. Tente mais tarde.",
+    "failed": "A mensagem não foi enviada. Tente de novo."
   },
   "hero": {
     "line1Before": "As alterações climáticas deslocam pessoas ",
