@@ -128,9 +128,18 @@ test("mark spam asks for confirmation and the other verbs submit directly", () =
     assert.ok(spam);
     assert.ok(archive);
     assert.equal(archive.getAttribute("type"), "submit");
-    act(() => {
-      spam.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
+    const OriginalFormData = globalThis.FormData;
+    globalThis.FormData = class FormData {
+      get() { return null; }
+      has() { return false; }
+    };
+    try {
+      act(() => {
+        spam.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      });
+    } finally {
+      globalThis.FormData = OriginalFormData;
+    }
     const dialog = view.host.querySelector("[role='alertdialog']");
     assert.ok(dialog);
     assert.match(dialog.textContent, /Mark as spam\?/);
