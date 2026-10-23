@@ -2,6 +2,7 @@ import Link from "next/link";
 import { card } from "@/components/admin/marks";
 import { WeekBars } from "@/components/admin/WeekBars";
 import type { Dashboard } from "@/lib/admin/dashboard";
+import { NEW_MESSAGE_STATUS, messagesListHref } from "@/lib/contact/model";
 import type { WeekCount } from "@/lib/admin/weeks";
 
 function when(value: Date): string {
@@ -44,6 +45,12 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
         <article className={card}>
           <h2 className="text-lg font-semibold">Partner inquiries</h2>
           <p className="mt-2 text-3xl font-semibold">{data.partners.total}</p>
+        </article>
+        <article className={card}>
+          <h2 className="text-lg font-semibold">New messages</h2>
+          <Link href={messagesListHref(NEW_MESSAGE_STATUS)} className="mt-2 block text-3xl font-semibold outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+            {data.newMessages}
+          </Link>
         </article>
         <AttentionCard title="Nominations needing attention" summary={data.nominationDesk} />
         <AttentionCard title="Partners needing attention" summary={data.partnerWorkflow} />

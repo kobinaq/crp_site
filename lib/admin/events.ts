@@ -1,3 +1,4 @@
+import type { ContactStatus, MessageId, NoteId } from "@/lib/contact/model";
 import type { NominationStatus, PartnerStatus } from "@/lib/desk/case";
 import { adminEvents, type Tx } from "@/lib/db";
 import type { Recommendation } from "@/lib/review/rubric";
@@ -19,6 +20,15 @@ export type AdminEvent =
   | { readonly kind: "partner.noted"; readonly partnerId: string; readonly noteId: string }
   | { readonly kind: "partner.status"; readonly partnerId: string; readonly from: PartnerStatus; readonly to: PartnerStatus }
   | { readonly kind: "partner.assigned"; readonly subject: string | null; readonly partnerId: string; readonly assigneeId: string | null; readonly previousAssigneeId: string | null }
+  | { readonly kind: "contact.noted"; readonly messageId: MessageId; readonly noteId: NoteId }
+  | { readonly kind: "contact.status"; readonly messageId: MessageId; readonly from: ContactStatus; readonly to: ContactStatus }
+  | {
+      readonly kind: "contact.assigned";
+      readonly subject: string | null;
+      readonly messageId: MessageId;
+      readonly assigneeId: string | null;
+      readonly previousAssigneeId: string | null;
+    }
   | { readonly kind: "answer.media_opened"; readonly applicantId: string; readonly questionId: string }
   | { readonly kind: "identity.document_opened"; readonly applicantId: string; readonly documentId: string };
 
@@ -40,6 +50,7 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
   if ("documentId" in event) detail.documentId = event.documentId;
   if ("nominationId" in event) detail.nominationId = event.nominationId;
   if ("partnerId" in event) detail.partnerId = event.partnerId;
+  if ("messageId" in event) detail.messageId = event.messageId;
   if ("reviewCycle" in event) detail.reviewCycle = event.reviewCycle;
   if ("recommendation" in event) detail.recommendation = event.recommendation;
   if ("criteria" in event) detail.criteria = [...event.criteria];

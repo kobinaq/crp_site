@@ -1,5 +1,7 @@
 import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { weeklyIntake, type WeekCount } from "@/lib/admin/weeks";
+import { listMessages } from "@/lib/contact/messages";
+import { CONTACT_LIST, MESSAGE_LIST_HEADERS, messageCells, messageStatusOptions } from "@/lib/contact/model";
 import { recordEvent } from "@/lib/admin/events";
 import {
   ageGroup,
@@ -29,8 +31,10 @@ import { deskColumns, deskOfList, deskWhere, statusOptions as deskStatusOptions 
 import { offeredMoves, type ConfirmMove } from "@/lib/sync";
 import { NEEDS_DECISION_STATUSES, parseQueue, type QueueName } from "@/lib/review/queue";
 
-export const RECORD_LISTS = ["applicants", "nominations", "interest", "waitlist", "partners"] as const;
+export const RECORD_LISTS = ["applicants", "nominations", "interest", "waitlist", "partners", "messages"] as const;
 export type RecordList = (typeof RECORD_LISTS)[number];
+
+const messageList = CONTACT_LIST satisfies RecordList;
 export const PAGE_SIZE = 50;
 
 export type RecordQuery = {
@@ -73,6 +77,7 @@ const TITLES: Record<RecordList, string> = {
   interest: "Interest",
   waitlist: "Waitlist",
   partners: "Partner inquiries",
+  messages: "Messages",
 };
 
 const SCREEN: Record<RecordList, readonly string[]> = {
@@ -81,6 +86,7 @@ const SCREEN: Record<RecordList, readonly string[]> = {
   interest: ["Name", "Email", "Age", "Track", "Created"],
   waitlist: ["Name", "Email", "Status", "Created"],
   partners: ["Name", "Email", "Organization", "Support", "Staff status", "Assignee", "Created"],
+  messages: MESSAGE_LIST_HEADERS,
 };
 
 export type ApplicantReview = {
@@ -256,6 +262,7 @@ export async function loadRecords(db: Db, query: RecordQuery, viewer: { readonly
 }
 
 function deskList(list: RecordList): readonly (readonly [string, string])[] {
+  if (list === messageList) return messageStatusOptions();
   const desk = deskOfList(list);
   return desk ? deskStatusOptions(desk) : [];
 }
@@ -268,6 +275,7 @@ export async function exportList(
   if (!can(actor.role, "records.export")) return null;
   return db.transaction(async (tx) => {
     const sheet = await sheetOf(tx, query, actor);
+    if (!sheet) return null;
     await recordEvent(tx, actor.id, {
       kind: "records.exported",
       list: query.list,
@@ -456,19 +464,57 @@ export async function loadReviewers(db: Db): Promise<readonly ReviewerOption[]> 
 }
 
 async function listRows(db: Store, query: RecordQuery, viewer: { readonly id: string; readonly role?: string }, limit: number, offset: number): Promise<{ rows: readonly RecordRow[]; total: number }> {
-  if (query.list === "applicants") return applicantRows(db, query, viewer, limit, offset);
-  if (query.list === "nominations") return nominationRows(db, query, viewer, limit, offset);
-  if (query.list === "interest") return interestRows(db, query, limit, offset);
-  if (query.list === "waitlist") return waitlistRows(db, query, limit, offset);
-  return partnerRows(db, query, viewer, limit, offset);
+  switch (query.list) {
+    case "applicants":
+      return applicantRows(db, query, viewer, limit, offset);
+    case "nominations":
+      return nominationRows(db, query, viewer, limit, offset);
+    case "interest":
+      return interestRows(db, query, limit, offset);
+    case "waitlist":
+      return waitlistRows(db, query, limit, offset);
+    case "partners":
+      return partnerRows(db, query, viewer, limit, offset);
+    case messageList:
+      return messageRows(db, query, viewer, limit, offset);
+    default: {
+      const unreachable: never = query.list;
+      return unreachable;
+    }
+  }
 }
 
-async function sheetOf(db: Store, query: RecordQuery, viewer: { readonly id: string }): Promise<Sheet> {
-  if (query.list === "applicants") return applicantSheet(db, query, viewer);
-  if (query.list === "nominations") return nominationSheet(db, query);
-  if (query.list === "interest") return interestSheet(db, query);
-  if (query.list === "waitlist") return waitlistSheet(db, query);
-  return partnerSheet(db, query);
+async function sheetOf(db: Store, query: RecordQuery, viewer: { readonly id: string }): Promise<Sheet | null> {
+  switch (query.list) {
+    case "applicants":
+      return applicantSheet(db, query, viewer);
+    case "nominations":
+      return nominationSheet(db, query);
+    case "interest":
+      return interestSheet(db, query);
+    case "waitlist":
+      return waitlistSheet(db, query);
+    case "partners":
+      return partnerSheet(db, query);
+    case messageList:
+      return null;
+    default: {
+      const unreachable: never = query.list;
+      return unreachable;
+    }
+  }
+}
+
+async function messageRows(db: Store, query: RecordQuery, viewer: { readonly role?: string }, limit: number, offset: number): Promise<{ rows: RecordRow[]; total: number }> {
+  const listed = await listMessages(db, { q: query.q, status: query.status, limit, offset }, { role: viewer.role ?? "" });
+  return {
+    total: listed.total,
+    rows: listed.rows.map((row) => ({
+      id: row.id,
+      href: row.href,
+      cells: messageCells(row, stamp(row.createdAt)),
+    })),
+  };
 }
 
 function applicantWhere(query: RecordQuery, viewer: { readonly id: string }): SQL | "empty" {

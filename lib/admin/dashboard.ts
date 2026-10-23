@@ -1,4 +1,5 @@
 import { count, desc, sql } from "drizzle-orm";
+import { countNewMessages } from "@/lib/contact/messages";
 import {
   applicants,
   interest,
@@ -59,6 +60,7 @@ export type Dashboard = {
   partners: { total: number; recent: readonly { id: string; createdAt: Date; name: string; email: string; organization: string; support: string }[] };
   nominationDesk: DeskSummary;
   partnerWorkflow: DeskSummary;
+  newMessages: number;
 };
 
 function num(value: unknown): number {
@@ -84,6 +86,7 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
     const [partnerTotal] = await tx.select({ count: count() }).from(partnerInquiries);
     const nominationDesk = await loadDeskSummary(tx, "nomination");
     const partnerWorkflow = await loadDeskSummary(tx, "partner");
+    const newMessages = await countNewMessages(tx);
     const recentNominations = await tx
       .select({
         id: nominations.id,
@@ -139,6 +142,7 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
       partners: { total: num(partnerTotal?.count), recent: recentPartners },
       nominationDesk,
       partnerWorkflow,
+      newMessages,
     };
   });
 }

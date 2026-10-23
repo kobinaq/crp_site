@@ -33,9 +33,9 @@ function names(text) {
 }
 
 test("each catalog has the bundled leaf count and every locale has those leaves", () => {
-  assert.equal(leaves("page").length, 372);
+  assert.equal(leaves("page").length, 377);
   assert.equal(leaves("ui").length, 114);
-  assert.equal(leaves("ackEmail").length, 13);
+  assert.equal(leaves("ackEmail").length, 15);
   assert.equal(leaves("appEmail").length, 32);
   for (const leaf of leaves("page")) {
     assert.equal(leaf.key.includes(".."), false);

@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { ContactStatus } from "@/lib/contact/model";
 import {
   pgEnum,
   pgTable,
@@ -521,6 +522,55 @@ export const deskNotes = pgTable("desk_notes", {
   check("desk_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
   index("desk_notes_record_idx").on(t.desk, t.recordId, t.createdAt),
 ]);
+
+export const contactMessages = pgTable(
+  "contact_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    organization: text("organization"),
+    phone: text("phone").notNull(),
+    body: text("body").notNull(),
+    locale: text("locale").notNull(),
+    status: text("status").$type<ContactStatus>().notNull().default("new"),
+    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    check("contact_messages_status", sql`${t.status} in ('new', 'read', 'archived', 'spam')`),
+    check("contact_messages_read_pair", sql`
+      (${t.status} = 'new' and ${t.readAt} is null)
+      or (${t.status} = 'read' and ${t.readAt} is not null)
+      or (${t.status} in ('archived', 'spam'))
+    `),
+    check("contact_messages_name_len", sql`char_length(${t.name}) between 2 and 200`),
+    check("contact_messages_email", sql`char_length(${t.email}) between 3 and 254 and ${t.email} = lower(${t.email})`),
+    check("contact_messages_organization_len", sql`${t.organization} is null or char_length(${t.organization}) between 1 and 200`),
+    check("contact_messages_phone", sql`${t.phone} ~ '^[+][0-9]{1,4} [0-9]{6,15}$'`),
+    check("contact_messages_body_len", sql`char_length(${t.body}) between 3 and 4000`),
+    check("contact_messages_locale", sql`${t.locale} in ('en', 'fr', 'es', 'pt')`),
+    index("contact_messages_created_idx").on(t.createdAt),
+    index("contact_messages_status_created_idx").on(t.status, t.createdAt),
+    index("contact_messages_assignee_idx").on(t.assigneeId),
+  ],
+);
+
+export const contactNotes = pgTable(
+  "contact_notes",
+  {
+    id: uuid("id").primaryKey(),
+    messageId: uuid("message_id").notNull().references(() => contactMessages.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").notNull().references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    check("contact_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+    index("contact_notes_message_idx").on(t.messageId, t.createdAt),
+  ],
+);
 
 export const copyDrafts = pgTable("copy_drafts", {
   catalog: text("catalog").notNull(),

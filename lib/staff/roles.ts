@@ -17,6 +17,8 @@ const GRANTS = [
   ["partners.read", "admin"],
   ["partners.manage", "admin"],
   ["identity.view", "admin"],
+  ["messages.read", "admin"],
+  ["messages.manage", "admin"],
 ] as const satisfies readonly (readonly [string, ...UserRole[]])[];
 
 export type Capability = (typeof GRANTS)[number][0];

@@ -129,7 +129,12 @@
     "emailField": "*Correo electrónico",
     "mobile": "*Teléfono móvil",
     "message": "Escribe aquí tu mensaje",
-    "send": "Enviar"
+    "send": "Enviar",
+    "sent": "Hemos recibido tu mensaje.",
+    "invalid": "Revisa los campos e inténtalo de nuevo.",
+    "turnstile": "La verificación no se completó. Inténtalo de nuevo.",
+    "rateLimited": "Has enviado varios mensajes. Inténtalo más tarde.",
+    "failed": "El mensaje no se envió. Inténtalo de nuevo."
   },
   "hero": {
     "line1Before": "El cambio climático desplaza a las personas ",

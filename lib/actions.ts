@@ -13,6 +13,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { createApplication, requestResumeLink } from "@/lib/application";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { loadEmailSources } from "@/lib/copy/read";
+import { acceptContactMessage } from "@/lib/contact/messages";
+import type { ContactSubmitResult } from "@/lib/contact/model";
 import { nominationEmail, partnerEmail } from "@/lib/emails";
 import {
   waitlistInput,
@@ -149,6 +151,11 @@ export async function submitPartner(raw: unknown): Promise<{ ok: boolean; reason
     await enqueueEmail(tx, `email:partner:${row.id}`, { to: row.email, ...partnerEmail(row.name, locale, sources) }, "partner");
   });
   return { ok: true };
+}
+
+export async function submitContact(raw: unknown): Promise<ContactSubmitResult> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return acceptContactMessage(getDb(), raw, ip);
 }
 
 export async function startApplication(raw: unknown): Promise<ApplicationResult> {
