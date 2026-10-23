@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/admin/Button";
-import { isStaffStreamPath, type AnswerView, type DocumentView } from "@/lib/holdings";
+import { staffMediaPath, type AnswerView, type DocumentView } from "@/lib/holdings";
 
 type ClipView = Extract<AnswerView, { readonly kind: "clip" }>;
 
@@ -10,7 +10,6 @@ type Player = {
   identity: string;
   src: string | null;
   failed: boolean;
-  retried: boolean;
 };
 
 type DocumentState = {
@@ -18,53 +17,25 @@ type DocumentState = {
   src: string | null;
 };
 
-async function openHolding(applicantId: string, slot: "answer" | "document", holdingId: string): Promise<string | null> {
-  const response = await fetch(`/admin/records/applicants/${applicantId}/open`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ slot, holdingId }),
-  });
-  const opened = await response.json().catch(() => null);
-  const url = opened && typeof opened === "object" && typeof opened.url === "string" ? opened.url : "";
-  if (!response.ok || !isStaffStreamPath(applicantId, url)) return null;
-  return url;
-}
-
 function blankPlayer(identity: string): Player {
-  return { identity, src: null, failed: false, retried: false };
+  return { identity, src: null, failed: false };
 }
 
+// Nothing is requested until staff press the button. The stream route checks
+// the staff session cookie, so the address carries no access code.
 export function PrivateMedia({ applicantId, view }: { applicantId: string; view: ClipView }) {
   const identity = `${applicantId}:${view.questionId}:${view.medium}`;
   const [player, setPlayer] = useState(() => blankPlayer(identity));
   if (player.identity !== identity) setPlayer(blankPlayer(identity));
   const shown = player.identity === identity ? player : blankPlayer(identity);
-  const opening = useRef(false);
-  const openingFor = useRef("");
 
-  async function open() {
-    if (opening.current && openingFor.current === identity) return;
-    opening.current = true;
-    openingFor.current = identity;
-    const requested = identity;
-    try {
-      const url = await openHolding(applicantId, "answer", view.questionId);
-      if (!url) return;
-      setPlayer((current) => current.identity === requested ? { ...current, src: url, failed: false } : current);
-    } finally {
-      if (openingFor.current === requested) opening.current = false;
-    }
+  function open() {
+    const src = staffMediaPath(applicantId, "answer", view.questionId);
+    setPlayer((current) => current.identity === identity ? { ...current, src, failed: false } : current);
   }
 
   function onError() {
-    if (!shown.src) return;
-    const retry = !shown.retried;
-    setPlayer((current) => {
-      if (current.identity !== identity || !current.src) return current;
-      if (current.retried) return { ...current, src: null, failed: true };
-      return { ...current, src: null, retried: true };
-    });
-    if (retry) void open();
+    setPlayer((current) => current.identity === identity && current.src ? { ...current, src: null, failed: true } : current);
   }
 
   if (shown.failed) return <p className="mt-3 text-sm">Playback failed</p>;
@@ -100,21 +71,10 @@ export function DocumentReveal({ applicantId, view }: { applicantId: string; vie
   const [documentState, setDocumentState] = useState(() => blankDocument(identity));
   if (documentState.identity !== identity) setDocumentState(blankDocument(identity));
   const shown = documentState.identity === identity ? documentState : blankDocument(identity);
-  const opening = useRef(false);
-  const openingFor = useRef("");
 
-  async function open() {
-    if (opening.current && openingFor.current === identity) return;
-    opening.current = true;
-    openingFor.current = identity;
-    const requested = identity;
-    try {
-      const url = await openHolding(applicantId, "document", view.documentId);
-      if (!url) return;
-      setDocumentState((current) => current.identity === requested ? { ...current, src: url } : current);
-    } finally {
-      if (openingFor.current === requested) opening.current = false;
-    }
+  function open() {
+    const src = staffMediaPath(applicantId, "document", view.documentId);
+    setDocumentState((current) => current.identity === identity ? { ...current, src } : current);
   }
 
   const image = view.contentType.startsWith("image/");
