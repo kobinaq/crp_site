@@ -4,7 +4,8 @@ import { appUrl } from "@/lib/config";
 import { signInTokens, userSessions, users, type Db, type Tx } from "@/lib/db";
 import { deliverEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
-import { issueSignInLink, staffLinkHtml, type StaffGrant } from "@/lib/staff/auth";
+import { staffSignInEmail } from "@/lib/emails";
+import { issueSignInLink, type StaffGrant } from "@/lib/staff/auth";
 import { can, isUserRole, type UserRole } from "@/lib/staff/roles";
 import { isUserId, type Email, type UserId } from "@/lib/staff/users";
 
@@ -66,7 +67,7 @@ export async function inviteStaff(db: Db, actor: StaffGrant<"users.manage">, inp
   if (issued.kind === "refused") return issued;
   const link = `${appUrl()}/admin/confirm?token=${encodeURIComponent(issued.raw)}`;
   const sent = await deliverEmail(
-    { to: input.email, subject: "Sign in to Climate Refugee Pavilion", html: staffLinkHtml(link, input.role) },
+    { to: input.email, ...staffSignInEmail(link, input.role) },
     issued.hash,
   );
   const mail: InviteMail = !sent.ok
