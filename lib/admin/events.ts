@@ -30,7 +30,8 @@ export type AdminEvent =
       readonly previousAssigneeId: string | null;
     }
   | { readonly kind: "answer.media_opened"; readonly applicantId: string; readonly questionId: string }
-  | { readonly kind: "identity.document_opened"; readonly applicantId: string; readonly documentId: string };
+  | { readonly kind: "identity.document_opened"; readonly applicantId: string; readonly documentId: string }
+  | { readonly kind: "identity.document_downloaded"; readonly applicantId: string; readonly documentId: string; readonly operator: string };
 
 export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEvent): Promise<void> {
   const subjectId = "subject" in event ? event.subject : null;
@@ -48,6 +49,7 @@ export async function recordEvent(tx: Tx, actorId: string | null, event: AdminEv
   if ("applicantId" in event) detail.applicantId = event.applicantId;
   if ("questionId" in event) detail.questionId = event.questionId;
   if ("documentId" in event) detail.documentId = event.documentId;
+  if ("operator" in event) detail.operator = event.operator;
   if ("nominationId" in event) detail.nominationId = event.nominationId;
   if ("partnerId" in event) detail.partnerId = event.partnerId;
   if ("messageId" in event) detail.messageId = event.messageId;

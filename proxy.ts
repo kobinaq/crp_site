@@ -17,6 +17,15 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers } });
   response.headers.set("Content-Language", headers.get("x-site-locale")!);
   if (!isPublic) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    // Staff pages must never be framed by another site (clickjacking) or leak
+    // their addresses through the Referer header. Same-origin framing stays
+    // allowed because the console shows private documents in an iframe.
+    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+    response.headers.set("Referrer-Policy", "same-origin");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+  }
   if (pathname === "/admin/confirm") {
     response.headers.set("Referrer-Policy", "no-referrer");
     response.headers.set("Cache-Control", "private, no-store");

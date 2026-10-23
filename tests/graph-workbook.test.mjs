@@ -73,6 +73,16 @@ test("graph workbook reads a sheet and patches the changed row on close", async 
   assert.ok(calls.some((call) => call.url.includes("/closeSession")));
 });
 
+test("applicant text that looks like a formula is written to the workbook as plain text", () => {
+  const graph = load("lib/graph-workbook.ts");
+  for (const value of ["=HYPERLINK(\"https://evil.example\",\"x\")", "+233 24 000 0000", "-1+1", "@SUM(A1)", "  =1+1"]) {
+    assert.equal(graph.workbookText(value), `'${value}`, value);
+  }
+  for (const value of ["Ada", "accept", "", "a=b", 5, -5, true]) {
+    assert.equal(graph.workbookText(value), value, String(value));
+  }
+});
+
 test("a missing Graph worksheet is reported as a missing table", async () => {
   const graph = load("lib/graph-workbook.ts");
   const realFetch = globalThis.fetch;

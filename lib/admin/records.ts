@@ -1018,8 +1018,8 @@ async function partnerSheet(db: Store, query: RecordQuery): Promise<Sheet> {
   };
 }
 
-function csvCell(value: string): string {
-  const guarded = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+export function csvCell(value: string): string {
+  const guarded = /^[\s]*[=+\-@]|^[\t\r]/.test(value) ? `'${value}` : value;
   if (/[",\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
   return guarded;
 }

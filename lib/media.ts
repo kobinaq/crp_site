@@ -299,6 +299,25 @@ export type StreamResult =
   | { readonly ok: true; readonly bytes: StaffBytes }
   | { readonly ok: false; readonly status: 403 | 404 | 502 };
 
+// Identity documents keep the type the provider reported. Only types a browser
+// shows without running code are served inline; anything else (HTML, SVG, XML)
+// downloads as opaque bytes so it can never execute on the console's origin.
+const INLINE_DOCUMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/avif",
+  "application/pdf",
+]);
+
+export function servedDocumentType(contentType: string): string | null {
+  const base = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return INLINE_DOCUMENT_TYPES.has(base) ? base : null;
+}
+
 function disposition(slot: "answer" | "document", contentType: string): string {
   const known = clipStorage(contentType);
   const subtype = contentType.split(";")[0]?.split("/")[1]?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
@@ -353,8 +372,13 @@ export async function streamHolding(db: Db, input: StreamInput): Promise<StreamR
   const object = holding ? storedObject(holding) : null;
   if (!holding || !object) return { ok: false, status: 404 };
   const read = readRangeHeader(input.rangeHeader, object.byteSize);
-  const header = streamHeaders(object.contentType, object.byteSize, read);
-  const headers = { ...header.headers, "Content-Disposition": disposition(holding.slot, object.contentType) };
+  const safeDocument = holding.slot === "document" ? servedDocumentType(object.contentType) : null;
+  const opaque = holding.slot === "document" && !safeDocument;
+  const header = streamHeaders(opaque ? "application/octet-stream" : safeDocument ?? object.contentType, object.byteSize, read);
+  const headers = {
+    ...header.headers,
+    "Content-Disposition": opaque ? 'attachment; filename="document.bin"' : disposition(holding.slot, object.contentType),
+  };
   if (read.kind === "unsatisfiable" || input.method === "HEAD") {
     return { ok: true, bytes: { status: header.status, headers, body: null } };
   }

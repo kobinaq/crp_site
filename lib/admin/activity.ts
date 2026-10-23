@@ -128,6 +128,7 @@ export function activityLabel(kind: string, detail: Record<string, unknown>): st
   if (kind === "contact.assigned") return textOf(detail, "assigneeId") ? "Assigned a message" : "Unassigned a message";
   if (kind === "answer.media_opened") return "Opened a video answer";
   if (kind === "identity.document_opened") return "Showed an identity document";
+  if (kind === "identity.document_downloaded") return `Downloaded an identity document through the operations API (${textOf(detail, "operator") || "unknown key"})`;
   return "Other change";
 }
 

@@ -736,3 +736,64 @@ test("a public identity blob is copied aside and the public url is the only dele
   getImpl = async () => { throw new Error("get was not expected"); };
 });
 
+
+test("an identity document of a scriptable type downloads as opaque bytes", async () => {
+  const id = await applicant("ada-svg@example.org");
+  const inserted = await sql.query(
+    `insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', $2, 'image/svg+xml', 5) returning id`,
+    [id, `identity/${id}/passport-0.svg`],
+  );
+  const admin = await staffUser("admin-svg@example.org", "admin");
+  const { streamHolding, servedDocumentType } = load("lib/media.ts");
+  const { parseApplicantId } = load("lib/holdings.ts");
+  const database = load("lib/db/index.ts").getDb();
+  getImpl = async () => ({
+    statusCode: 200,
+    stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("<svg>")); controller.close(); } }),
+    headers: new Headers(),
+    blob: { url: "https://store.example.vercel-storage.com/hidden", size: 5, pathname: "hidden" },
+  });
+  const served = await streamHolding(database, streamInput({ actorId: admin, role: "admin", applicantId: parseApplicantId(id), slot: "document", holdingId: inserted.rows[0].id }));
+  assert.equal(served.ok, true);
+  assert.equal(served.bytes.headers["Content-Type"], "application/octet-stream");
+  assert.match(served.bytes.headers["Content-Disposition"], /^attachment;/);
+  assert.equal(servedDocumentType("Image/JPEG; charset=binary"), "image/jpeg");
+  assert.equal(servedDocumentType("application/pdf"), "application/pdf");
+  for (const type of ["text/html", "image/svg+xml", "application/xml", ""]) assert.equal(servedDocumentType(type), null, type);
+});
+
+test("an operations download of an identity document is audited and never served as a page", async () => {
+  const { createHash } = await import("node:crypto");
+  const token = "ops-token-ops-token-ops-token-ops-token";
+  process.env.OPERATIONS_TOKENS = JSON.stringify([{ id: "support-desk", tokenHash: createHash("sha256").update(token).digest("hex") }]);
+  const id = await applicant("ada-ops@example.org");
+  const inserted = await sql.query(
+    `insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', $2, 'text/html', 5) returning id`,
+    [id, `identity/${id}/passport-0.html`],
+  );
+  const documentId = inserted.rows[0].id;
+  getImpl = async () => ({
+    statusCode: 200,
+    stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("<b>x")); controller.close(); } }),
+    headers: new Headers(),
+    blob: { url: "https://store.example.vercel-storage.com/hidden", size: 5, pathname: "hidden" },
+  });
+  const { GET } = load("app/api/ops/documents/[id]/route.ts");
+  const { NextRequest } = load("node_modules/next/server.js");
+  const call = (auth) => GET(
+    new NextRequest(`https://pavilion.example/api/ops/documents/${documentId}`, { headers: auth ? { authorization: `Bearer ${auth}` } : {} }),
+    { params: Promise.resolve({ id: documentId }) },
+  );
+  assert.equal((await call(null)).status, 401);
+  assert.equal((await call("wrong-token-wrong-token-wrong-token-xx")).status, 401);
+  assert.equal(await eventCount("identity.document_downloaded"), 0);
+  const response = await call(token);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "application/octet-stream");
+  assert.match(response.headers.get("content-disposition"), /^attachment;/);
+  const events = await sql.query(`select actor_id, detail from admin_events where kind = 'identity.document_downloaded'`);
+  assert.equal(events.rowCount, 1);
+  assert.equal(events.rows[0].actor_id, null);
+  assert.deepEqual(events.rows[0].detail, { applicantId: id, documentId, operator: "support-desk" });
+  delete process.env.OPERATIONS_TOKENS;
+});
