@@ -17,9 +17,6 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Activity</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-black/70">
-          Staff changes, CSV exports, and copy publishes. Editors keep publish history on the copy desk. This page is for admins.
-        </p>
       </div>
       <section className={card}>
         {page.rows.length === 0 ? <p className="text-sm text-black/60">No activity yet.</p> : (

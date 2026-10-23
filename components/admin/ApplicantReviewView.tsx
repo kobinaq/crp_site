@@ -4,7 +4,6 @@ import { EmailLine } from "@/components/admin/EmailLine";
 import { RecordChrome } from "@/components/admin/RecordChrome";
 import { ReviewEditor } from "@/components/admin/ReviewEditor";
 import { When } from "@/components/admin/When";
-import { buttonClass } from "@/components/admin/Button";
 import { card } from "@/components/admin/marks";
 import { STATUS_LABEL } from "@/lib/admin/dashboard";
 import { cycleLabel, languageLabel, trackLabel } from "@/lib/admin/labels";
@@ -58,7 +57,7 @@ export function ApplicantReviewView({
         <div className="order-2 grid gap-6 desk:order-1">
           <section className="grid gap-4 desk:grid-cols-2">
             <article className={card}>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">VideoAsk</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Video answers</h2>
               <p className="mt-2 text-2xl font-semibold">{review.videoAsk === "complete" ? "Complete" : "Not complete"}</p>
               <p className="mt-1 text-sm text-black/70">{review.round1CompletedAt ? <When stamp={review.round1CompletedAt} /> : "No completion time"}</p>
             </article>
@@ -163,16 +162,10 @@ function AnswerBlock({ applicantId, view }: { applicantId: string; view: AnswerV
 
 function Fact({ term, value, when = false }: { term: string; value: string; when?: boolean }) {
   const shown = when && value ? <When stamp={value} /> : value || "Not given";
-  const body = term === "Phone" && value ? (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <span>{value}</span>
-      <a className={buttonClass("outline", "sm")} href={`tel:${value.replace(/\s+/g, "")}`}>Call</a>
-    </span>
-  ) : shown;
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{term}</dt>
-      <dd className="mt-1 text-sm">{body}</dd>
+      <dd className="mt-1 break-all text-sm">{shown}</dd>
     </div>
   );
 }

@@ -324,13 +324,13 @@ async function applicantReview() {
   assert.equal(activity.rows.some((row) => row.label.startsWith("Exported")), true);
   assert.equal(activityLabel("nope", {}), "Unknown event");
   assert.equal(activityLabel("nomination.noted", { body: "private desk note" }), "Added a nomination note");
-  assert.equal(activityLabel("nomination.status", { from: "new", to: "closed" }), "Moved a nomination from new to closed");
+  assert.equal(activityLabel("nomination.status", { from: "new", to: "closed" }), "Moved a nomination from New to Closed");
   assert.equal(activityLabel("nomination.assigned", { assigneeId: "00000000-0000-4000-8000-000000000001" }), "Assigned a nomination");
   assert.equal(activityLabel("nomination.assigned", {}), "Cleared a nomination assignee");
   assert.equal(activityLabel("partner.noted", {}), "Added a partner note");
-  assert.equal(activityLabel("partner.status", { from: "new", to: "declined" }), "Moved a partner inquiry from new to declined");
+  assert.equal(activityLabel("partner.status", { from: "new", to: "declined" }), "Moved a partner inquiry from New to Declined");
   assert.equal(activityLabel("partner.assigned", { assigneeId: "" }), "Cleared a partner assignee");
-  assert.equal(activityLabel("answer.media_opened", { pathname: "videoask/secret.example", transcript: "private words" }), "Played a VideoAsk recording");
+  assert.equal(activityLabel("answer.media_opened", { pathname: "videoask/secret.example", transcript: "private words" }), "Opened a video answer");
   assert.equal(activityLabel("identity.document_opened", { url: "https://store.example.vercel-storage.com/doc" }), "Showed an identity document");
 }
 

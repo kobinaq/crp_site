@@ -14,9 +14,6 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
       <main className={`${card} mx-auto max-w-md`}>
         <Wordmark />
         <h1 className="mt-6 text-3xl font-semibold tracking-tight">Finish signing in</h1>
-        <p className="mt-2 text-sm leading-6 text-black/70">
-          The link in your email has not been used yet. Confirm to open the admin.
-        </p>
         <form action={completeStaffSignIn} className="mt-8">
           <input type="hidden" name="token" value={token} />
           <Button variant="primary" type="submit">Finish signing in</Button>

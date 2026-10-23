@@ -41,9 +41,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Staff</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-black/70">
-          Invite an editor or a reviewer. An admin cannot remove the last enabled admin, and cannot change their own account.
-        </p>
         <ResultLine message={notice ?? null} tone={params.notice === "saved" ? "ok" : "warn"} />
       </div>
       <section className={card}>

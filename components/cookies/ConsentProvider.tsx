@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   ALL_OPTIONAL,
   CONSENT_COOKIE,
@@ -54,6 +55,8 @@ function consentCookie() {
  */
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const { locale } = useLanguage();
+  const pathname = usePathname();
+  const onAdmin = pathname.startsWith("/admin");
   const raw = useSyncExternalStore<string | null>(subscribe, consentCookie, () => null);
   const consent = useMemo(() => (raw === null ? undefined : parseConsent(raw)), [raw]);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -85,7 +88,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
       {/* First in the DOM so keyboard and screen-reader users reach it early; it is
           fixed to the bottom visually. Stays mounted (inert) under the panel so focus
           can return to MANAGE PREFERENCES when the panel closes. */}
-      {consent === null ? (
+      {consent === null && !onAdmin ? (
         <CookieBanner
           hidden={panelOpen}
           onAcceptAll={() => save(ALL_OPTIONAL)}

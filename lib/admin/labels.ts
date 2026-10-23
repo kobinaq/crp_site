@@ -30,5 +30,5 @@ export function intakeLabel(value: string): string {
 
 export function cycleLabel(cycle: number): string | null {
   if (!Number.isInteger(cycle) || cycle <= 0) return null;
-  return `Cycle ${cycle}`;
+  return `Review round ${cycle}`;
 }

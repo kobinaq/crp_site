@@ -13,7 +13,7 @@ const SAVE: Record<string, string> = {
   forbidden: "Your role cannot save a review.",
   invalid: "Check the scores and the note.",
   not_found: "That applicant was not found.",
-  stale_cycle: "This review cycle is out of date. Reload the page.",
+  stale_cycle: "This review round is out of date. Reload the page.",
 };
 
 const ASSIGN: Record<string, string> = {

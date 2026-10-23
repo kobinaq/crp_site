@@ -1,12 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { confirmBulkAction, previewBulkAction } from "@/app/admin/(console)/records/actions";
 import { AdminSelect } from "@/components/admin/AdminSelect";
-import { Button, buttonClass } from "@/components/admin/Button";
-import { RecordCell } from "@/components/admin/RecordCell";
+import { Button } from "@/components/admin/Button";
+import { RecordTable } from "@/components/admin/RecordTable";
 import { ResultLine } from "@/components/admin/ResultLine";
 import type { RecordRow } from "@/lib/admin/records";
 import { languageLabel } from "@/lib/admin/labels";
@@ -115,39 +114,19 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
   return (
     <div>
       {rows.length === 0 ? <p className="mt-3 text-sm text-black/60">Nothing matches these filters.</p> : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-left text-sm">
-            <thead>
-              <tr>
-                <th scope="col" className="pb-2 font-semibold">Select</th>
-                {headers.map((header) => <th key={header} scope="col" className="pb-2 font-semibold">{header}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="border-t border-black/10 py-3 pr-4">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${row.cells[0] ?? "applicant"}`}
-                      checked={selected.includes(row.id)}
-                      onChange={() => toggle(row.id)}
-                    />
-                  </td>
-                  {row.cells.map((cell, index) => (
-                    <td key={`${row.id}-${index}`} className="border-t border-black/10 py-3 pr-4">
-                      {index === 0 && row.href ? (
-                        <Link className={buttonClass("outline", "sm")} href={row.href}>
-                          <RecordCell list="applicants" header={headers[index] ?? ""} value={cell} />
-                        </Link>
-                      ) : <RecordCell list="applicants" header={headers[index] ?? ""} value={cell} />}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RecordTable
+          list="applicants"
+          headers={headers}
+          rows={rows}
+          leading={(row) => (
+            <input
+              type="checkbox"
+              aria-label={`Select ${row.cells[0] ?? "applicant"}`}
+              checked={selected.includes(row.id)}
+              onChange={() => toggle(row.id)}
+            />
+          )}
+        />
       )}
       <div className="mt-4 grid gap-3">
         <label className="grid gap-1 text-sm font-semibold">

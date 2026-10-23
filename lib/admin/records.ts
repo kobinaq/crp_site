@@ -82,7 +82,7 @@ const TITLES: Record<RecordList, string> = {
 };
 
 const SCREEN: Record<RecordList, readonly string[]> = {
-  applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Cycle", "Created"],
+  applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Review round", "Created"],
   nominations: ["Nominator", "Nominee", "Email", "Track", "Staff status", "Assignee", "Created"],
   interest: ["Name", "Email", "Age", "Track", "Created"],
   waitlist: ["Name", "Email", "Status", "Created"],
