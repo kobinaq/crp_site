@@ -137,7 +137,6 @@ export function ContactPage() {
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [message, setMessage] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
   const [dial, setDial] = useState<Country>(US);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [widgetKey, setWidgetKey] = useState(0);
@@ -161,6 +160,8 @@ export function ContactPage() {
     if (!ready || submitting) return;
     setSubmitting(true);
     setError(null);
+    const trap = e.currentTarget.elements.namedItem(HONEYPOT_FIELD);
+    const honeypot = trap && "value" in trap ? String(trap.value) : "";
     try {
       const result = await submitContact({
         name,
@@ -171,7 +172,7 @@ export function ContactPage() {
         message,
         locale,
         turnstileToken,
-        [HONEYPOT_FIELD]: companyWebsite,
+        [HONEYPOT_FIELD]: honeypot,
       });
       if (!result.ok) {
         setTurnstileToken(null);
@@ -214,11 +215,10 @@ export function ContactPage() {
         >
           <input
             name={HONEYPOT_FIELD}
-            value={companyWebsite}
-            onChange={(e) => setCompanyWebsite(e.target.value)}
             tabIndex={-1}
             autoComplete="off"
             aria-hidden
+            defaultValue=""
             className="absolute left-[-9999px] h-px w-px overflow-hidden"
           />
           <input
@@ -276,7 +276,7 @@ export function ContactPage() {
             aria-label={c.message}
             className={`${PILL} ${PILL_TYPE} h-[171px] w-full resize-none rounded-[31.5px] py-6 pl-6 pr-8 desk:h-auto desk:min-h-0 desk:flex-1`}
           />
-          {error ? <p role="alert" className="w-full text-sm font-semibold text-black">{error}</p> : null}
+          {error ? <p role="alert" className="w-full text-sm font-semibold text-magenta">{error}</p> : null}
           <Turnstile key={widgetKey} onToken={setTurnstileToken} />
           <button
             type="submit"

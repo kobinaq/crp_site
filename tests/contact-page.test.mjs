@@ -42,6 +42,19 @@ function page(action) {
   return { Turnstile, find, render };
 }
 
+function submitEvent(honeypot = "") {
+  return {
+    preventDefault() {},
+    currentTarget: {
+      elements: {
+        namedItem(name) {
+          return name === "company_website" ? { value: honeypot } : null;
+        },
+      },
+    },
+  };
+}
+
 function fill(find, tree) {
   find(tree, (node) => node.props?.name === "name").props.onChange({ target: { value: "Ada" } });
   find(tree, (node) => node.props?.name === "email").props.onChange({ target: { value: "ada@example.com" } });
@@ -67,20 +80,20 @@ test("the contact form posts the message and keeps the published address", async
   fill(find, tree);
   tree = render();
   const widgetKey = find(tree, (node) => node.type === Turnstile).key;
-  await find(tree, (node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  await find(tree, (node) => node.type === "form").props.onSubmit(submitEvent("https://spam.example"));
   tree = render();
   assert.equal(calls[0].message, "Hello there");
+  assert.equal(calls[0].company_website, "https://spam.example");
   assert.equal(calls[0].dial, "+1");
   assert.equal(calls[0].nationalNumber, "5551234567");
   assert.equal(calls[0].locale, "fr");
-  assert.equal(calls[0].company_website, "");
   assert.notEqual(find(tree, (node) => node.type === Turnstile).key, widgetKey);
   assert.equal(find(tree, (node) => node.props?.role === "alert").props.children, copy.contactPage.turnstile);
 
   result = { ok: true };
   find(tree, (node) => node.type === Turnstile).props.onToken("fresh");
   tree = render();
-  await find(tree, (node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  await find(tree, (node) => node.type === "form").props.onSubmit(submitEvent());
   tree = render();
   assert.equal(find(tree, (node) => node.props?.role === "status").props.children, copy.contactPage.sent);
   assert.equal(find(tree, (node) => node.type === "form"), undefined);
@@ -95,7 +108,7 @@ test("a thrown submit shows the failure line and remounts Turnstile", async () =
   fill(find, tree);
   tree = render();
   const widgetKey = find(tree, (node) => node.type === Turnstile).key;
-  await find(tree, (node) => node.type === "form").props.onSubmit({ preventDefault() {} });
+  await find(tree, (node) => node.type === "form").props.onSubmit(submitEvent());
   tree = render();
   assert.equal(find(tree, (node) => node.props?.role === "alert").props.children, copy.contactPage.failed);
   assert.notEqual(find(tree, (node) => node.type === Turnstile).key, widgetKey);
