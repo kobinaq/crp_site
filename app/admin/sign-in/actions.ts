@@ -9,6 +9,7 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { issueSignInLink } from "@/lib/staff/auth";
 import { staffSameOrigin } from "@/lib/staff/origin";
 import { parseEmail } from "@/lib/staff/users";
+import { staffSignInLink } from "@/lib/staff/link";
 
 const SENT = "If this address can sign in, a link is on its way.";
 
@@ -22,7 +23,7 @@ export async function requestStaffLink(_previous: { message: string; devLink?: s
   if (!allowed) return { message: SENT };
   const issued = await issueSignInLink(getDb(), email);
   if (!issued) return { message: SENT };
-  const link = `${appUrl()}/admin/confirm?token=${encodeURIComponent(issued.raw)}`;
+  const link = staffSignInLink(appUrl(), issued.raw);
   const mail = staffSignInEmail(link, null);
   const sent = await deliverEmail({ to: email, subject: mail.subject, html: mail.html }, issued.hash);
   if (!sent.ok) return { message: SENT };

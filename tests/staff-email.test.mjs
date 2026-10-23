@@ -8,7 +8,7 @@ const { staffLinkHtml } = load("lib/staff/auth.ts");
 const { applicationEmail } = load("lib/emails.ts");
 const { JSON_EMAILS } = load("lib/copy/sources.ts");
 
-const LINK = "https://pavilion.example/admin/confirm?token=abc_def-XYZ";
+const LINK = "https://pavilion.example/admin/confirm#token=abc_def-XYZ";
 
 function shellMarks(html) {
   return {

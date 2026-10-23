@@ -8,6 +8,7 @@ import { staffSignInEmail } from "@/lib/emails";
 import { issueSignInLink, type StaffGrant } from "@/lib/staff/auth";
 import { can, isUserRole, type UserRole } from "@/lib/staff/roles";
 import { isUserId, type Email, type UserId } from "@/lib/staff/users";
+import { staffSignInLink } from "@/lib/staff/link";
 
 export type StaffStatus = "invited" | "active" | "disabled";
 
@@ -65,7 +66,7 @@ export async function inviteStaff(db: Db, actor: StaffGrant<"users.manage">, inp
   if (!allowed) return { kind: "refused", reason: "rate-limited" };
   const issued = await db.transaction((tx) => issueInvite(tx, actor.id, input));
   if (issued.kind === "refused") return issued;
-  const link = `${appUrl()}/admin/confirm?token=${encodeURIComponent(issued.raw)}`;
+  const link = staffSignInLink(appUrl(), issued.raw);
   const sent = await deliverEmail(
     { to: input.email, ...staffSignInEmail(link, input.role) },
     issued.hash,
