@@ -1,4 +1,7 @@
+"use client";
+
 import { trail } from "@/lib/fonts";
+import { useFitText } from "@/lib/useFitText";
 
 type DisplayWordmarkProps = {
   word: string;
@@ -13,6 +16,8 @@ export function DisplayWordmark({
   className = "",
   size = "md",
 }: DisplayWordmarkProps) {
+  // Translated words can be longer than the English ("PLATEFORME", "CONTENIDOS").
+  const wordRef = useFitText<HTMLSpanElement>(word);
   let theClass: string;
   let wordClass: string;
   switch (size) {
@@ -48,7 +53,7 @@ export function DisplayWordmark({
   return (
     <div className={`flex flex-col items-center text-center ${stackGap} ${className}`}>
       <span className={theClass}>{kicker}</span>
-      <span aria-label={word} className={wordClass}>
+      <span ref={wordRef} aria-label={word} className={`max-w-full ${wordClass}`}>
         {word}
       </span>
     </div>

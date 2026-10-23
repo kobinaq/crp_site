@@ -16,6 +16,7 @@ import {
 } from "@/lib/contact/model";
 import { submitContact } from "@/lib/actions";
 import { trail } from "@/lib/fonts";
+import { useFitText } from "@/lib/useFitText";
 import { CountryDropdown } from "../apply/CountryDropdown";
 import { useCopy, useLanguage } from "../LanguageProvider";
 import { Turnstile, TURNSTILE_SITE_KEY } from "../Turnstile";
@@ -139,6 +140,7 @@ export function ContactPage() {
   const copy = useCopy();
   const { locale } = useLanguage();
   const c = copy.contactPage;
+  const titleRef = useFitText<HTMLHeadingElement>(c.title);
   const desk = useDesk();
   const [name, setName] = useState("");
   const [organization, setOrganization] = useState("");
@@ -240,6 +242,7 @@ export function ContactPage() {
       <div className="mx-auto flex w-full min-w-0 max-w-[1072px] flex-col overflow-hidden rounded-[88px] bg-white px-6 py-8 desk:h-[629px] desk:min-h-0 desk:flex-row desk:items-end desk:rounded-[154px] desk:px-10 desk:py-16">
         <div className="mb-[-19px] flex flex-col desk:mb-0 desk:h-[501px] desk:w-[558px] desk:shrink-0 desk:-mr-[109px]">
           <h1
+            ref={titleRef}
             className={`${trail.className} text-[64px] uppercase leading-[0.9] tracking-[2.56px] text-black desk:flex-1 desk:text-[clamp(56px,12vw,130px)] desk:tracking-[5.2px]`}
           >
             {c.title}
