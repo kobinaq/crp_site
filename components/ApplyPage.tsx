@@ -4,6 +4,7 @@ import Link from "@/components/LocaleLink";
 import { useCallback, useState } from "react";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { trail } from "@/lib/fonts";
+import { useFitText } from "@/lib/useFitText";
 import {
   AgeSelectionLayout,
   APPLY_GRADIENT,
@@ -82,6 +83,8 @@ const HERO_CTA =
 
 export function ApplyPage() {
   const copy = useCopy();
+  // "PRÓXI-" and "DADES" are wider than any line of "MORE COMING SOON" on phones.
+  const moreRef = useFitText<HTMLParagraphElement>(copy.apply.more);
   const applyFlow = useApplyFlowEnabled();
   const [interestGroup, setInterestGroup] = useState<InterestAgeGroup | null>(
     null,
@@ -137,6 +140,7 @@ export function ApplyPage() {
             />
             <div className="relative flex size-[244px] shrink-0 items-start overflow-hidden rounded-[64px] bg-white p-6 desk:h-full desk:w-auto desk:flex-1 desk:p-[32px]">
               <p
+                ref={moreRef}
                 aria-label={copy.a11y.moreComingSoon}
                 className={`${trail.className} absolute left-6 top-[72px] w-[min(100%-3rem,280px)] text-[80px] uppercase leading-[0.67] tracking-[-0.04em] text-black/32 desk:left-[32px] desk:top-[calc(50%-176.67px)] desk:w-[407px] desk:text-[135.429px] desk:tracking-[-5.4171px]`}
               >
