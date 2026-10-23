@@ -51,6 +51,8 @@ Waitlist and interest forms now queue confirmation emails. No record is created,
 resubscribed, or updated until its mailbox owner confirms. Both known and unknown
 addresses receive the same public response. Confirmation links are single-use,
 short-lived, and unaffected by GET previews. Nomination submissions remain separate.
+The contact form stores a message after Turnstile and the rate limit, then
+queues a short receipt to the sender. There is no staff notification email.
 
 ## Individual operations access
 
