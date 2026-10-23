@@ -4,24 +4,26 @@ import { AdminNav } from "@/components/admin/AdminNav";
 import { countNewMessages } from "@/lib/contact/messages";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/staff/gate";
-import { can, type Capability } from "@/lib/staff/roles";
+import { can } from "@/lib/staff/roles";
+import { AREA_HREF, consoleAreas, type ConsoleArea } from "@/lib/admin/access";
 import { signOut } from "./actions";
 
-const NAV: readonly { readonly href: string; readonly label: string; readonly capability: Capability }[] = [
-  { href: "/admin", label: "Dashboard", capability: "dashboard.read" },
-  { href: "/admin/records", label: "Records", capability: "dashboard.read" },
-  { href: "/admin/copy", label: "Website text", capability: "copy.edit" },
-  { href: "/admin/staff", label: "Staff", capability: "users.manage" },
-  { href: "/admin/activity", label: "Activity", capability: "activity.read" },
+const NAV: readonly { readonly area: ConsoleArea; readonly label: string }[] = [
+  { area: "dashboard", label: "Dashboard" },
+  { area: "records", label: "Records" },
+  { area: "copy", label: "Website text" },
+  { area: "staff", label: "Staff" },
+  { area: "activity", label: "Activity" },
 ];
 
 export default async function ConsoleLayout({ children }: { children: ReactNode }) {
   const staff = await requireStaff("dashboard.read");
   const messages = can(staff.role, "messages.read") ? await countNewMessages(getDb()) : 0;
-  const items = NAV.filter((item) => can(staff.role, item.capability)).map((item) => ({
-    href: item.href,
+  const areas = consoleAreas(staff.role);
+  const items = NAV.filter((item) => areas.includes(item.area)).map((item) => ({
+    href: AREA_HREF[item.area],
     label: item.label,
-    badge: item.href === "/admin/records" && messages > 0 ? messages : undefined,
+    badge: item.area === "records" && messages > 0 ? messages : undefined,
   }));
   return (
     <AdminFrame>

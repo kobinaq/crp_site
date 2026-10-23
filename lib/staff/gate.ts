@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { readStaff, revokeSession, STAFF_COOKIE, staffCookieOptions, type Staff, type StaffGrant } from "@/lib/staff/auth";
 import { staffSameOrigin } from "@/lib/staff/origin";
@@ -13,7 +13,8 @@ export async function currentStaff(): Promise<Staff | null> {
 export async function requireStaff<C extends Capability>(capability: C): Promise<StaffGrant<C>> {
   const staff = await currentStaff();
   if (!staff) redirect("/admin/sign-in");
-  if (!can(staff.role, capability)) redirect("/admin?denied=1");
+  // A page a role cannot use does not exist for that role.
+  if (!can(staff.role, capability)) notFound();
   return staff as StaffGrant<C>;
 }
 

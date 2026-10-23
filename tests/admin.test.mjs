@@ -189,7 +189,7 @@ async function dashboardCounts() {
   await sql.query(`insert into interest (email, age_group) values ('interest@example.org', '19_plus')`);
   await sql.query(`insert into waitlist (email) values ('wait@example.org')`);
   await sql.query(`insert into partner_inquiries (name, email, organization, designation, support) values ('Pat', 'pat@example.org', 'Org', 'Lead', 'Funding')`);
-  const dashboard = await loadDashboard(mod("lib/db/index.ts").getDb());
+  const dashboard = await loadDashboard(mod("lib/db/index.ts").getDb(), "admin");
   assert.equal(dashboard.pipeline.find((row) => row.status === "submitted").count, 0);
   assert.equal(dashboard.nominations.counts.find((row) => row.status === "new").count, 1);
   assert.equal(dashboard.nominations.counts.find((row) => row.status === "declined").count, 0);
@@ -198,6 +198,19 @@ async function dashboardCounts() {
   assert.equal(dashboard.partnerWorkflow.needsAttention, 1);
   assert.equal(dashboard.nominations.recent[0].status, "New");
   assert.equal(dashboard.interest.total, 1);
+  const reviewerView = await loadDashboard(mod("lib/db/index.ts").getDb(), "reviewer");
+  assert.deepEqual(reviewerView.access, { applicants: true, nominations: true, partners: false, signups: false, messages: false });
+  assert.equal(reviewerView.nominationDesk.needsAttention, 1);
+  assert.equal(reviewerView.interest.total, 0);
+  assert.equal(reviewerView.interest.recent.length, 0);
+  assert.equal(reviewerView.waitlist.recent.length, 0);
+  assert.equal(reviewerView.partners.total, 0);
+  assert.equal(reviewerView.partnerWorkflow.needsAttention, 0);
+  assert.equal(reviewerView.newMessages, 0);
+  const editorView = await loadDashboard(mod("lib/db/index.ts").getDb(), "editor");
+  assert.equal(Object.values(editorView.access).some(Boolean), false);
+  assert.equal(editorView.nominations.recent.length, 0);
+  assert.equal(editorView.applicantTotal, 0);
   assert.equal(dashboard.partners.total, 1);
   assert.equal(JSON.stringify(dashboard).includes("round1_link"), false);
   assert.equal(JSON.stringify(dashboard).includes("identity_link"), false);

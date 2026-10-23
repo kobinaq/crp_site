@@ -469,7 +469,7 @@ test("the messages list searches the body, hides an unknown status, and does not
   assert.equal(messageWeeks.reduce((sum, row) => sum + row.count, 0), messages.rows[0].n);
   assert.equal(partnerWeeks.reduce((sum, row) => sum + row.count, 0), partners.rows[0].n);
 
-  const dashboard = await stored("lib/admin/dashboard.ts").loadDashboard(database);
+  const dashboard = await stored("lib/admin/dashboard.ts").loadDashboard(database, "admin");
   const fresh = await sql.query("select count(*)::int as n from contact_messages where status = 'new'");
   assert.equal(dashboard.newMessages, fresh.rows[0].n);
 

@@ -7,13 +7,12 @@ import { WeekBars } from "@/components/admin/WeekBars";
 import { card, field } from "@/components/admin/marks";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
 import { ageLabel, languageLabel, trackLabel, waitlistLabel } from "@/lib/admin/labels";
-import type { RecordPage, RecordQuery } from "@/lib/admin/records";
-import { RECORD_LISTS } from "@/lib/admin/records";
+import type { RecordList, RecordPage, RecordQuery } from "@/lib/admin/records";
 import { filtersAreOpen, recordsHref } from "@/lib/admin/return";
 import { CONTACT_LIST, showsAttention } from "@/lib/contact/model";
 import { ageGroup, appLanguage, track, waitlistStatus } from "@/lib/db";
 
-const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
+const LABELS: Record<RecordList, string> = {
   applicants: "Applicants",
   nominations: "Nominations",
   interest: "Interest",
@@ -22,7 +21,7 @@ const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
   messages: "Messages",
 };
 
-const SEARCH: Record<(typeof RECORD_LISTS)[number], string> = {
+const SEARCH: Record<RecordList, string> = {
   applicants: "Name, email, nationality, or city",
   nominations: "Nominator or nominee",
   interest: "Name or email",
@@ -31,14 +30,24 @@ const SEARCH: Record<(typeof RECORD_LISTS)[number], string> = {
   messages: "Name, email, phone, or message",
 };
 
-export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage; exportable: boolean; canConfirm: boolean }) {
+export function RecordsView({
+  data,
+  lists,
+  exportable,
+  canConfirm,
+}: {
+  data: RecordPage;
+  lists: readonly RecordList[];
+  exportable: boolean;
+  canConfirm: boolean;
+}) {
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const filtered = filtersAreOpen(data.filters);
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <h1 className="text-3xl font-semibold tracking-tight">Records</h1>
       <nav className="flex flex-wrap gap-2" aria-label="Lists">
-        {RECORD_LISTS.map((list) => (
+        {lists.map((list) => (
           <Button key={list} variant={list === data.list ? "solid" : "outline"} href={recordsHref({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "", attention: "" })}>
             {LABELS[list]}
           </Button>

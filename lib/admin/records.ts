@@ -23,7 +23,7 @@ import {
   type Store,
 } from "@/lib/db";
 import type { StaffGrant } from "@/lib/staff/auth";
-import { can } from "@/lib/staff/roles";
+import { can, type Capability } from "@/lib/staff/roles";
 import { isUserId } from "@/lib/staff/users";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
 import { parseApplicantId, type AnswerView, type DocumentView } from "@/lib/holdings";
@@ -36,6 +36,20 @@ export const RECORD_LISTS = ["applicants", "nominations", "interest", "waitlist"
 export type RecordList = (typeof RECORD_LISTS)[number];
 
 const messageList = CONTACT_LIST satisfies RecordList;
+
+// Who may open each list. Pages, tabs, and the dashboard all read this one map.
+export const LIST_CAPABILITY: Record<RecordList, Capability> = {
+  applicants: "applicants.read",
+  nominations: "nominations.read",
+  interest: "signups.read",
+  waitlist: "signups.read",
+  partners: "partners.read",
+  messages: "messages.read",
+};
+
+export function readableLists(role: string): readonly RecordList[] {
+  return RECORD_LISTS.filter((list) => can(role, LIST_CAPABILITY[list]));
+}
 export const PAGE_SIZE = 50;
 
 export type RecordQuery = {
@@ -312,7 +326,7 @@ export async function exportList(
   actor: StaffGrant<"records.export">,
   query: RecordQuery,
 ): Promise<{ readonly filename: string; readonly body: string } | null> {
-  if (!can(actor.role, "records.export")) return null;
+  if (!can(actor.role, "records.export") || !can(actor.role, LIST_CAPABILITY[query.list])) return null;
   return db.transaction(async (tx) => {
     const sheet = await sheetOf(tx, query, actor);
     if (!sheet) return null;

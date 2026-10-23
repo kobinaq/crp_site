@@ -79,6 +79,7 @@ test("applicants, nominations, partners, and messages open from the row, with th
   ];
   const views = lists.map(([list, headers, row]) => render(React.createElement(RecordsView, {
     data: page(list, headers, row),
+    lists: ["applicants", "nominations", "interest", "waitlist", "partners", "messages"],
     exportable: false,
     canConfirm: false,
   })));

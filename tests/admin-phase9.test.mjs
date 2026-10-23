@@ -114,6 +114,7 @@ test("the copy desk shows the plain label and keeps the key as a tooltip only", 
 
 function dashboard(overrides = {}) {
   return {
+    access: { applicants: true, nominations: true, partners: true, signups: true, messages: true },
     pipeline: [],
     applicantTotal: 0,
     cycles: [],
@@ -144,7 +145,7 @@ test("needs attention sums the decision statuses and links each count to its lis
 
 test("an empty dashboard says all caught up", () => {
   const { DashboardView } = load("components/admin/DashboardView.tsx");
-  const view = render(React.createElement(DashboardView, { data: dashboard(), denied: false, weeks: [] }));
+  const view = render(React.createElement(DashboardView, { data: dashboard(), weeks: [] }));
   try {
     assert.match(view.host.textContent, /All caught up\./);
   } finally {
@@ -155,7 +156,7 @@ test("an empty dashboard says all caught up", () => {
 test("dashboard rows open from the whole row and the name stays plain text", () => {
   const { DashboardView } = load("components/admin/DashboardView.tsx");
   const recent = [{ id: "p1", createdAt: new Date("2026-10-01T10:00:00Z"), name: "North Sea Trust", email: "n@example.org", organization: "NST", support: "Funding" }];
-  const view = render(React.createElement(DashboardView, { data: dashboard({ partners: { total: 1, recent } }), denied: false, weeks: [] }));
+  const view = render(React.createElement(DashboardView, { data: dashboard({ partners: { total: 1, recent } }), weeks: [] }));
   try {
     const link = view.host.querySelector("a[href='/admin/records/partners/p1']");
     assert.equal(link.getAttribute("aria-label"), "Open North Sea Trust");

@@ -414,7 +414,7 @@ test("record filters show the address, and a select follows a new value from the
       weeks: [],
     };
   }
-  const records = await render(React.createElement(RecordsView, { data: pageData("alpha", "new"), exportable: false, canConfirm: false }));
+  const records = await render(React.createElement(RecordsView, { data: pageData("alpha", "new"), lists: ["applicants", "nominations", "interest", "waitlist", "partners", "messages"], exportable: false, canConfirm: false }));
   const options = [
     { value: "reviewer", label: "reviewer" },
     { value: "editor", label: "editor" },
@@ -424,7 +424,7 @@ test("record filters show the address, and a select follows a new value from the
   try {
     assert.equal(document.querySelector("input[name=q]").value, "alpha");
     assert.equal(document.querySelector("input[name=status]").value, "new");
-    await records.rerender(React.createElement(RecordsView, { data: pageData("beta", ""), exportable: false, canConfirm: false }));
+    await records.rerender(React.createElement(RecordsView, { data: pageData("beta", ""), lists: ["applicants", "nominations", "interest", "waitlist", "partners", "messages"], exportable: false, canConfirm: false }));
     assert.equal(document.querySelector("input[name=q]").value, "beta");
     assert.equal(document.querySelector("input[name=status]").value, "");
     assert.equal(document.querySelector("input[name=role]").value, "reviewer");
