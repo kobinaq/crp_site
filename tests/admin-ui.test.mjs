@@ -190,44 +190,26 @@ async function settle() {
   });
 }
 
-test("a play started for one applicant does not block or fill the next applicant", async () => {
+test("a play started for one applicant does not fill the next applicant", async () => {
   const { PrivateMedia } = load("components/admin/PrivateMedia.tsx");
-  const original = global.fetch;
-  const pending = [];
-  global.fetch = (url) => new Promise((resolve) => {
-    const id = String(url).match(/applicants\/([^/]+)\/open/)[1];
-    pending.push(() => resolve({
-      ok: true,
-      json: async () => ({ url: `/admin/records/applicants/${id}/stream/tok.en` }),
-    }));
-  });
   const media = await render(React.createElement(PrivateMedia, { applicantId: "applicant-a", view: clip("intro") }));
   try {
     await act(async () => { document.querySelector("button").click(); });
+    assert.match(document.querySelector("video").src, /applicant-a\/media\/answer\/intro$/);
     await media.rerender(React.createElement(PrivateMedia, { applicantId: "applicant-b", view: clip("intro") }));
-    await act(async () => { document.querySelector("button").click(); });
-    assert.equal(pending.length, 2);
-    await act(async () => { pending[0](); });
-    await settle();
     assert.equal(document.querySelector("video"), null);
-    await act(async () => { pending[1](); });
+    await act(async () => { document.querySelector("button").click(); });
     await settle();
     assert.match(document.querySelector("video").src, /applicant-b/);
     assert.doesNotMatch(document.querySelector("video").src, /applicant-a/);
   } finally {
-    global.fetch = original;
     await media.unmount();
   }
 });
 
 test("the media player and document card drop the previous applicant", async () => {
   const { PrivateMedia, DocumentReveal } = load("components/admin/PrivateMedia.tsx");
-  const original = global.fetch;
   let applicant = "applicant-a";
-  global.fetch = async () => ({
-    ok: true,
-    json: async () => ({ url: `/admin/records/applicants/${applicant}/stream/tok.en` }),
-  });
   const media = await render(React.createElement(PrivateMedia, { applicantId: applicant, view: clip("intro") }));
   const documentView = await render(React.createElement(DocumentReveal, {
     applicantId: applicant,
@@ -253,7 +235,6 @@ test("the media player and document card drop the previous applicant", async () 
     assert.match(document.querySelector("video").src, /applicant-b/);
     assert.doesNotMatch(document.querySelector("video").src, /applicant-a/);
   } finally {
-    global.fetch = original;
     await media.unmount();
     await documentView.unmount();
   }

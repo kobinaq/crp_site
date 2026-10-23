@@ -32,6 +32,7 @@ export async function GET(
       "Content-Disposition": `inline; filename="${document.kind.replace(/[^a-z0-9_-]+/gi, "_")}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
     },
   });
 }
