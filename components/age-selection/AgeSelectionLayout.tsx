@@ -222,13 +222,18 @@ function ApplyFooter() {
           tone="color"
           imgClassName="mx-auto h-12 w-auto object-contain desk:mx-0 desk:h-[121px] desk:w-[341px] desk:object-left"
         />
-        <div className="flex w-full justify-center gap-8 whitespace-nowrap desk:w-auto desk:justify-start desk:gap-[64px]">
+        {/* Mobile: titles and links wrap at spaces (e.g. "Informations légales") so the row never
+            outgrows the screen; each column still keeps its longest word whole, and under 380px the gap
+            narrows so pt (Patrocinadores / Solidariedade / Informação) fits at 360. From 420px up to
+            desktop the row may use the footer's side padding, as it always has, so wider phones keep
+            the one-line titles. Desktop stays on one line. */}
+        <div className="flex w-full justify-center gap-8 max-[380px]:gap-5 min-[420px]:max-desk:-mx-5 min-[420px]:max-desk:w-[calc(100%+40px)] desk:w-auto desk:justify-start desk:gap-[64px] desk:whitespace-nowrap">
           {copy.footer.columns.map((col, columnIndex) => (
             <div
               key={col.title}
               className="flex flex-col items-start gap-3 desk:gap-[16px]"
             >
-              <p className="text-[12px] font-bold tracking-[1.2px] text-[#111] uppercase">
+              <p className="break-words text-[12px] font-bold tracking-[1.2px] text-[#111] uppercase">
                 {col.title}
               </p>
               {col.links.map((link, linkIndex) => {
