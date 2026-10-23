@@ -9,12 +9,13 @@ import { RecordTable } from "@/components/admin/RecordTable";
 import { ResultLine } from "@/components/admin/ResultLine";
 import type { RecordRow } from "@/lib/admin/records";
 import { languageLabel } from "@/lib/admin/labels";
+import { bulkDecisionKey } from "@/lib/review/bulk-key";
 import type { ConfirmMove } from "@/lib/sync";
 
 const MOVES: readonly { readonly move: ConfirmMove; readonly label: string }[] = [
   { move: { field: "reviewDecision", value: "accept", to: "accepted" }, label: "Accept" },
-  { move: { field: "reviewDecision", value: "reject", to: "rejected" }, label: "Reject" },
-  { move: { field: "reviewDecision", value: "reject", to: "online_offered" }, label: "Reject, offer an online place" },
+  { move: { field: "reviewDecision", value: "reject", to: "rejected" }, label: "Reject (online applicants)" },
+  { move: { field: "reviewDecision", value: "reject", to: "online_offered" }, label: "Reject, offer an online place (in-person applicants)" },
   { move: { field: "interviewOutcome", value: "yes", to: "interview_yes" }, label: "Passed interview" },
   { move: { field: "interviewOutcome", value: "no", to: "rejected" }, label: "Did not pass interview, reject" },
   { move: { field: "interviewOutcome", value: "no", to: "online_offered" }, label: "Did not pass interview, offer an online place" },
@@ -42,8 +43,9 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
   const [counts, setCounts] = useState<{ apply: number; stale: number; notAllowed: number; notFound: number } | null>(null);
   const [languages, setLanguages] = useState<readonly { language: string; apply: number }[]>([]);
   const [decisionIds, setDecisionIds] = useState<Record<string, string>>({});
-  const [results, setResults] = useState<readonly { applicantId: string; result: string }[]>([]);
+  const [results, setResults] = useState<readonly { applicantId: string; result: string; name: string }[]>([]);
   const choice = MOVES[moveIndex]?.move;
+  const names = new Map(rows.map((row) => [row.id, row.cells[0] ?? ""]));
   const picked = rows.filter((row) => selected.includes(row.id) && typeof row.version === "number" && typeof row.reviewCycle === "number");
   const key = `${picked.map((row) => `${row.id}:${row.version}`).sort().join(",")}::${choice ? `${choice.field}:${choice.value}:${choice.to}` : ""}`;
   const ready = Boolean(choice && picked.length > 0 && previewKey === key && counts);
@@ -58,8 +60,13 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
     const requested = key;
     const ticket = ++request.current;
     setPending(true);
+    // One id per row, version, and move. Confirming the same choice again
+    // replays it, and a different choice later on this page gets its own id.
     const ids = { ...decisionIds };
-    for (const row of picked) if (!ids[row.id]) ids[row.id] = crypto.randomUUID();
+    for (const row of picked) {
+      const slot = bulkDecisionKey(row.id, row.version as number, row.reviewCycle as number, choice);
+      if (!ids[slot]) ids[slot] = crypto.randomUUID();
+    }
     setDecisionIds(ids);
     try {
       const result = await previewBulkAction({
@@ -94,7 +101,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
           applicantId: row.id,
           version: row.version,
           reviewCycle: row.reviewCycle,
-          decisionId: decisionIds[row.id],
+          decisionId: decisionIds[bulkDecisionKey(row.id, row.version as number, row.reviewCycle as number, choice)],
         })),
       });
       if (request.current !== ticket) return;
@@ -102,7 +109,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
         setNotice(result.result === "forbidden" ? "You don't have permission to confirm a decision." : "That confirmation could not be read.");
         return;
       }
-      setResults(result.rows);
+      setResults(result.rows.map((row) => ({ ...row, name: names.get(row.applicantId) ?? "" })));
       setPreviewKey("");
       setCounts(null);
       router.refresh();
@@ -151,7 +158,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
         <ResultLine message={notice} tone="warn" />
         {results.length > 0 ? (
           <ul className="grid gap-1 text-sm">
-            {results.map((row) => <li key={row.applicantId}>{RESULT[row.result] ?? row.result}</li>)}
+            {results.map((row) => <li key={row.applicantId}>{row.name ? `${row.name}: ` : ""}{RESULT[row.result] ?? row.result}</li>)}
           </ul>
         ) : null}
       </div>
