@@ -15,12 +15,15 @@ import { can } from "@/lib/staff/roles";
 import { isUserId, type UserId } from "@/lib/staff/users";
 import type { DeskId } from "@/lib/desk/case";
 import {
+  CONSTRAINT_FIELD,
+  CONTACT_FIELDS,
   CONTACT_LIMITS,
   CONTACT_RATE,
   CONTACT_STATUS_LABEL,
   NEW_MESSAGE_STATUS,
   applyAssign,
   applyContactVerb,
+  charLength,
   contactEmailDedupeKey,
   contactRateScopes,
   deskStateOf,
@@ -37,6 +40,7 @@ import {
   turnstileTokenOf,
   verbsFor,
   type ContactAddress,
+  type ContactField,
   type ContactIntake,
   type ContactStatus,
   type ContactSubmitResult,
@@ -55,13 +59,20 @@ const knownDials = COUNTRIES.map((country) => country.dial);
 
 function parseContactEmail(value: unknown): ContactAddress | null {
   if (typeof value !== "string") return null;
-  const parsed = z.string().trim().max(CONTACT_LIMITS.emailMax).transform(normalizeEmail).pipe(z.email()).safeParse(value);
-  if (!parsed.success || parsed.data.length < CONTACT_LIMITS.emailMin) return null;
+  const parsed = z.string().trim().max(CONTACT_LIMITS.emailMax * 2).transform(normalizeEmail).pipe(z.email()).safeParse(value);
+  if (!parsed.success) return null;
+  // Measured after lowercasing, on the exact string the insert stores, in code points like char_length.
+  const length = charLength(parsed.data);
+  if (length < CONTACT_LIMITS.emailMin || length > CONTACT_LIMITS.emailMax) return null;
   return parsed.data as ContactAddress;
 }
 
-export function parseContactIntake(raw: unknown, dials: readonly string[] = knownDials): ContactIntake | null {
-  if (!raw || typeof raw !== "object") return null;
+export type ContactValidation =
+  | { readonly ok: true; readonly intake: ContactIntake }
+  | { readonly ok: false; readonly fields: readonly ContactField[] };
+
+export function validateContactIntake(raw: unknown, dials: readonly string[] = knownDials): ContactValidation {
+  if (!raw || typeof raw !== "object") return { ok: false, fields: [...CONTACT_FIELDS] };
   const record = raw as Record<string, unknown>;
   const name = parseContactName(record.name);
   const organization = parseOrganization(record.organization);
@@ -69,23 +80,57 @@ export function parseContactIntake(raw: unknown, dials: readonly string[] = know
   const dial = parseDial(record.dial, dials);
   const national = parseNational(record.nationalNumber);
   const email = parseContactEmail(record.email);
-  if (!name || !organization.ok || !body || !dial || !national || !email) return null;
+  const invalid: Record<ContactField, boolean> = {
+    name: !name,
+    organization: !organization.ok,
+    email: !email,
+    phone: !dial || !national,
+    message: !body,
+  };
+  if (!name || !organization.ok || !body || !dial || !national || !email) {
+    return { ok: false, fields: CONTACT_FIELDS.filter((field) => invalid[field]) };
+  }
   const locale: Locale = typeof record.locale === "string" && isLocale(record.locale) ? record.locale : "en";
   return {
-    name,
-    organization: organization.value,
-    email,
-    phone: formatPhone(dial, national),
-    body,
-    locale,
+    ok: true,
+    intake: {
+      name,
+      organization: organization.value,
+      email,
+      phone: formatPhone(dial, national),
+      body,
+      locale,
+    },
   };
+}
+
+export function parseContactIntake(raw: unknown, dials: readonly string[] = knownDials): ContactIntake | null {
+  const result = validateContactIntake(raw, dials);
+  return result.ok ? result.intake : null;
+}
+
+// The parsers above mirror every CHECK on contact_messages, so this is a backstop:
+// if one still trips, the visitor gets that field's error instead of "did not send".
+export function checkViolationField(err: unknown): ContactField | null {
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const { code, constraint } = current as { code?: unknown; constraint?: unknown };
+    if (code === "23514" && typeof constraint === "string" && Object.hasOwn(CONSTRAINT_FIELD, constraint)) {
+      return CONSTRAINT_FIELD[constraint];
+    }
+    current = "cause" in current ? (current as { cause?: unknown }).cause : undefined;
+  }
+  return null;
 }
 
 export async function acceptContactMessage(db: Db, raw: unknown, ip: string): Promise<ContactSubmitResult> {
   if (honeypotFilled(raw)) return { ok: true };
   if (!(await verifyTurnstile(turnstileTokenOf(raw), ip))) return { ok: false, reason: "turnstile" };
-  const intake = parseContactIntake(raw);
-  if (!intake) return { ok: false, reason: "invalid" };
+  const validation = validateContactIntake(raw);
+  if (!validation.ok) return { ok: false, reason: "invalid", fields: validation.fields };
+  const { intake } = validation;
   const scopes = contactRateScopes();
   const [ipOk, emailOk] = await Promise.all([
     rateLimit(scopes.ip, ip, CONTACT_RATE.perIp, CONTACT_RATE.windowSeconds),
@@ -93,23 +138,29 @@ export async function acceptContactMessage(db: Db, raw: unknown, ip: string): Pr
   ]);
   if (!ipOk || !emailOk) return { ok: false, reason: "rate_limited" };
   const sources = await loadEmailSources();
-  await db.transaction(async (tx) => {
-    const [row] = await tx.insert(contactMessages).values({
-      name: intake.name,
-      email: intake.email,
-      organization: intake.organization,
-      phone: intake.phone,
-      body: intake.body,
-      locale: intake.locale,
-    }).returning({ id: contactMessages.id });
-    const id = row.id as MessageId;
-    await enqueueEmail(
-      tx,
-      contactEmailDedupeKey(id),
-      { to: intake.email, ...contactEmail(intake.name, intake.locale, sources) },
-      CONTACT_EMAIL_TEMPLATE,
-    );
-  });
+  try {
+    await db.transaction(async (tx) => {
+      const [row] = await tx.insert(contactMessages).values({
+        name: intake.name,
+        email: intake.email,
+        organization: intake.organization,
+        phone: intake.phone,
+        body: intake.body,
+        locale: intake.locale,
+      }).returning({ id: contactMessages.id });
+      const id = row.id as MessageId;
+      await enqueueEmail(
+        tx,
+        contactEmailDedupeKey(id),
+        { to: intake.email, ...contactEmail(intake.name, intake.locale, sources) },
+        CONTACT_EMAIL_TEMPLATE,
+      );
+    });
+  } catch (err) {
+    const field = checkViolationField(err);
+    if (field) return { ok: false, reason: "invalid", fields: [field] };
+    throw err;
+  }
   return { ok: true };
 }
 

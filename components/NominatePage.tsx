@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "@/components/LocaleLink";
-import { useState } from "react";
 import {
   AgeSelectionLayout,
   APPLY_GRADIENT,
@@ -11,6 +10,8 @@ import { NominateFlow } from "./nominate/NominateFlow";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useCopy } from "./LanguageProvider";
 import { useText } from "@/lib/ui-text";
+import { NOMINATE_DRAFT } from "@/lib/formDraft";
+import { useDraftOpen } from "@/lib/useFormDraft";
 
 const CTA_REVEAL =
   "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
@@ -82,8 +83,9 @@ function NominateCta({ onExpress, nominate }: { onExpress: () => void; nominate:
 
 export function NominatePage() {
   const copy = useCopy();
-  const [interestOpen, setInterestOpen] = useState(false);
   const applyFlow = useApplyFlowEnabled();
+  // With the full flow, an open form (and its typed answers) survives a language switch.
+  const [interestOpen, setInterestOpen] = useDraftOpen(NOMINATE_DRAFT, applyFlow);
 
   return (
     <>

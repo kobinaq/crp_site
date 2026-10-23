@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { ExpressInterestPopup } from "../ExpressInterestPopup";
 import { ApplyFlow } from "../apply/ApplyFlow";
 import { NominateFlow } from "../nominate/NominateFlow";
 import { useApplyFlowEnabled } from "@/lib/applyFlowGate";
 import { useLanguage } from "../LanguageProvider";
 import { useText } from "@/lib/ui-text";
+import { APPLY_DRAFT, NOMINATE_DRAFT } from "@/lib/formDraft";
+import { useDraftOpen } from "@/lib/useFormDraft";
 
 /** Floating CTA pinned to the bottom of the viewport. */
 export function ProgramApplyBar({ mode = "apply" }: { mode?: "apply" | "nominate" }) {
   const { copy } = useLanguage();
-  const [open, setOpen] = useState(false);
   const nominate = mode === "nominate";
   const applyFlow = useApplyFlowEnabled();
+  // With the full flow, an open form (and its typed answers) survives a language switch.
+  const [open, setOpen] = useDraftOpen(nominate ? NOMINATE_DRAFT : APPLY_DRAFT, applyFlow);
   const tr = useText();
   // Figma labels the bar "Apply" when it opens ApplyFlow; the production
   // ExpressInterestPopup path (and nominate mode) keep "Express interest".

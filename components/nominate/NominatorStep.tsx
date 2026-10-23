@@ -9,6 +9,8 @@ import { FormShell } from "../apply/FormShell";
 import { Toast } from "../apply/Toast";
 import { ContinueButton } from "../apply/ContinueButton";
 import { Turnstile, TURNSTILE_SITE_KEY } from "../Turnstile";
+import { NOMINATE_DRAFT, asCountry, asText } from "@/lib/formDraft";
+import { useDraftState } from "@/lib/useFormDraft";
 import { FIELD, FIELD_M, PLACEHOLDER, PLACEHOLDER_M } from "../apply/fieldStyles";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,12 +42,13 @@ export function NominatorStep({
   onDismissError?: () => void;
 }) {
   const tr = useText();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [dialCountry, setDialCountry] = useState<Country>(GHANA);
-  const [mobile, setMobile] = useState("");
-  const [organization, setOrganization] = useState("");
-  const [relation, setRelation] = useState("");
+  // Typed answers live in the session draft so they survive a language switch.
+  const [name, setName] = useDraftState(NOMINATE_DRAFT, "nominator.name", "", asText);
+  const [email, setEmail] = useDraftState(NOMINATE_DRAFT, "nominator.email", "", asText);
+  const [dialCountry, setDialCountry] = useDraftState<Country>(NOMINATE_DRAFT, "nominator.dialCountry", GHANA, asCountry);
+  const [mobile, setMobile] = useDraftState(NOMINATE_DRAFT, "nominator.mobile", "", asText);
+  const [organization, setOrganization] = useDraftState(NOMINATE_DRAFT, "nominator.organization", "", asText);
+  const [relation, setRelation] = useDraftState(NOMINATE_DRAFT, "nominator.relation", "", asText);
   const [emailTouched, setEmailTouched] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 

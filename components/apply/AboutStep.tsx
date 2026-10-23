@@ -17,6 +17,8 @@ import { Toast } from "./Toast";
 import { ContinueButton } from "./ContinueButton";
 import { FormRadioCard } from "./FormRadioCard";
 import { FormCheckRow } from "./FormCheckRow";
+import { APPLY_DRAFT, asBoolean, asCountry, asNullable, asOneOf, asText } from "@/lib/formDraft";
+import { endDraft, useDraftState } from "@/lib/useFormDraft";
 import { FIELD, FIELD_LG, MINI_LABEL, PLACEHOLDER_LG, VALUE_LG } from "./fieldStyles";
 
 // Text pill with a floating label once filled (Figma 2308:2967): placeholder
@@ -104,16 +106,17 @@ export function AboutStep({
   const router = useRouter();
   const applicationLanguage = locale === "fr" || locale === "es" ? locale : "en";
 
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [dob, setDob] = useState("");
-  const [dialCountry, setDialCountry] = useState<Country>(GHANA);
-  const [mobile, setMobile] = useState("");
-  const [nationality, setNationality] = useState<Country | null>(null);
-  const [basedIn, setBasedIn] = useState<Country | null>(null);
-  const [track, setTrack] = useState<"in_person" | "online" | null>(null);
-  const [canTravel, setCanTravel] = useState(false);
-  const [hasValidPassport, setHasValidPassport] = useState(false);
+  // Typed answers live in the session draft so they survive a language switch.
+  const [fullName, setFullName] = useDraftState(APPLY_DRAFT, "about.fullName", "", asText);
+  const [email, setEmail] = useDraftState(APPLY_DRAFT, "about.email", "", asText);
+  const [dob, setDob] = useDraftState(APPLY_DRAFT, "about.dob", "", asText);
+  const [dialCountry, setDialCountry] = useDraftState<Country>(APPLY_DRAFT, "about.dialCountry", GHANA, asCountry);
+  const [mobile, setMobile] = useDraftState(APPLY_DRAFT, "about.mobile", "", asText);
+  const [nationality, setNationality] = useDraftState<Country | null>(APPLY_DRAFT, "about.nationality", null, asNullable(asCountry));
+  const [basedIn, setBasedIn] = useDraftState<Country | null>(APPLY_DRAFT, "about.basedIn", null, asNullable(asCountry));
+  const [track, setTrack] = useDraftState<"in_person" | "online" | null>(APPLY_DRAFT, "about.track", null, asNullable(asOneOf(["in_person", "online"] as const)));
+  const [canTravel, setCanTravel] = useDraftState(APPLY_DRAFT, "about.canTravel", false, asBoolean);
+  const [hasValidPassport, setHasValidPassport] = useDraftState(APPLY_DRAFT, "about.hasValidPassport", false, asBoolean);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastKind | null>(null);
   const [interestBusy, setInterestBusy] = useState(false);
@@ -216,6 +219,7 @@ export function AboutStep({
         failed();
         return;
       }
+      endDraft(APPLY_DRAFT);
       setToast(res.status === "already_recorded" ? "already-recorded" : "success");
       window.setTimeout(() => router.push(localePath("/", locale)), 3000);
     } catch (err) {

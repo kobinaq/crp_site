@@ -10,6 +10,16 @@ import { submitNomination } from "@/lib/actions";
 import { NomineeStep, type NomineeData } from "./NomineeStep";
 import { NominatorStep, type NominatorData } from "./NominatorStep";
 import { ThanksStep } from "./ThanksStep";
+import { NOMINATE_DRAFT, asNullable, asOneOf, asRecord } from "@/lib/formDraft";
+import { endDraft, useDraftState } from "@/lib/useFormDraft";
+
+const asNominee = asNullable(
+  asRecord<NomineeData>(
+    ["nomineeName", "nomineeEmail", "nomineeDob", "track"],
+    ["nomineePhone", "nomineeNationality", "nomineeBasedIn"],
+    { track: ["in_person", "online"] },
+  ),
+);
 
 type Step = "nominee" | "nominator" | "thanks";
 
@@ -18,8 +28,9 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
   const tr = useText();
   const router = useRouter();
   const { locale } = useLanguage();
-  const [step, setStep] = useState<Step>("nominee");
-  const [nominee, setNominee] = useState<NomineeData | null>(null);
+  // Step and the finished nominee details live in the session draft so a language switch resumes here.
+  const [step, setStep] = useDraftState<Step>(NOMINATE_DRAFT, "step", "nominee", asOneOf(["nominee", "nominator"] as const));
+  const [nominee, setNominee] = useDraftState<NomineeData | null>(NOMINATE_DRAFT, "nominee", null, asNominee);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryable, setRetryable] = useState(false);
@@ -40,6 +51,7 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
         setSubmitting(false);
         return;
       }
+      endDraft(NOMINATE_DRAFT);
       setStep("thanks");
     } catch (err) {
       console.error("[nominate] submit failed", err);
@@ -59,7 +71,7 @@ export function NominateFlow({ onClose }: { onClose: () => void }) {
     return <ThanksStep onExit={handleExit} />;
   }
 
-  if (step === "nominator") {
+  if (step === "nominator" && nominee) {
     return (
       <NominatorStep
         onBack={() => setStep("nominee")}

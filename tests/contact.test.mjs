@@ -130,16 +130,76 @@ test("Turnstile rejection stores nothing", async () => {
 
 test("validation rejects a short name, a long body, a bad email, an unknown dial, and a short national number", async () => {
   const cases = [
-    payload({ name: "A" }),
-    payload({ message: "y".repeat(4001) }),
-    payload({ email: "not-an-email" }),
-    payload({ dial: "+999" }),
-    payload({ nationalNumber: "12345" }),
+    [payload({ name: "A" }), ["name"]],
+    [payload({ message: "y".repeat(4001) }), ["message"]],
+    [payload({ email: "not-an-email" }), ["email"]],
+    [payload({ dial: "+999" }), ["phone"]],
+    [payload({ nationalNumber: "12345" }), ["phone"]],
+    [payload({ name: "A", organization: "o".repeat(201), message: "hi" }), ["name", "organization", "message"]],
   ];
-  for (const fields of cases) {
-    assert.deepEqual(await acceptStored(fields, "203.0.113.22"), { ok: false, reason: "invalid" });
+  for (const [fields, invalid] of cases) {
+    assert.deepEqual(await acceptStored(fields, "203.0.113.22"), { ok: false, reason: "invalid", fields: invalid });
     if (fields.email.includes("@")) assert.equal(await countEmail(fields.email.toLowerCase()), 0);
   }
+});
+
+// Postgres char_length counts code points; String.length counts UTF-16 units.
+const ASTRAL = "\u{1F600}"; // 😀: char_length 1, String.length 2
+
+test("an emoji-only name is a name field error, not a failed insert", async () => {
+  const fields = payload({ name: ASTRAL });
+  assert.deepEqual(await acceptStored(fields, "203.0.113.30"), { ok: false, reason: "invalid", fields: ["name"] });
+  assert.equal(await countEmail(fields.email), 0);
+  const padded = payload({ name: `  ${ASTRAL}  ` });
+  assert.deepEqual(await acceptStored(padded, "203.0.113.30"), { ok: false, reason: "invalid", fields: ["name"] });
+});
+
+test("a two-emoji name is stored and the database agrees on its length", async () => {
+  const fields = payload({ name: ASTRAL + ASTRAL });
+  assert.deepEqual(await acceptStored(fields, "203.0.113.31"), { ok: true });
+  const rows = await sql.query("select name, char_length(name) as n from contact_messages where email = $1", [fields.email]);
+  assert.equal(rows.rowCount, 1);
+  assert.equal(rows.rows[0].name, ASTRAL + ASTRAL);
+  assert.equal(rows.rows[0].n, 2);
+});
+
+test("bodies and names at the max in code points are stored, and one more is a field error", async () => {
+  const body = ASTRAL.repeat(4000);
+  assert.equal(body.length, 8000);
+  const atMax = payload({ message: body });
+  assert.deepEqual(await acceptStored(atMax, "203.0.113.32"), { ok: true });
+  const rows = await sql.query("select char_length(body) as n from contact_messages where email = $1", [atMax.email]);
+  assert.equal(rows.rows[0].n, 4000);
+
+  const over = payload({ message: ASTRAL.repeat(4001) });
+  assert.deepEqual(await acceptStored(over, "203.0.113.32"), { ok: false, reason: "invalid", fields: ["message"] });
+  assert.equal(await countEmail(over.email), 0);
+
+  const mixed = payload({ message: `${"a".repeat(3999)}${ASTRAL}` });
+  assert.deepEqual(await acceptStored(mixed, "203.0.113.32"), { ok: true });
+
+  const name = payload({ name: ASTRAL.repeat(200), organization: ASTRAL.repeat(200) });
+  assert.deepEqual(await acceptStored(name, "203.0.113.33"), { ok: true });
+  const longName = payload({ name: ASTRAL.repeat(201), organization: ASTRAL.repeat(201) });
+  assert.deepEqual(await acceptStored(longName, "203.0.113.33"), { ok: false, reason: "invalid", fields: ["name", "organization"] });
+
+  const nul = payload({ name: "Ada\u0000", message: "Hello\u0000there" });
+  assert.deepEqual(await acceptStored(nul, "203.0.113.33"), { ok: false, reason: "invalid", fields: ["name", "message"] });
+});
+
+test("a CHECK violation from the database maps to the field it guards", async () => {
+  const messages = stored("lib/contact/messages.ts");
+  const error = await sql.query(
+    "insert into contact_messages (name, email, phone, body, locale) values ($1, $2, '+1 5551234567', 'hello', 'en')",
+    [ASTRAL, `check-${randomUUID()}@example.com`],
+  ).then(() => null, (err) => err);
+  assert.equal(error.code, "23514");
+  assert.equal(error.constraint, "contact_messages_name_len");
+  assert.equal(messages.checkViolationField(error), "name");
+  assert.equal(messages.checkViolationField(new Error("wrapped", { cause: error })), "name");
+  assert.equal(messages.checkViolationField({ code: "23514", constraint: "contact_messages_body_len" }), "message");
+  assert.equal(messages.checkViolationField({ code: "23514", constraint: "contact_messages_read_pair" }), null);
+  assert.equal(messages.checkViolationField({ code: "23505", constraint: "contact_messages_name_len" }), null);
 });
 
 test("a message is stored as new with read_at null", async () => {

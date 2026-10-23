@@ -77,9 +77,33 @@ export const CONTACT_PAGE_FEEDBACK = {
 
 export type ContactSubmitReason = "invalid" | "turnstile" | "rate_limited";
 
+// The public form fields a submit can reject one by one. "message" is the form's
+// name for the stored body, and "phone" covers both the dial and the national number.
+export const CONTACT_FIELDS = ["name", "organization", "email", "phone", "message"] as const;
+export type ContactField = (typeof CONTACT_FIELDS)[number];
+
 export type ContactSubmitResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: ContactSubmitReason };
+  | { readonly ok: false; readonly reason: "invalid"; readonly fields: readonly ContactField[] }
+  | { readonly ok: false; readonly reason: Exclude<ContactSubmitReason, "invalid"> };
+
+// Copy keys for the line shown under each rejected field.
+export const FIELD_ERROR_LEAF = {
+  name: "nameInvalid",
+  organization: "organizationInvalid",
+  email: "emailInvalid",
+  phone: "mobileInvalid",
+  message: "messageInvalid",
+} as const satisfies Record<ContactField, string>;
+
+// The contact_messages CHECK constraints, by the form field each one guards.
+export const CONSTRAINT_FIELD: Readonly<Record<string, ContactField>> = {
+  contact_messages_name_len: "name",
+  contact_messages_organization_len: "organization",
+  contact_messages_email: "email",
+  contact_messages_phone: "phone",
+  contact_messages_body_len: "message",
+};
 
 export const REASON_LEAF = {
   invalid: CONTACT_PAGE_FEEDBACK.invalid,
@@ -203,18 +227,32 @@ export function storedPhonePattern(): string {
   return `^[+][0-9]{1,${CONTACT_LIMITS.dialMaxDigits}} [0-9]{${CONTACT_LIMITS.nationalMin},${CONTACT_LIMITS.nationalMax}}$`;
 }
 
+// Postgres char_length counts code points, so "😀" is 1 there but 2 in String.length.
+// Every bound below is checked against the CHECK constraints on contact_messages and
+// contact_notes, so it has to count the same way.
+export function charLength(value: string): number {
+  return Array.from(value).length;
+}
+
+// Postgres text cannot hold U+0000, so the insert would fail instead of a CHECK.
+function storableText(value: string, min: number, max: number): boolean {
+  if (value.includes("\u0000")) return false;
+  // A code point is one or two UTF-16 units, so these bounds settle it without counting.
+  if (value.length < min || value.length > max * 2) return false;
+  const length = charLength(value);
+  return length >= min && length <= max;
+}
+
 export function parseContactName(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (trimmed.length < CONTACT_LIMITS.nameMin || trimmed.length > CONTACT_LIMITS.nameMax) return null;
-  return trimmed;
+  return storableText(trimmed, CONTACT_LIMITS.nameMin, CONTACT_LIMITS.nameMax) ? trimmed : null;
 }
 
 export function parseContactBody(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (trimmed.length < CONTACT_LIMITS.bodyMin || trimmed.length > CONTACT_LIMITS.bodyMax) return null;
-  return trimmed;
+  return storableText(trimmed, CONTACT_LIMITS.bodyMin, CONTACT_LIMITS.bodyMax) ? trimmed : null;
 }
 
 export function parseOrganization(value: unknown): { readonly ok: true; readonly value: string | null } | { readonly ok: false } {
@@ -222,14 +260,13 @@ export function parseOrganization(value: unknown): { readonly ok: true; readonly
   if (typeof value !== "string") return { ok: false };
   const trimmed = value.trim();
   if (trimmed.length === 0) return { ok: true, value: null };
-  if (trimmed.length > CONTACT_LIMITS.organizationMax) return { ok: false };
+  if (!storableText(trimmed, 1, CONTACT_LIMITS.organizationMax)) return { ok: false };
   return { ok: true, value: trimmed };
 }
 
 export function parseNoteBody(value: string): string | null {
   const trimmed = value.trim();
-  if (trimmed.length < 1 || trimmed.length > CONTACT_LIMITS.noteMax) return null;
-  return trimmed;
+  return storableText(trimmed, 1, CONTACT_LIMITS.noteMax) ? trimmed : null;
 }
 
 function restoredStatus(state: ContactDeskState): "new" | "read" {

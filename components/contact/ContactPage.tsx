@@ -4,12 +4,15 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { COUNTRIES, type Country } from "@/lib/countries";
 import {
   CONTACT_PAGE_FEEDBACK,
+  FIELD_ERROR_LEAF,
   HONEYPOT_FIELD,
   REASON_LEAF,
   parseContactBody,
   parseContactName,
   parseDial,
   parseNational,
+  parseOrganization,
+  type ContactField,
 } from "@/lib/contact/model";
 import { submitContact } from "@/lib/actions";
 import { trail } from "@/lib/fonts";
@@ -37,6 +40,11 @@ const PILL =
 const PILL_TYPE =
   "text-[12px] tracking-[0.48px] placeholder:text-[12px] placeholder:tracking-[0.48px] desk:text-[14px] desk:tracking-[0.56px] desk:placeholder:text-[14px] desk:placeholder:tracking-[0.56px]";
 const FIELD_SM = `${PILL} ${PILL_TYPE} h-[61px] rounded-[48px] px-6 desk:h-[63px]`;
+const FIELD_INVALID = "border-magenta";
+
+function fieldErrorId(field: ContactField): string {
+  return `contact-${field}-error`;
+}
 
 function MobileTile({
   icon,
@@ -143,23 +151,56 @@ export function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverFields, setServerFields] = useState<readonly ContactField[]>([]);
+  const [touched, setTouched] = useState<readonly ContactField[]>([]);
   const knownDials = useMemo(() => COUNTRIES.map((country) => country.dial), []);
+
+  // The same parsers the server runs, so a name like "😀" is caught here too.
+  const values: Record<ContactField, string> = { name, organization, email, phone: mobile, message };
+  const clientInvalid: Record<ContactField, boolean> = {
+    name: parseContactName(name) === null,
+    organization: !parseOrganization(organization).ok,
+    email: !EMAIL_RE.test(email.trim()),
+    phone: parseNational(mobile) === null,
+    message: parseContactBody(message) === null,
+  };
+  const fieldInvalid = (field: ContactField) =>
+    serverFields.includes(field)
+    || (touched.includes(field) && values[field].trim() !== "" && clientInvalid[field]);
+  const touch = (field: ContactField) => () =>
+    setTouched((list) => (list.includes(field) ? list : [...list, field]));
+  const edit = (field: ContactField, set: (value: string) => void) => (value: string) => {
+    set(value);
+    setServerFields((list) => list.filter((item) => item !== field));
+  };
+  const invalidProps = (field: ContactField) =>
+    fieldInvalid(field)
+      ? { "aria-invalid": true as const, "aria-describedby": fieldErrorId(field) }
+      : {};
+  const fieldError = (field: ContactField) =>
+    fieldInvalid(field) ? (
+      <p id={fieldErrorId(field)} className="w-full px-6 text-sm font-semibold text-magenta">
+        {c[FIELD_ERROR_LEAF[field]]}
+      </p>
+    ) : null;
 
   const ready = useMemo(() => {
     const phoneOk = parseDial(dial.dial, knownDials) !== null && parseNational(mobile) !== null;
     const turnstileReady = !TURNSTILE_SITE_KEY || Boolean(turnstileToken);
     return parseContactName(name) !== null
+      && parseOrganization(organization).ok
       && parseContactBody(message) !== null
       && phoneOk
       && EMAIL_RE.test(email.trim())
       && turnstileReady;
-  }, [dial.dial, email, knownDials, message, mobile, name, turnstileToken]);
+  }, [dial.dial, email, knownDials, message, mobile, name, organization, turnstileToken]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!ready || submitting) return;
     setSubmitting(true);
     setError(null);
+    setServerFields([]);
     const trap = e.currentTarget.elements.namedItem(HONEYPOT_FIELD);
     const honeypot = trap && "value" in trap ? String(trap.value) : "";
     try {
@@ -177,7 +218,11 @@ export function ContactPage() {
       if (!result.ok) {
         setTurnstileToken(null);
         setWidgetKey((key) => key + 1);
-        setError(c[REASON_LEAF[result.reason]]);
+        if (result.reason === "invalid" && result.fields.length > 0) {
+          setServerFields(result.fields);
+        } else {
+          setError(c[REASON_LEAF[result.reason]]);
+        }
         setSubmitting(false);
         return;
       }
@@ -227,19 +272,25 @@ export function ContactPage() {
             autoComplete="name"
             placeholder={c.name}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => edit("name", setName)(e.target.value)}
+            onBlur={touch("name")}
             aria-label={c.name}
-            className={FIELD_SM}
+            {...invalidProps("name")}
+            className={`${FIELD_SM} ${fieldInvalid("name") ? FIELD_INVALID : ""}`}
           />
+          {fieldError("name")}
           <input
             name="organization"
             autoComplete="organization"
             placeholder={c.organization}
             value={organization}
-            onChange={(e) => setOrganization(e.target.value)}
+            onChange={(e) => edit("organization", setOrganization)(e.target.value)}
+            onBlur={touch("organization")}
             aria-label={c.organization}
-            className={FIELD_SM}
+            {...invalidProps("organization")}
+            className={`${FIELD_SM} ${fieldInvalid("organization") ? FIELD_INVALID : ""}`}
           />
+          {fieldError("organization")}
           <div className="flex w-full flex-col gap-2 desk:flex-row">
             <input
               required
@@ -248,11 +299,13 @@ export function ContactPage() {
               autoComplete="email"
               placeholder={c.emailField}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => edit("email", setEmail)(e.target.value)}
+              onBlur={touch("email")}
               aria-label={c.emailField}
-              className={`${FIELD_SM} desk:min-w-0 desk:flex-1 desk:w-auto`}
+              {...invalidProps("email")}
+              className={`${FIELD_SM} desk:min-w-0 desk:flex-1 desk:w-auto ${fieldInvalid("email") ? FIELD_INVALID : ""}`}
             />
-            <div className={`${PILL} ${PILL_TYPE} flex h-[61px] items-center gap-4 rounded-[48px] pl-4 pr-10 desk:h-[63px] desk:min-w-0 desk:flex-1 desk:w-auto desk:pr-6`}>
+            <div className={`${PILL} ${PILL_TYPE} flex h-[61px] items-center gap-4 rounded-[48px] pl-4 pr-10 desk:h-[63px] desk:min-w-0 desk:flex-1 desk:w-auto desk:pr-6 ${fieldInvalid("phone") ? FIELD_INVALID : ""}`}>
               <CountryDropdown compact={!desk} variant="inline" value={dial} onChange={setDial} />
               <input
                 required
@@ -261,21 +314,28 @@ export function ContactPage() {
                 autoComplete="tel"
                 placeholder={c.mobile}
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                onChange={(e) => edit("phone", setMobile)(e.target.value)}
+                onBlur={touch("phone")}
                 aria-label={c.mobile}
+                {...invalidProps("phone")}
                 className={`${PILL_TYPE} min-w-0 flex-1 bg-transparent uppercase text-black outline-none placeholder:font-semibold placeholder:uppercase placeholder:text-black/48`}
               />
             </div>
           </div>
+          {fieldError("email")}
+          {fieldError("phone")}
           <textarea
             required
             name="message"
             placeholder={c.message}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => edit("message", setMessage)(e.target.value)}
+            onBlur={touch("message")}
             aria-label={c.message}
-            className={`${PILL} ${PILL_TYPE} h-[171px] w-full resize-none rounded-[31.5px] py-6 pl-6 pr-8 desk:h-auto desk:min-h-0 desk:flex-1`}
+            {...invalidProps("message")}
+            className={`${PILL} ${PILL_TYPE} h-[171px] w-full resize-none rounded-[31.5px] py-6 pl-6 pr-8 desk:h-auto desk:min-h-0 desk:flex-1 ${fieldInvalid("message") ? FIELD_INVALID : ""}`}
           />
+          {fieldError("message")}
           {error ? <p role="alert" className="w-full text-sm font-semibold text-magenta">{error}</p> : null}
           <Turnstile key={widgetKey} onToken={setTurnstileToken} />
           <button

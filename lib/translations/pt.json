@@ -132,6 +132,11 @@
     "send": "Enviar",
     "sent": "Recebemos a sua mensagem.",
     "invalid": "Verifique os campos e tente de novo.",
+    "nameInvalid": "Escreva um nome com 2 a 200 caracteres.",
+    "organizationInvalid": "A organização não pode ter mais de 200 caracteres.",
+    "emailInvalid": "Escreva um endereço de e-mail válido.",
+    "mobileInvalid": "Escreva um número de telemóvel com 6 a 15 dígitos.",
+    "messageInvalid": "Escreva uma mensagem com 3 a 4000 caracteres.",
     "turnstile": "A verificação não foi concluída. Tente de novo.",
     "rateLimited": "Enviou várias mensagens. Tente mais tarde.",
     "failed": "A mensagem não foi enviada. Tente de novo."

@@ -11,6 +11,8 @@ import { TermsStep } from "./TermsStep";
 import { SkillsStep } from "./SkillsStep";
 import { AboutStep, type AboutData } from "./AboutStep";
 import { RedirectingStep } from "./RedirectingStep";
+import { APPLY_DRAFT, asBoolean, asOneOf, asTextList } from "@/lib/formDraft";
+import { endDraft, useDraftState } from "@/lib/useFormDraft";
 
 type Step = "terms" | "skills" | "about" | "redirecting" | "redirecting-home" | "check-email";
 
@@ -19,13 +21,14 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
   const tr = useText();
   const { locale } = useLanguage();
   const router = useRouter();
-  const [step, setStep] = useState<Step>("terms");
-  const [skills, setSkills] = useState<string[]>([]);
+  // Step, skills and consent live in the session draft so a language switch resumes here.
+  const [step, setStep] = useDraftState<Step>(APPLY_DRAFT, "step", "terms", asOneOf(["terms", "skills", "about"] as const));
+  const [skills, setSkills] = useDraftState<string[]>(APPLY_DRAFT, "skills", [], asTextList);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryable, setRetryable] = useState(false);
   const [existing, setExisting] = useState(false);
-  const [consent, setConsent] = useState(false);
+  const [consent, setConsent] = useDraftState(APPLY_DRAFT, "consent", false, asBoolean);
   // Display-only copy of who applied, for the check-email screen.
   const [applicant, setApplicant] = useState<{ name: string; email: string } | null>(null);
 
@@ -39,6 +42,7 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
       const result = await startApplication({ ...data, consent, language: data.language });
       if (!result.ok) {
         if (result.reason === "ineligible") {
+          endDraft(APPLY_DRAFT);
           setStep("redirecting-home");
           window.setTimeout(() => router.push(localePath("/", locale)), 2500);
           return;
@@ -60,6 +64,7 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
         setSubmitting(false);
         return;
       }
+      endDraft(APPLY_DRAFT);
       setApplicant({ name: data.fullName, email: data.email });
       setStep("check-email");
     } catch (err) {
@@ -72,7 +77,8 @@ export function ApplyFlow({ onClose }: { onClose: () => void }) {
     }
   };
 
-  if (step === "terms") {
+  // A restored step past the terms needs the consent given on them.
+  if (step === "terms" || (!consent && (step === "skills" || step === "about"))) {
     return <TermsStep onAccept={() => { setConsent(true); setStep("skills"); }} onClose={onClose} />;
   }
   if (step === "skills") {
