@@ -330,7 +330,8 @@ export function AboutStep({
               </div>
 
               {/* Program radios */}
-              <div className="flex min-w-0 desk:mt-0.5">
+              {/* Phones: top-align card content so radios and first label lines match when only one label wraps (FR/ES/PT). */}
+              <div className="flex min-w-0 desk:mt-0.5 max-desk:[&>button]:justify-start">
                 <FormRadioCard label={tr("Only program")} selected={track === "online"} onSelect={() => setTrack("online")} />
                 <FormRadioCard label={tr("Travel to Antalya")} selected={track === "in_person"} onSelect={() => setTrack("in_person")} />
               </div>
