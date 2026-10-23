@@ -18,7 +18,7 @@ import {
   type CopyDraftMap,
 } from "@/lib/copy/draftState";
 import type { CopyRow } from "@/lib/copy/editor";
-import type { CatalogId } from "@/lib/copy/catalog";
+import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
 
 export function CopyEditor({
   row,
@@ -61,7 +61,7 @@ export function CopyEditor({
       const href = anchor.getAttribute("href") ?? "";
       if (href.startsWith("/admin/copy") || href.startsWith("?") || href.startsWith("#")) return;
       if (typeof window.confirm !== "function") return;
-      if (window.confirm("You have unsaved copy edits. Leave without saving?")) {
+      if (window.confirm("You have unsaved changes. Leave without saving?")) {
         clearCopyDrafts();
         return;
       }
@@ -78,7 +78,10 @@ export function CopyEditor({
 
   return (
     <section className="grid min-w-0 gap-4">
-      <h2 className="break-all text-xl font-semibold">{row.key}</h2>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-black/50">{row.catalog === "page" ? row.sectionLabel : CATALOGS[row.catalog].label}</p>
+        <h2 className="mt-1 break-words text-xl font-semibold" title={row.key}>{row.label}</h2>
+      </div>
       <div className="grid gap-4 desk:grid-cols-2">
         {row.cells.map((cell) => {
           const id = copyCellId(row.catalog, row.key, cell.locale);
@@ -95,11 +98,12 @@ export function CopyEditor({
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-semibold">{languageLabel(cell.locale)}</h3>
                 <StateChip kind={cell.state.kind} />
-                {cell.override ? <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">Published</span> : <span className="rounded-full border border-black/15 px-2 py-1 text-xs">File</span>}
+                {cell.override ? <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">Edited</span> : <span className="rounded-full border border-black/15 px-2 py-1 text-xs">Default</span>}
+                {cell.locale !== "en" && cell.state.kind !== "source" && !server.trim() ? <span className="rounded-full bg-magenta px-2 py-1 text-xs font-semibold text-white">Missing translation</span> : null}
                 {cell.draft !== null || (live[id] && live[id].revision === cell.revision) ? <span className="rounded-full bg-orange px-2 py-1 text-xs font-semibold">Draft</span> : null}
                 {preview ? <Button href={preview} variant="outline" size="sm">Preview</Button> : null}
               </div>
-              <label className="sr-only" htmlFor={fieldId}>Value in {cell.locale}</label>
+              <label className="sr-only" htmlFor={fieldId}>{languageLabel(cell.locale)} text</label>
               <textarea
                 id={fieldId}
                 name="value"
@@ -121,11 +125,11 @@ export function CopyEditor({
                   name="intent"
                   value="reset"
                   pendingLabel="Resetting"
-                  title="Reset this language to the file?"
-                  message="The published text is replaced by the file copy. You can restore an older revision from history."
+                  title="Go back to the default text?"
+                  message="Your edits to this language are replaced. You can restore them from earlier versions."
                   confirmLabel="Reset"
                 >
-                  Reset to file
+                  Reset to default
                 </ConfirmSubmit>
                 {cell.state.kind === "stale" ? <SubmitButton className={buttonClass("outline")} name="intent" value="mark" pendingLabel="Saving">Mark reviewed</SubmitButton> : null}
               </div>
@@ -163,7 +167,7 @@ export function HiddenScope({
 }
 
 function StateChip({ kind }: { kind: "source" | "current" | "stale" }) {
-  if (kind === "source") return <span className="rounded-full bg-lime px-2 py-1 text-xs font-semibold">Source</span>;
+  if (kind === "source") return <span className="rounded-full bg-lime px-2 py-1 text-xs font-semibold">Original</span>;
   if (kind === "stale") return <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-lime">Needs review</span>;
-  return <span className="rounded-full bg-leaf/40 px-2 py-1 text-xs font-semibold">Current</span>;
+  return <span className="rounded-full bg-leaf/40 px-2 py-1 text-xs font-semibold">Up to date</span>;
 }

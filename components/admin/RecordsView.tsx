@@ -10,7 +10,7 @@ import { ageLabel, languageLabel, trackLabel, waitlistLabel } from "@/lib/admin/
 import type { RecordPage, RecordQuery } from "@/lib/admin/records";
 import { RECORD_LISTS } from "@/lib/admin/records";
 import { filtersAreOpen, recordsHref } from "@/lib/admin/return";
-import { CONTACT_LIST, showsAttention, statusFilterLabel } from "@/lib/contact/model";
+import { CONTACT_LIST, showsAttention } from "@/lib/contact/model";
 import { ageGroup, appLanguage, track, waitlistStatus } from "@/lib/db";
 
 const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
@@ -37,7 +37,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
   return (
     <div className="grid gap-6">
       <h1 className="text-3xl font-semibold tracking-tight">Records</h1>
-      <nav className="flex flex-wrap gap-2" aria-label="Record lists">
+      <nav className="flex flex-wrap gap-2" aria-label="Lists">
         {RECORD_LISTS.map((list) => (
           <Button key={list} variant={list === data.list ? "solid" : "outline"} href={recordsHref({ ...data.filters, list, page: 1, q: "", status: "", track: "", language: "", cycle: "", age: "", queue: "", attention: "" })}>
             {LABELS[list]}
@@ -48,7 +48,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
         <input type="hidden" name="list" value={data.list} />
         <Filter label="Search" name="q" value={data.filters.q} placeholder={SEARCH[data.list]} />
         {data.list === "applicants" ? <Choice label="Status" name="status" value={data.filters.status} options={PIPELINE_ORDER.map((status) => [status, STATUS_LABEL[status]])} /> : null}
-        {data.statusOptions.length > 0 ? <Choice label={statusFilterLabel(data.list)} name="status" value={data.filters.status} options={data.statusOptions} /> : null}
+        {data.statusOptions.length > 0 ? <Choice label="Status" name="status" value={data.filters.status} options={data.statusOptions} /> : null}
         {showsAttention(data.list) ? <Choice label="Attention" name="attention" value={data.filters.attention} options={[["needs", "Needs attention"]]} /> : null}
         {data.list === "waitlist" ? <Choice label="Status" name="status" value={data.filters.status} options={waitlistStatus.enumValues.map((status) => [status, waitlistLabel(status)])} /> : null}
         {data.list === "applicants" || data.list === "nominations" || data.list === "interest" ? <Choice label="Track" name="track" value={data.filters.track} options={track.enumValues.map((item) => [item, trackLabel(item)])} /> : null}
@@ -70,7 +70,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
       <section className={card}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{data.title}</h2>
-          <p className="text-sm text-black/60">{data.total === 1 ? "1 row" : `${data.total} rows`}</p>
+          <p className="text-sm text-black/60">{data.total === 1 ? "1 result" : `${data.total} results`}</p>
         </div>
         {data.list === "applicants" && canConfirm ? <BulkQueue headers={data.headers} rows={data.rows} /> : data.rows.length === 0 ? (
           <p className="mt-3 text-sm text-black/60">{filtered ? "Nothing matches these filters." : `No ${LABELS[data.list].toLowerCase()} yet.`}</p>
@@ -93,12 +93,12 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
             <input type="hidden" name="age" value={data.filters.age} />
             <input type="hidden" name="queue" value={data.filters.queue} />
             <input type="hidden" name="attention" value={data.filters.attention} />
-            <SubmitButton className={buttonClass(canConfirm ? "outline" : "primary")} pendingLabel="Preparing">Download CSV</SubmitButton>
+            <SubmitButton className={buttonClass(canConfirm ? "outline" : "primary")} pendingLabel="Preparing">Download spreadsheet</SubmitButton>
           </form>
         ) : null}
       </section>
       <section className={card}>
-        <h2 className="text-lg font-semibold">New rows by week</h2>
+        <h2 className="text-lg font-semibold">New by week</h2>
         <WeekBars weeks={data.weeks} />
       </section>
     </div>

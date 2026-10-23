@@ -9,16 +9,16 @@ import type { ApplicantReview, RecordQuery } from "@/lib/admin/records";
 import type { ConfirmMove } from "@/lib/sync";
 
 const NOTICE: Record<string, string> = {
-  forbidden: "Your role cannot confirm a decision.",
-  invalid: "That decision could not be read.",
+  forbidden: "You don't have permission to confirm a decision.",
+  invalid: "Not saved. Reload the page and try again.",
   stale: "This page is out of date. Reload it before confirming.",
-  not_allowed: "That move is not available.",
-  not_found: "That applicant was not found.",
-  conflict: "That decision was already used for a different request.",
+  not_allowed: "That change isn't available for this applicant.",
+  not_found: "This applicant could not be found.",
+  conflict: "Something else changed. Reload the page and try again.",
   unchanged: "The status did not change.",
   replayed: "That decision was already confirmed.",
-  staff_held: "The spreadsheet row is held.",
-  staff_kept: "The spreadsheet row already matches.",
+  staff_held: "A staff decision is already in place.",
+  staff_kept: "Already up to date.",
 };
 
 export function DecisionPanel({
@@ -78,11 +78,11 @@ function DecisionBody({
     <div className="grid gap-5">
       {review.conflicts.map((conflict) => (
         <p key={conflict.decisionId} className="rounded-3xl bg-cream px-4 py-3 text-sm leading-6">
-          Spreadsheet says {statusLabel[conflict.sheetTarget] || "nothing"}. The staff decision {statusLabel[conflict.heldStatus] || conflict.heldStatus} stands. The spreadsheet row was not applied.
+          The spreadsheet says {statusLabel[conflict.sheetTarget] || "nothing"}, but the decision made here ({statusLabel[conflict.heldStatus] || conflict.heldStatus}) was kept.
         </p>
       ))}
       <div>
-        <h2 className="text-lg font-semibold">Sheet</h2>
+        <h2 className="text-lg font-semibold">Spreadsheet</h2>
         <dl className="mt-3 grid gap-3">
           <SheetFact term="Review decision" value={review.reviewDecision} />
           <SheetFact term="Reviewer" value={review.reviewer} />
@@ -95,9 +95,9 @@ function DecisionBody({
       </div>
       <div>
         <h2 className="text-lg font-semibold">Decision</h2>
-        {review.offeredMoves.length === 0 ? <p className="mt-2 text-sm text-black/60">No moves from this status.</p> : canConfirm ? (
+        {review.offeredMoves.length === 0 ? <p className="mt-2 text-sm text-black/60">No decision to make at this stage.</p> : canConfirm ? (
           <fieldset className="mt-3 grid gap-2">
-            <legend className="sr-only">Offered moves</legend>
+            <legend className="sr-only">Decisions</legend>
             {review.offeredMoves.map((item, itemIndex) => (
               <label key={moveKey(item)} className="flex items-center gap-2 text-sm">
                 <input type="radio" name="offered-move" checked={itemIndex === bounded} onChange={() => setIndex(itemIndex)} />
@@ -173,15 +173,22 @@ function moveKey(move: ConfirmMove): string {
 function moveText(move: ConfirmMove, statusLabel: Readonly<Record<string, string>>): string {
   const action = move.field === "reviewDecision"
     ? (move.value === "accept" ? "Accept" : "Reject")
-    : (move.value === "yes" ? "Interview yes" : "Interview no");
-  return `${action} to ${statusLabel[move.to] ?? move.to}`;
+    : (move.value === "yes" ? "Passed interview" : "Did not pass interview");
+  return `${action}: ${statusLabel[move.to] ?? move.to}`;
 }
 
 function SheetFact({ term, value }: { term: string; value: string }) {
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{term}</dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm">{value || "Not given"}</dd>
+      <dd className="mt-1 whitespace-pre-wrap text-sm">{sheetValue(value)}</dd>
     </div>
   );
+}
+
+const SHEET_VALUE: Readonly<Record<string, string>> = { accept: "Accept", reject: "Reject", yes: "Yes", no: "No" };
+
+function sheetValue(value: string): string {
+  if (!value) return "Not given";
+  return SHEET_VALUE[value] ?? value;
 }

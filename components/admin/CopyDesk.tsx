@@ -6,18 +6,20 @@ import { card, field, focusRing } from "@/components/admin/marks";
 import { ConfirmSubmit, SubmitButton } from "@/components/admin/SubmitButton";
 import { lineDiff } from "@/lib/copy/diff";
 import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
+import { languageLabel } from "@/lib/admin/labels";
+import { When } from "@/components/admin/When";
 import type { CopyRow, Head } from "@/lib/copy/editor";
 import { REVIEW_CAP } from "@/lib/copy/editor";
 
 const ERRORS: Record<string, string> = {
-  invalid: "That text was not saved. Check the placeholders against English.",
-  placeholders: "That text was not saved. The placeholders do not match English.",
-  "line-break": "Subjects cannot contain a line break.",
-  "too-long": "That text is over the length limit.",
-  conflict: "English changed, or someone else published this key. Reload and try again.",
-  missing: "There is no draft or revision to publish.",
-  forbidden: "Your role cannot publish.",
-  "too-many": `Mark at most ${REVIEW_CAP} cells at a time.`,
+  invalid: "Not saved. Keep the words in curly brackets, like {name}, the same as English.",
+  placeholders: "Not saved. Keep the words in curly brackets, like {name}, the same as English.",
+  "line-break": "An email subject must be one line.",
+  "too-long": "Not saved. The text is too long.",
+  conflict: "Someone else changed this text. Reload and try again.",
+  missing: "Nothing to publish yet.",
+  forbidden: "You can't publish.",
+  "too-many": `Mark up to ${REVIEW_CAP} at a time.`,
 };
 
 export function CopyDesk({
@@ -43,22 +45,30 @@ export function CopyDesk({
 }) {
   const sections = new Map<string, CopyRow[]>();
   for (const row of rows) {
-    const label = scopeAll ? `${row.catalog} / ${row.section}` : row.section;
+    const label = !scopeAll ? row.sectionLabel : row.catalog === "page" ? row.sectionLabel : CATALOGS[row.catalog].label;
     const list = sections.get(label) ?? [];
     list.push(row);
     sections.set(label, list);
   }
   const staleCells = rows.flatMap((row) => row.cells.filter((cell) => cell.state.kind === "stale").map((cell) => ({ row, cell }))).slice(0, REVIEW_CAP);
   const staleTotal = rows.reduce((sum, row) => sum + row.cells.filter((cell) => cell.state.kind === "stale").length, 0);
+  const missingCount = rows.filter((row) => missingLocales(row).length > 0).length;
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Copy</h1>
-        {reviewCount > 0 ? <p className="mt-1 text-sm text-black/60">{reviewCount === 1 ? "1 needs review" : `${reviewCount} need review`}</p> : null}
+        <h1 className="text-3xl font-semibold tracking-tight">Website text</h1>
+        {reviewCount > 0 || missingCount > 0 ? (
+          <p className="mt-1 text-sm text-black/60">
+            {[
+              reviewCount > 0 ? `${reviewCount} need review` : "",
+              missingCount > 0 ? `${missingCount} missing a translation` : "",
+            ].filter(Boolean).join(" · ")}
+          </p>
+        ) : null}
         {error && ERRORS[error] ? <p className="mt-3 text-sm font-semibold text-magenta">{ERRORS[error]}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant={scopeAll ? "solid" : "outline"} href={deskHref({ all: true, review: needsReview, q: query })}>All catalogs</Button>
+        <Button variant={scopeAll ? "solid" : "outline"} href={deskHref({ all: true, review: needsReview, q: query })}>All</Button>
         {catalogIds().map((id) => (
           <Button key={id} variant={!scopeAll && id === catalog ? "solid" : "outline"} href={deskHref({ catalog: id, review: needsReview, q: query })}>{CATALOGS[id].label}</Button>
         ))}
@@ -67,16 +77,16 @@ export function CopyDesk({
         {scopeAll ? <input type="hidden" name="all" value="1" /> : <input type="hidden" name="catalog" value={catalog} />}
         {needsReview ? <input type="hidden" name="review" value="1" /> : null}
         {selected ? <input type="hidden" name="key" value={selected.key} /> : null}
-        <label className="sr-only" htmlFor="copy-filter">Filter copy</label>
-        <input id="copy-filter" key={query} name="q" defaultValue={query} placeholder="Key or any language" autoComplete="off" className={`${field} max-w-md`} />
-        <SubmitButton className={buttonClass("outline")} pendingLabel="Filtering">Filter</SubmitButton>
+        <label className="sr-only" htmlFor="copy-filter">Search text</label>
+        <input id="copy-filter" key={query} name="q" type="search" defaultValue={query} placeholder="Search" autoComplete="off" className={`${field} max-w-md`} />
+        <SubmitButton className={buttonClass("outline")} pendingLabel="Searching">Search</SubmitButton>
         <Button variant={needsReview ? "solid" : "outline"} href={deskHref({ catalog: scopeAll ? undefined : catalog, all: scopeAll, review: !needsReview, q: query, key: selected?.key })}>
-          {needsReview ? "Showing needs review" : "Needs review"}
+Needs review
         </Button>
       </form>
       {needsReview && staleCells.length > 0 ? (
         <form action={markReviewedCopy} className={`${card} grid gap-3`}>
-          <p className="text-sm">Mark {staleCells.length} visible cells reviewed{staleTotal > REVIEW_CAP ? `. ${staleTotal - REVIEW_CAP} more stay for the next pass.` : "."}</p>
+          <p className="text-sm">{staleCells.length === 1 ? "1 translation" : `${staleCells.length} translations`} to mark reviewed{staleTotal > REVIEW_CAP ? `. ${staleTotal - REVIEW_CAP} more after this.` : "."}</p>
           {staleCells.map(({ row, cell }) => (
             <span key={`${row.catalog}:${row.key}:${cell.locale}`}>
               <input type="hidden" name="cellCatalog" value={row.catalog} />
@@ -91,19 +101,30 @@ export function CopyDesk({
         </form>
       ) : null}
       <div className="grid items-start gap-6 desk:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]">
-        <nav className={`${card} max-h-[70vh] overflow-auto p-4`} aria-label="Copy keys">
-          {rows.length === 0 ? <p className="text-sm">No keys match.</p> : null}
+        <nav className={`${card} max-h-[70vh] overflow-auto p-4`} aria-label="Text entries">
+          {rows.length === 0 ? <p className="text-sm">Nothing matches.</p> : null}
           {[...sections.entries()].map(([section, items]) => (
             <details key={section} open={selected ? items.some((item) => item.key === selected.key && item.catalog === selected.catalog) : undefined} className="mb-3">
               <summary className="cursor-pointer text-sm font-semibold">{section}</summary>
               <ul className="mt-2 grid gap-1">
                 {items.map((item) => {
                   const stale = item.cells.some((cell) => cell.state.kind === "stale");
+                  const missing = missingLocales(item).length > 0;
                   return (
                     <li key={`${item.catalog}:${item.key}`}>
-                      <Link className={`block rounded-2xl px-3 py-2 text-sm ${focusRing} ${selected?.key === item.key && selected.catalog === item.catalog ? "bg-lime" : "hover:bg-cream"}`} href={deskHref({ catalog: item.catalog, all: scopeAll, review: needsReview, q: query, key: item.key })}>
-                        <span className="block break-all">{item.key}</span>
-                        {stale ? <span className="text-xs font-semibold">Needs review</span> : null}
+                      <Link
+                        title={item.key}
+                        aria-current={selected?.key === item.key && selected.catalog === item.catalog ? "page" : undefined}
+                        className={`block rounded-2xl px-3 py-2 text-sm ${focusRing} ${selected?.key === item.key && selected.catalog === item.catalog ? "bg-lime" : "hover:bg-cream"}`}
+                        href={deskHref({ catalog: item.catalog, all: scopeAll, review: needsReview, q: query, key: item.key })}
+                      >
+                        <span className="block break-words">{item.label}</span>
+                        {stale || missing ? (
+                          <span className="mt-1 flex flex-wrap gap-1">
+                            {stale ? <span className="text-xs font-semibold">Needs review</span> : null}
+                            {missing ? <span className="text-xs font-semibold text-magenta">Missing translation</span> : null}
+                          </span>
+                        ) : null}
                       </Link>
                     </li>
                   );
@@ -118,7 +139,7 @@ export function CopyDesk({
               <History key={cell.locale} row={selected} scopeAll={scopeAll} query={query} needsReview={needsReview} locale={cell.locale} base={cell.revision} rows={history[cell.locale] ?? []} />
             ))}
           </CopyEditor>
-        ) : <p className={`${card} text-sm`}>Choose a key.</p>}
+        ) : <p className={`${card} text-sm`}>Choose an entry.</p>}
       </div>
     </div>
   );
@@ -144,16 +165,16 @@ function History({
   if (rows.length === 0) return null;
   return (
     <details className={card}>
-      <summary className="cursor-pointer text-sm font-semibold">History for {locale}</summary>
+      <summary className="cursor-pointer text-sm font-semibold">{languageLabel(locale)}: earlier versions</summary>
       <ul className="mt-2 grid gap-2">
         {rows.map((item, index) => {
           const previous = rows[index + 1];
           const diff = item.value !== null && previous?.value != null ? lineDiff(previous.value, item.value) : null;
           return (
             <li key={item.revision} className="rounded-2xl bg-cream p-3 text-sm">
-              <p className="font-semibold">Revision {item.revision}{item.revertedFrom ? `, restored from ${item.revertedFrom}` : ""}</p>
-              <p className="text-black/60">{item.authorEmail ?? "Former staff"} · {item.createdAt.toISOString().slice(0, 16).replace("T", " ")}</p>
-              {item.value === null ? <p className="mt-2 text-black/70">File value</p> : diff ? (
+              <p className="font-semibold">Version {item.revision}{item.revertedFrom ? `, restored from version ${item.revertedFrom}` : ""}</p>
+              <p className="text-black/60">{item.authorEmail ?? "Former staff"} · <When stamp={item.createdAt.toISOString().slice(0, 16).replace("T", " ")} /></p>
+              {item.value === null ? <p className="mt-2 text-black/70">Default text</p> : diff ? (
                 <div className="mt-2 grid gap-1">
                   {diff.map((line, lineIndex) => (
                     <p key={`${item.revision}-${lineIndex}`} className={line.kind === "add" ? "text-leaf" : line.kind === "remove" ? "text-magenta line-through" : "text-black/70"}>
@@ -167,7 +188,7 @@ function History({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="base" value={base} />
                 <input type="hidden" name="revision" value={item.revision} />
-                <ConfirmSubmit className={buttonClass("outline")} name="intent" value="restore" pendingLabel="Restoring" title="Restore this revision?" message="This language is published again from the revision you picked." confirmLabel="Restore">Restore</ConfirmSubmit>
+                <ConfirmSubmit className={buttonClass("outline")} name="intent" value="restore" pendingLabel="Restoring" title="Restore this version?" message="This version goes live on the site." confirmLabel="Restore">Restore</ConfirmSubmit>
               </form>
             </li>
           );
@@ -175,6 +196,10 @@ function History({
       </ul>
     </details>
   );
+}
+
+export function missingLocales(row: CopyRow): readonly string[] {
+  return row.cells.filter((cell) => cell.locale !== "en" && cell.state.kind !== "source" && !(cell.draft ?? cell.value).trim()).map((cell) => cell.locale);
 }
 
 function catalogIds(): readonly CatalogId[] {

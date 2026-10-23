@@ -47,7 +47,7 @@ test("the messages list has a status filter, no attention filter, and no CSV", (
   const data = {
     list: "messages",
     title: "Messages",
-    headers: ["Name", "Email", "Organization", "Status", "Assignee", "Created"],
+    headers: ["Name", "Email", "Organization", "Status", "Assigned to", "Received"],
     rows: [],
     total: 0,
     page: 1,
@@ -81,7 +81,7 @@ test("the messages list has a status filter, no attention filter, and no CSV", (
   }
 });
 
-test("the dashboard card counts new messages and links to that list", () => {
+test("the needs attention card counts new messages and links to that list", () => {
   const { DashboardView } = load("components/admin/DashboardView.tsx");
   const data = {
     pipeline: [],
@@ -98,9 +98,7 @@ test("the dashboard card counts new messages and links to that list", () => {
   const view = render(React.createElement(DashboardView, { data, denied: false, weeks: [] }));
   try {
     const link = view.host.querySelector("a[href='/admin/records?list=messages&status=new']");
-    assert.equal(link.textContent, "Open messages");
-    assert.match(view.host.textContent, /New messages/);
-    assert.match(view.host.textContent, /4/);
+    assert.equal(link.textContent, "4New messages");
   } finally {
     view.cleanup();
   }

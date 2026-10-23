@@ -11,11 +11,11 @@ export function SignInForm({ expired }: { expired: boolean }) {
   return (
     <form action={action} className="mt-8 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold" htmlFor="email">
-        Email
-        <input id="email" name="email" type="email" autoComplete="username" required className={field} />
+        Your email
+        <input id="email" name="email" type="email" autoComplete="username" inputMode="email" required autoFocus className={field} />
       </label>
       <Button variant="primary" type="submit" disabled={pending}>
-        {pending ? "Sending" : "Send link"}
+        {pending ? "Sending" : "Email me a sign-in link"}
       </Button>
       <ResultLine
         message={state?.message ?? (expired ? "That link has expired or was already used." : null)}

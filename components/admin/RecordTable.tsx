@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { RecordCell } from "@/components/admin/RecordCell";
+import { RowLink, linkedRowClass } from "@/components/admin/RowLink";
 
 export type RecordTableRow = {
   readonly id: string;
@@ -32,15 +32,11 @@ export function RecordTable({
           {rows.map((row) => {
             const name = row.cells[0] ?? "record";
             return (
-              <tr key={row.id} className={row.href ? "relative hover:bg-black/[0.03]" : undefined}>
+              <tr key={row.id} className={row.href ? linkedRowClass : undefined}>
                 {leading ? <td className="relative z-20 border-t border-black/10 py-3 pr-4">{leading(row)}</td> : null}
                 {row.cells.map((cell, index) => (
                   <td key={`${row.id}-${index}`} className="border-t border-black/10 py-3 pr-4">
-                    {index === 0 && row.href ? (
-                      <Link href={row.href} aria-label={`Open ${name}`} className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black">
-                        <span className="sr-only">{`Open ${name}`}</span>
-                      </Link>
-                    ) : null}
+                    {index === 0 && row.href ? <RowLink href={row.href} name={name} /> : null}
                     <span className="relative z-0"><RecordCell list={list} header={headers[index] ?? ""} value={cell} /></span>
                   </td>
                 ))}

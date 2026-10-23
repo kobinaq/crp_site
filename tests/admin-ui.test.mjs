@@ -55,7 +55,9 @@ function copyRow(key, english, french) {
   return {
     catalog: "page",
     key,
+    label: `Menu: ${english}`,
     section: "nav",
+    sectionLabel: "Top menu",
     english,
     digest: "digest",
     cells: [cell("en", english), cell("fr", french)],

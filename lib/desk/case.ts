@@ -533,7 +533,7 @@ async function nominationFields(db: Store, recordId: string): Promise<{ heading:
       ["Nominator email", row.nominatorEmail],
       ["Nominator phone", shown(row.nominatorPhone)],
       ["Nominator organization", shown(row.nominatorOrganization)],
-      ["Nominator relation", shown(row.nominatorRelation)],
+      ["Relation to nominee", shown(row.nominatorRelation)],
       ["Nominee name", row.nomineeName],
       ["Nominee email", row.nomineeEmail],
       ["Nominee phone", shown(row.nomineePhone)],
@@ -541,8 +541,8 @@ async function nominationFields(db: Store, recordId: string): Promise<{ heading:
       ["Nominee based in", shown(row.nomineeBasedIn)],
       ["Nominee location", shown(row.nomineeLocation)],
       ["Track", shown(row.track)],
-      ["Intake status", row.intakeStatus],
-      ["Created", stamp(row.createdAt)],
+      ["Nominee status", row.intakeStatus],
+      ["Received", stamp(row.createdAt)],
     ].map(([label, value]) => ({ label, value })),
   };
 }
@@ -571,11 +571,11 @@ async function partnerFields(db: Store, recordId: string): Promise<{ heading: st
       ["Email", row.email],
       ["Phone", shown(row.phone)],
       ["Organization", row.organization],
-      ["Designation", row.designation],
+      ["Job title", row.designation],
       ["Support", row.support],
       ["Sponsorship", shown(row.sponsorship)],
       ["Message", shown(row.message)],
-      ["Created", stamp(row.createdAt)],
+      ["Received", stamp(row.createdAt)],
     ].map(([label, value]) => ({ label, value })),
   };
 }

@@ -10,7 +10,7 @@ import { signOut } from "./actions";
 const NAV: readonly { readonly href: string; readonly label: string; readonly capability: Capability }[] = [
   { href: "/admin", label: "Dashboard", capability: "dashboard.read" },
   { href: "/admin/records", label: "Records", capability: "dashboard.read" },
-  { href: "/admin/copy", label: "Copy", capability: "copy.edit" },
+  { href: "/admin/copy", label: "Website text", capability: "copy.edit" },
   { href: "/admin/staff", label: "Staff", capability: "users.manage" },
   { href: "/admin/activity", label: "Activity", capability: "activity.read" },
 ];

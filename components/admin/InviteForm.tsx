@@ -11,14 +11,14 @@ import { USER_ROLES } from "@/lib/staff/roles";
 import { inviteAction, type InviteState } from "@/app/admin/(console)/staff/actions";
 
 const NOTICES: Record<string, string> = {
-  invited: "Invite recorded.",
-  "mail-failed": "The account was created, but the message did not send. Invite them again.",
-  resent: "A fresh link was issued.",
+  invited: "Invite sent.",
+  "mail-failed": "The account was added, but the email did not send. Invite them again.",
+  resent: "A new invite was sent.",
   "role-differs": "That person already has a different role. Change it from the list.",
   disabled: "That account is disabled.",
   "already-staff": "That person has already signed in.",
   "rate-limited": "Too many invites. Try again later.",
-  forbidden: "Your role cannot invite staff.",
+  forbidden: "You don't have permission to invite staff.",
   invalid: "Enter an email and a role.",
 };
 

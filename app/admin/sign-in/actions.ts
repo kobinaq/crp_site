@@ -16,7 +16,7 @@ export async function requestStaffLink(_previous: { message: string; devLink?: s
   const headerList = await headers();
   if (!staffSameOrigin(headerList)) return { message: SENT };
   const email = parseEmail(String(formData.get("email") ?? ""));
-  if (!email) return { message: "Enter the email address on the admin list." };
+  if (!email) return { message: "Enter your email address." };
   const ip = clientIp(headerList);
   const allowed = (await rateLimit("staff-signin:ip", ip, 20, 3600)) && (await rateLimit("staff-signin:email", email, 5, 3600));
   if (!allowed) return { message: SENT };

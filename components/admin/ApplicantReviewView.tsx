@@ -63,7 +63,7 @@ export function ApplicantReviewView({
             </article>
             <article className={card}>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Identity</h2>
-              <p className="mt-2 text-2xl font-semibold">{words(review.identity)}</p>
+              <p className="mt-2 text-2xl font-semibold">{identityWords(review.identity)}</p>
               <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt ? <When stamp={review.identityCheckedAt} /> : "Not checked"}</p>
               {review.documents.length === 0 ? <p className="mt-3 text-sm text-black/60">No document on file.</p> : review.documents.map((document) => (
                 <DocumentReveal key={`${review.id}:${document.documentId}`} applicantId={review.id} view={document} />
@@ -88,8 +88,8 @@ export function ApplicantReviewView({
               <Fact term="Can travel" value={review.canTravel} />
               <Fact term="Valid passport" value={review.hasValidPassport} />
               <Fact term="Submitted" value={review.createdAt} when />
-              <Fact term="Documents" value={review.docsStatus} />
-              <Fact term="Online offered" value={review.onlineOfferedAt} />
+              <Fact term="Documents" value={documentWords(review.docsStatus)} />
+              <Fact term="Offered online place" value={review.onlineOfferedAt} when />
             </dl>
           </section>
           <section className={card}>
@@ -121,8 +121,21 @@ function statusName(value: string, empty: string): string {
   return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-function words(value: string): string {
-  if (!value || value === "none") return "Not started";
+const IDENTITY_WORDS: Record<string, string> = {
+  none: "Not started",
+  pending: "In progress",
+  verified: "Confirmed",
+  failed: "Failed",
+  review: "Needs a manual look",
+};
+
+function identityWords(value: string): string {
+  if (!value) return "Not started";
+  return IDENTITY_WORDS[value] ?? value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function documentWords(value: string): string {
+  if (value === "submitted") return "Sent in";
   return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
@@ -165,7 +178,7 @@ function Fact({ term, value, when = false }: { term: string; value: string; when
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{term}</dt>
-      <dd className="mt-1 break-all text-sm">{shown}</dd>
+      <dd className="mt-1 break-words text-sm">{shown}</dd>
     </div>
   );
 }

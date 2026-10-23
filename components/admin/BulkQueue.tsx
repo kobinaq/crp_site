@@ -12,12 +12,12 @@ import { languageLabel } from "@/lib/admin/labels";
 import type { ConfirmMove } from "@/lib/sync";
 
 const MOVES: readonly { readonly move: ConfirmMove; readonly label: string }[] = [
-  { move: { field: "reviewDecision", value: "accept", to: "accepted" }, label: "Accept to Accepted" },
-  { move: { field: "reviewDecision", value: "reject", to: "rejected" }, label: "Reject to Rejected" },
-  { move: { field: "reviewDecision", value: "reject", to: "online_offered" }, label: "Reject to Online offered" },
-  { move: { field: "interviewOutcome", value: "yes", to: "interview_yes" }, label: "Interview yes" },
-  { move: { field: "interviewOutcome", value: "no", to: "rejected" }, label: "Interview no to Rejected" },
-  { move: { field: "interviewOutcome", value: "no", to: "online_offered" }, label: "Interview no to Online offered" },
+  { move: { field: "reviewDecision", value: "accept", to: "accepted" }, label: "Accept" },
+  { move: { field: "reviewDecision", value: "reject", to: "rejected" }, label: "Reject" },
+  { move: { field: "reviewDecision", value: "reject", to: "online_offered" }, label: "Reject, offer an online place" },
+  { move: { field: "interviewOutcome", value: "yes", to: "interview_yes" }, label: "Passed interview" },
+  { move: { field: "interviewOutcome", value: "no", to: "rejected" }, label: "Did not pass interview, reject" },
+  { move: { field: "interviewOutcome", value: "no", to: "online_offered" }, label: "Did not pass interview, offer an online place" },
 ];
 
 const RESULT: Record<string, string> = {
@@ -27,9 +27,9 @@ const RESULT: Record<string, string> = {
   not_found: "Not found",
   unchanged: "Unchanged",
   replayed: "Already confirmed",
-  conflict: "Conflict",
-  staff_held: "Held",
-  staff_kept: "Kept",
+  conflict: "Changed elsewhere",
+  staff_held: "On hold",
+  staff_kept: "Kept as is",
 };
 
 export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows: readonly RecordRow[] }) {
@@ -70,7 +70,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
       if (result.result !== "ready") {
         setPreviewKey("");
         setCounts(null);
-        setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "Select at most 50 applicants.");
+        setNotice(result.result === "forbidden" ? "You don't have permission to confirm a decision." : "Select at most 50 applicants.");
         return;
       }
       setPreviewKey(requested);
@@ -99,7 +99,7 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
       });
       if (request.current !== ticket) return;
       if (result.result !== "done") {
-        setNotice(result.result === "forbidden" ? "Your role cannot confirm a decision." : "That confirmation could not be read.");
+        setNotice(result.result === "forbidden" ? "You don't have permission to confirm a decision." : "That confirmation could not be read.");
         return;
       }
       setResults(result.rows);
@@ -139,12 +139,12 @@ export function BulkQueue({ headers, rows }: { headers: readonly string[]; rows:
           />
         </label>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" type="button" onClick={onPreview} disabled={pending || picked.length === 0}>Preview counts</Button>
+          <Button variant="outline" type="button" onClick={onPreview} disabled={pending || picked.length === 0}>Preview</Button>
           <Button variant="primary" type="button" onClick={onConfirm} disabled={!ready || pending}>Confirm</Button>
         </div>
         {counts && previewKey === key ? (
           <p className="text-sm text-black/70">
-            {counts.apply} will apply, {counts.stale} are out of date, {counts.notAllowed} cannot move, {counts.notFound} were not found.
+            {counts.apply} will move, {counts.stale} changed since you opened this page, {counts.notAllowed} can&apos;t make this move, {counts.notFound} not found.
             {languages.length > 0 ? ` ${languages.map((item) => `${languageLabel(item.language)} ${item.apply}`).join(", ")}.` : ""}
           </p>
         ) : null}

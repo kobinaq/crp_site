@@ -443,7 +443,7 @@ test("the messages list searches the body, hides an unknown status, and does not
   const found = await records.loadRecords(database, records.parseRecordQuery({ list: "messages", q: token }), admin);
   assert.equal(found.total, 1);
   assert.equal(found.rows[0].cells[0], "List Person");
-  assert.equal(found.headers.join(","), "Name,Email,Organization,Status,Assignee,Created");
+  assert.equal(found.headers.join(","), "Name,Email,Organization,Status,Assigned to,Received");
   assert.equal(found.rows[0].href.startsWith("/admin/records/messages/"), true);
 
   const hidden = await records.loadRecords(database, records.parseRecordQuery({ list: "messages", q: token }), editor);
@@ -477,5 +477,5 @@ test("the messages list searches the body, hides an unknown status, and does not
   assert.equal(activityLabel("contact.status", { from: "archived", to: "spam" }), "Moved a message from Archived to Spam");
   assert.equal(activityLabel("contact.noted", { body: "private" }), "Added a message note");
   assert.equal(activityLabel("contact.assigned", { assigneeId: admin.id }), "Assigned a message");
-  assert.equal(activityLabel("contact.assigned", {}), "Cleared a message assignee");
+  assert.equal(activityLabel("contact.assigned", {}), "Unassigned a message");
 });

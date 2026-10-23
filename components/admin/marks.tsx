@@ -18,3 +18,18 @@ export function Wordmark() {
 export function AdminFrame({ children }: { children: ReactNode }) {
   return <div className="mx-auto w-full max-w-6xl px-4 py-6 desk:px-8 desk:py-10">{children}</div>;
 }
+
+export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="grid min-h-[80vh] place-items-center">
+      <main className="w-full max-w-md overflow-hidden rounded-[32px] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.08)]">
+        <div className="gradient-brand h-2" aria-hidden="true" />
+        <div className="p-6 desk:p-8">
+          <Wordmark />
+          <h1 className="mt-6 text-3xl font-semibold tracking-tight">{title}</h1>
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -111,7 +111,7 @@ export const REASON_LEAF = {
   rate_limited: CONTACT_PAGE_FEEDBACK.rateLimited,
 } as const satisfies Record<ContactSubmitReason, string>;
 
-export const MESSAGE_LIST_HEADERS = ["Name", "Email", "Organization", "Status", "Assignee", "Created"] as const;
+export const MESSAGE_LIST_HEADERS = ["Name", "Email", "Organization", "Status", "Assigned to", "Received"] as const;
 
 declare const messageIdBrand: unique symbol;
 export type MessageId = string & { readonly [messageIdBrand]: "MessageId" };
@@ -178,10 +178,6 @@ export function messageHref(id: MessageId): string {
 
 export function messageStatusOptions(): readonly (readonly [ContactStatus, string])[] {
   return CONTACT_STATUSES.map((status) => [status, CONTACT_STATUS_LABEL[status]]);
-}
-
-export function statusFilterLabel(list: string): string {
-  return list === CONTACT_LIST ? "Status" : "Staff status";
 }
 
 export function showsAttention(list: string): boolean {
