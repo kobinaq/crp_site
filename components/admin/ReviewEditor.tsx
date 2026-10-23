@@ -10,18 +10,18 @@ import { RECOMMENDATIONS, RUBRIC, isRecommendation, retiredScoreKeys } from "@/l
 
 const SAVE: Record<string, string> = {
   saved: "Saved.",
-  forbidden: "Your role cannot save a review.",
-  invalid: "Check the scores and the note.",
+  forbidden: "You don't have permission to save a review.",
+  invalid: "Not saved. Check the scores and the note.",
   not_found: "That applicant was not found.",
-  stale_cycle: "This review cycle is out of date. Reload the page.",
+  stale_cycle: "This applicant moved to a new review round. Reload the page.",
 };
 
 const ASSIGN: Record<string, string> = {
-  saved: "Assignee updated.",
-  forbidden: "Your role cannot assign a reviewer.",
-  invalid: "That assignment could not be read.",
+  saved: "Saved.",
+  forbidden: "You don't have permission to assign a reviewer.",
+  invalid: "Not saved. Reload the page and try again.",
   not_found: "That applicant was not found.",
-  conflict: "Someone else changed the assignee. Reload and try again.",
+  conflict: "Someone else changed this. Reload the page and try again.",
   invalid_assignee: "That person cannot review applications.",
 };
 
@@ -50,7 +50,7 @@ export function ReviewEditor({
   return (
     <div className="grid gap-6">
       <section className={card}>
-        <h2 className="text-lg font-semibold">Assignee</h2>
+        <h2 className="text-lg font-semibold">Assigned to</h2>
         <p className="mt-2 text-sm">{review.assignedStaff?.name ?? "Unassigned"}</p>
         {canAssign ? <AssignForm key={review.id} review={review} options={options} /> : null}
       </section>
@@ -93,7 +93,7 @@ function ScoreList({ scores }: { scores: Readonly<Record<string, number>> }) {
         <li key={criterion.id}>{criterion.label}: {scores[criterion.id] ?? "Not scored"}</li>
       ))}
       {retiredScoreKeys(scores).map((key) => (
-        <li key={key}>Retired {key}: {scores[key]}</li>
+        <li key={key}>Earlier question ({key.replaceAll("_", " ")}): {scores[key]}</li>
       ))}
     </ul>
   );

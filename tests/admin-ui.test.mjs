@@ -55,7 +55,9 @@ function copyRow(key, english, french) {
   return {
     catalog: "page",
     key,
+    label: `Menu: ${english}`,
     section: "nav",
+    sectionLabel: "Top menu",
     english,
     digest: "digest",
     cells: [cell("en", english), cell("fr", french)],
@@ -537,7 +539,10 @@ test("the applicant header keeps the filtered list and disables a missing neighb
     assert.match(document.body.textContent ?? "", /In person/);
     assert.match(document.body.textContent ?? "", /English/);
     assert.doesNotMatch(document.body.textContent ?? "", /Cycle 0/);
-    assert.equal(document.querySelector("a[href='mailto:ayat@example.com']")?.textContent, "Email");
+    assert.match(document.body.textContent ?? "", /ayat@example.com/);
+    assert.equal(document.querySelector("a[href='mailto:ayat@example.com']"), null);
+    assert.equal(document.querySelector("a[href^='tel:']"), null);
+    assert.equal((document.body.textContent ?? "").match(/\b(Email|Copy|Call)\b/), null);
   } finally {
     await view.unmount();
   }

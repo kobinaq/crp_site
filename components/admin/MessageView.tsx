@@ -26,12 +26,12 @@ type MessageAction = (previous: MessageFormState, formData: FormData) => Promise
 
 const RESULT: Record<NonNullable<MessageFormState>["result"], string> = {
   saved: "Saved.",
-  forbidden: "Your role cannot do that.",
-  invalid: "That could not be saved.",
-  not_found: "That record was not found.",
-  conflict: "Someone else changed this record. Reload and try again.",
-  illegal: "That move is not available.",
-  invalid_assignee: "That person cannot own this inbox.",
+  forbidden: "You don't have permission to do that.",
+  invalid: "Not saved. Check the form and try again.",
+  not_found: "This could not be found. It may have been removed.",
+  conflict: "Someone else changed this. Reload the page and try again.",
+  illegal: "That change isn't available right now.",
+  invalid_assignee: "That person can't be assigned here.",
 };
 
 function when(value: Date): string {
@@ -61,12 +61,12 @@ export function MessageView({
     ["Email", detail.email],
     ["Organization", detail.organization ?? ""],
     ["Phone", detail.phone],
-    ["Locale", detail.locale],
-    ["Created", when(detail.createdAt)],
+    ["Language", detail.locale],
+    ["Received", when(detail.createdAt)],
     ["Message", detail.body],
   ];
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <RecordChrome
         backHref={listHref}
         backLabel="Back to messages"
@@ -76,7 +76,7 @@ export function MessageView({
         meta={<p className="text-sm font-semibold">{detail.statusLabel}</p>}
       />
       <section className={card}>
-        <h2 className="text-lg font-semibold">Record</h2>
+        <h2 className="text-lg font-semibold">Details</h2>
         <dl className="mt-4 grid gap-4 desk:grid-cols-2">
           {fields.map((item) => (
             <div key={item[0]} className={item[0] === "Message" ? "desk:col-span-2" : undefined}>
@@ -97,7 +97,7 @@ export function MessageView({
         </section>
       ) : null}
       <section className={card}>
-        <h2 className="text-lg font-semibold">Assignee</h2>
+        <h2 className="text-lg font-semibold">Assigned to</h2>
         <p className="mt-2 text-sm">{detail.assignee ? detail.assignee.name || detail.assignee.email : "Unassigned"}</p>
         {detail.canManage ? <AssignForm key={detail.id} detail={detail} options={options} action={action} /> : null}
       </section>
@@ -122,8 +122,8 @@ export function MessageView({
 function messageField(label: string, value: string) {
   if (!value) return "Not given";
   if (label === "Email") return <EmailLine email={value} />;
-  if (label === "Created") return <When stamp={value} />;
-  if (label === "Locale") return languageLabel(value);
+  if (label === "Received") return <When stamp={value} />;
+  if (label === "Language") return languageLabel(value);
   return value;
 }
 
@@ -180,7 +180,7 @@ function AssignForm({
       <input type="hidden" name={MESSAGE_FIELDS.messageId} value={detail.id} />
       <input type="hidden" name={MESSAGE_FIELDS.expectedAssigneeId} value={detail.assignee?.id ?? ""} />
       <label className="grid gap-1 text-sm font-semibold">
-        Assignee
+        Assigned to
         <AdminSelect
           name={MESSAGE_FIELDS.assigneeId}
           defaultValue={detail.assignee?.id ?? ""}

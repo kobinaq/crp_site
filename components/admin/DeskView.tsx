@@ -28,12 +28,12 @@ type DeskAction = (previous: DeskFormState, formData: FormData) => Promise<DeskF
 
 const RESULT: Record<NonNullable<DeskFormState>["result"], string> = {
   saved: "Saved.",
-  forbidden: "Your role cannot do that.",
-  invalid: "That could not be saved.",
-  not_found: "That record was not found.",
-  conflict: "Someone else changed this record. Reload and try again.",
-  illegal: "That move is not available.",
-  invalid_assignee: "That person cannot own this desk.",
+  forbidden: "You don't have permission to do that.",
+  invalid: "Not saved. Check the form and try again.",
+  not_found: "This could not be found. It may have been removed.",
+  conflict: "Someone else changed this. Reload the page and try again.",
+  illegal: "That change isn't available right now.",
+  invalid_assignee: "That person can't be assigned here.",
 };
 
 export function DeskView({
@@ -61,7 +61,7 @@ export function DeskView({
     ? [...detail.assignees, detail.assignee]
     : detail.assignees;
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <RecordChrome
         backHref={listHref}
         backLabel={backLabel}
@@ -71,7 +71,7 @@ export function DeskView({
         meta={<p className="text-sm font-semibold">{detail.statusLabel}</p>}
       />
       <section className={card}>
-        <h2 className="text-lg font-semibold">Record</h2>
+        <h2 className="text-lg font-semibold">Details</h2>
         <dl className="mt-4 grid gap-4 desk:grid-cols-2">
           {detail.fields.map((item) => (
             <div key={item.label}>
@@ -92,7 +92,7 @@ export function DeskView({
         </section>
       ) : null}
       <section className={card}>
-        <h2 className="text-lg font-semibold">Assignee</h2>
+        <h2 className="text-lg font-semibold">Assigned to</h2>
         <p className="mt-2 text-sm">{detail.assignee ? detail.assignee.name || detail.assignee.email : "Unassigned"}</p>
         {detail.canAssign ? <AssignForm key={detail.recordId} detail={detail} options={options} action={assignAction} /> : null}
       </section>
@@ -117,8 +117,8 @@ export function DeskView({
 function fieldValue(label: string, value: string) {
   if (!value) return "Not given";
   if (label.toLowerCase().includes("email")) return <EmailLine email={value} />;
-  if (label === "Created") return <When stamp={value} />;
-  if (label === "Intake status") return intakeLabel(value);
+  if (label === "Received") return <When stamp={value} />;
+  if (label === "Nominee status") return intakeLabel(value);
   if (label === "Track") return trackLabel(value);
   if (label === "Locale" || label === "Language") return languageLabel(value);
   return value;
@@ -182,7 +182,7 @@ function AssignForm({
       <input type="hidden" name="recordId" value={detail.recordId} />
       <input type="hidden" name="expectedAssigneeId" value={detail.assignee?.id ?? ""} />
       <label className="grid gap-1 text-sm font-semibold">
-        Assignee
+        Assigned to
         <AdminSelect
           name="assigneeId"
           defaultValue={detail.assignee?.id ?? ""}

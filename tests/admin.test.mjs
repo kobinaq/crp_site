@@ -233,7 +233,7 @@ async function applicantReview() {
   assert.equal(detail.dob, "1990-01-02");
   assert.equal(detail.videoAsk, "complete");
   assert.equal(detail.identity, "verified");
-  assert.equal(detail.events.some((event) => event.reason === "round 1 finished"), true);
+  assert.equal(detail.events.some((event) => event.reason === "Round 1 finished"), true);
   assert.equal(Object.hasOwn(detail, "round1Link"), false);
   assert.equal(JSON.stringify(detail).includes("secret.example"), false);
   assert.equal(JSON.stringify(detail).includes("media.videoask.com"), false);
@@ -283,8 +283,8 @@ async function applicantReview() {
   const editorViewer = { id: user.rows[0].id, role: "editor" };
   const reviewerViewer = { id: user.rows[0].id, role: "reviewer" };
   const nominationList = await loadRecords(database, parseRecordQuery({ list: "nominations", q: "ivy" }), adminViewer);
-  assert.equal(nominationList.headers.at(-3), "Staff status");
-  assert.equal(nominationList.headers.at(-2), "Assignee");
+  assert.equal(nominationList.headers.at(-3), "Status");
+  assert.equal(nominationList.headers.at(-2), "Assigned to");
   assert.match(nominationList.rows[0].href, /^\/admin\/records\/nominations\//);
   assert.equal(nominationList.rows[0].cells.includes("New"), true);
   const editorNominations = await loadRecords(database, parseRecordQuery({ list: "nominations", q: "ivy" }), editorViewer);
@@ -297,7 +297,7 @@ async function applicantReview() {
   const editorPartners = await loadRecords(database, parseRecordQuery({ list: "partners" }), editorViewer);
   assert.equal(editorPartners.rows.every((row) => row.href === null), true);
   const adminPartners = await loadRecords(database, parseRecordQuery({ list: "partners" }), adminViewer);
-  assert.equal(adminPartners.headers.at(-3), "Staff status");
+  assert.equal(adminPartners.headers.at(-3), "Status");
   assert.match(adminPartners.rows[0].href, /^\/admin\/records\/partners\//);
   const needs = await loadRecords(database, parseRecordQuery({ list: "nominations", q: "ivy", attention: "needs" }), adminViewer);
   assert.equal(needs.total, 1);
@@ -321,16 +321,16 @@ async function applicantReview() {
   for (const week of weeks) assert.equal(new Date(`${week.week}T00:00:00Z`).getUTCDay(), 1);
   assert.equal(weeks.some((week) => week.count > 0), true);
   const activity = await loadActivity(database, null);
-  assert.equal(activity.rows.some((row) => row.label.startsWith("Exported")), true);
-  assert.equal(activityLabel("nope", {}), "Unknown event");
+  assert.equal(activity.rows.some((row) => row.label.startsWith("Downloaded")), true);
+  assert.equal(activityLabel("nope", {}), "Other change");
   assert.equal(activityLabel("nomination.noted", { body: "private desk note" }), "Added a nomination note");
-  assert.equal(activityLabel("nomination.status", { from: "new", to: "closed" }), "Moved a nomination from new to closed");
+  assert.equal(activityLabel("nomination.status", { from: "new", to: "closed" }), "Moved a nomination from New to Closed");
   assert.equal(activityLabel("nomination.assigned", { assigneeId: "00000000-0000-4000-8000-000000000001" }), "Assigned a nomination");
-  assert.equal(activityLabel("nomination.assigned", {}), "Cleared a nomination assignee");
+  assert.equal(activityLabel("nomination.assigned", {}), "Unassigned a nomination");
   assert.equal(activityLabel("partner.noted", {}), "Added a partner note");
-  assert.equal(activityLabel("partner.status", { from: "new", to: "declined" }), "Moved a partner inquiry from new to declined");
-  assert.equal(activityLabel("partner.assigned", { assigneeId: "" }), "Cleared a partner assignee");
-  assert.equal(activityLabel("answer.media_opened", { pathname: "videoask/secret.example", transcript: "private words" }), "Played a VideoAsk recording");
+  assert.equal(activityLabel("partner.status", { from: "new", to: "declined" }), "Moved a partner inquiry from New to Declined");
+  assert.equal(activityLabel("partner.assigned", { assigneeId: "" }), "Unassigned a partner inquiry");
+  assert.equal(activityLabel("answer.media_opened", { pathname: "videoask/secret.example", transcript: "private words" }), "Opened a video answer");
   assert.equal(activityLabel("identity.document_opened", { url: "https://store.example.vercel-storage.com/doc" }), "Showed an identity document");
 }
 

@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { hashToken } from "@/lib/access";
 import { signInTokens, userSessions, users, type Db, type Store, type Tx } from "@/lib/db";
+import { staffSignInEmail } from "@/lib/emails";
 import { can, isUserRole, type UserRole } from "@/lib/staff/roles";
 import { isUserId, parseEmail, resolveSignIn, type UserId } from "@/lib/staff/users";
 
@@ -30,18 +31,7 @@ export function staffCookieOptions(secure: boolean) {
 }
 
 export function staffLinkHtml(link: string, role: UserRole | null): string {
-  const href = escapeHtml(link);
-  const invite = role ? `<p style="font-family:Outfit,Helvetica,Arial,sans-serif">You were invited as ${escapeHtml(role)}.</p>` : "";
-  return `${invite}<p style="font-family:Outfit,Helvetica,Arial,sans-serif">Sign in to the Climate Refugee Pavilion admin. This link works once and expires in 15 minutes.</p><p><a href="${href}">Finish signing in</a></p>`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"]/g, (char) => {
-    if (char === "&") return "&amp;";
-    if (char === "<") return "&lt;";
-    if (char === ">") return "&gt;";
-    return "&quot;";
-  });
+  return staffSignInEmail(link, role).html;
 }
 
 export async function issueSignInLink(db: Db | Tx, email: string): Promise<{ raw: string; hash: string } | null> {

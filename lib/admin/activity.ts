@@ -1,4 +1,8 @@
 import { and, eq, or, sql, type SQL } from "drizzle-orm";
+import { STATUS_LABEL } from "@/lib/admin/dashboard";
+import { languageLabel } from "@/lib/admin/labels";
+import { CATALOGS, type CatalogId } from "@/lib/copy/catalog";
+import { copyLabel } from "@/lib/copy/labels";
 import { adminEvents, copyRevisions, users, type Db } from "@/lib/db";
 
 const PAGE = 50;
@@ -32,40 +36,99 @@ function textOf(detail: Record<string, unknown>, key: string): string {
 function filterText(detail: Record<string, unknown>): string {
   const filters = detail.filters;
   if (!filters || typeof filters !== "object" || Array.isArray(filters)) return "";
-  return Object.entries(filters).flatMap(([key, value]) => (typeof value === "string" && value ? [`${key}=${value}`] : [])).join(", ");
+  return Object.entries(filters).flatMap(([key, value]) => (typeof value === "string" && value ? [`${FILTER_NAME[key] ?? key}: ${key === "status" ? plainStatus(value) : value}`] : [])).join(", ");
+}
+
+function plainRole(value: string): string {
+  if (value === "admin") return "Admin";
+  if (value === "editor") return "Editor";
+  if (value === "reviewer") return "Reviewer";
+  return value;
+}
+
+const DESK_STATUS: Readonly<Record<string, string>> = {
+  new: "New",
+  read: "Read",
+  archived: "Archived",
+  spam: "Spam",
+  reviewing: "Reviewing",
+  contacted: "Contacted",
+  converted: "Converted to applicant",
+  closed: "Closed",
+  in_conversation: "In conversation",
+  committed: "Committed",
+  declined: "Declined",
+};
+
+function plainStatus(value: string): string {
+  if (Object.hasOwn(STATUS_LABEL, value)) return STATUS_LABEL[value as keyof typeof STATUS_LABEL];
+  return DESK_STATUS[value] ?? value.replaceAll("_", " ");
+}
+
+const LIST_NAME: Readonly<Record<string, string>> = {
+  applicants: "applicants",
+  nominations: "nominations",
+  interest: "interest sign-ups",
+  waitlist: "waitlist sign-ups",
+  partners: "partner inquiries",
+  messages: "messages",
+};
+
+const FILTER_NAME: Readonly<Record<string, string>> = {
+  q: "search",
+  status: "status",
+  track: "track",
+  language: "language",
+  cycle: "review round",
+  age: "age",
+  queue: "queue",
+  attention: "needs attention",
+};
+
+const RECOMMENDATION: Readonly<Record<string, string>> = { advance: "Advance", discuss: "Discuss", decline: "Decline" };
+
+function copyChange(detail: Record<string, unknown>): string {
+  const catalog = textOf(detail, "catalog");
+  const key = textOf(detail, "key");
+  const known = Object.hasOwn(CATALOGS, catalog) ? (catalog as CatalogId) : null;
+  const name = known ? copyLabel(known, key) ?? key : key;
+  const where = known ? CATALOGS[known].label : "Text";
+  const locale = textOf(detail, "locale");
+  return `Changed "${name}" (${where}${locale ? `, ${languageLabel(locale)}` : ""})`;
 }
 
 export function activityLabel(kind: string, detail: Record<string, unknown>): string {
   const email = textOf(detail, "email");
-  if (kind === "staff.bootstrap") return `${email} joined from the allowlist`;
-  if (kind === "staff.invited") return `Invited ${email} as ${textOf(detail, "role")}`;
-  if (kind === "staff.role") return `${email} moved from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "staff.bootstrap") return email ? `${email} joined` : "Joined";
+  if (kind === "staff.invited") return `Invited ${email} as ${plainRole(textOf(detail, "role"))}`;
+  if (kind === "staff.role") return `${email} moved from ${plainRole(textOf(detail, "from"))} to ${plainRole(textOf(detail, "to"))}`;
   if (kind === "staff.disabled") return `Disabled ${email}`;
   if (kind === "staff.enabled") return `Enabled ${email}`;
   if (kind === "records.exported") {
     const filters = filterText(detail);
-    const summary = `Exported ${textOf(detail, "rows") || "0"} ${textOf(detail, "list")} rows`;
+    const list = textOf(detail, "list");
+    const summary = `Downloaded ${textOf(detail, "rows") || "0"} ${LIST_NAME[list] ?? list}`;
     return filters ? `${summary} (${filters})` : summary;
   }
-  if (kind === "copy.published") return `Published ${textOf(detail, "catalog")} ${textOf(detail, "locale")} ${textOf(detail, "key")}`;
+  if (kind === "copy.published") return copyChange(detail);
   if (kind === "review.saved") {
     const recommendation = textOf(detail, "recommendation");
-    return recommendation ? `Saved a review, recommendation ${recommendation}` : "Saved a review";
+    return recommendation ? `Saved a review: ${RECOMMENDATION[recommendation] ?? recommendation}` : "Saved a review";
   }
-  if (kind === "review.assigned") return textOf(detail, "assigneeId") ? "Assigned a reviewer" : "Cleared the reviewer";
-  if (kind === "decision.confirmed") return `Confirmed ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "review.assigned") return textOf(detail, "assigneeId") ? "Assigned a reviewer" : "Removed the reviewer";
+  if (kind === "decision.confirmed") return `Moved an applicant from ${plainStatus(textOf(detail, "from"))} to ${plainStatus(textOf(detail, "to"))}`;
   if (kind === "nomination.noted") return "Added a nomination note";
-  if (kind === "nomination.status") return `Moved a nomination from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
-  if (kind === "nomination.assigned") return textOf(detail, "assigneeId") ? "Assigned a nomination" : "Cleared a nomination assignee";
+  if (kind === "nomination.status") return `Moved a nomination from ${plainStatus(textOf(detail, "from"))} to ${plainStatus(textOf(detail, "to"))}`;
+  if (kind === "nomination.assigned") return textOf(detail, "assigneeId") ? "Assigned a nomination" : "Unassigned a nomination";
   if (kind === "partner.noted") return "Added a partner note";
-  if (kind === "partner.status") return `Moved a partner inquiry from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
-  if (kind === "partner.assigned") return textOf(detail, "assigneeId") ? "Assigned a partner inquiry" : "Cleared a partner assignee";
+  if (kind === "partner.status") return `Moved a partner inquiry from ${plainStatus(textOf(detail, "from"))} to ${plainStatus(textOf(detail, "to"))}`;
+  if (kind === "partner.assigned") return textOf(detail, "assigneeId") ? "Assigned a partner inquiry" : "Unassigned a partner inquiry";
   if (kind === "contact.noted") return "Added a message note";
-  if (kind === "contact.status") return `Moved a message from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
-  if (kind === "contact.assigned") return textOf(detail, "assigneeId") ? "Assigned a message" : "Cleared a message assignee";
-  if (kind === "answer.media_opened") return "Played a VideoAsk recording";
+  if (kind === "contact.status") return `Moved a message from ${plainStatus(textOf(detail, "from"))} to ${plainStatus(textOf(detail, "to"))}`;
+  if (kind === "contact.assigned") return textOf(detail, "assigneeId") ? "Assigned a message" : "Unassigned a message";
+  if (kind === "answer.media_opened") return "Opened a video answer";
   if (kind === "identity.document_opened") return "Showed an identity document";
-  return "Unknown event";
+  return "Other change";
 }
 
 const STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$/;

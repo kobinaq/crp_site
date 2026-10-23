@@ -4,7 +4,6 @@ import { EmailLine } from "@/components/admin/EmailLine";
 import { RecordChrome } from "@/components/admin/RecordChrome";
 import { ReviewEditor } from "@/components/admin/ReviewEditor";
 import { When } from "@/components/admin/When";
-import { buttonClass } from "@/components/admin/Button";
 import { card } from "@/components/admin/marks";
 import { STATUS_LABEL } from "@/lib/admin/dashboard";
 import { cycleLabel, languageLabel, trackLabel } from "@/lib/admin/labels";
@@ -35,7 +34,7 @@ export function ApplicantReviewView({
 }) {
   const cycle = cycleLabel(review.reviewCycle);
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <RecordChrome
         backHref={recordsHref(listQuery)}
         backLabel="Back to applicants"
@@ -58,13 +57,13 @@ export function ApplicantReviewView({
         <div className="order-2 grid gap-6 desk:order-1">
           <section className="grid gap-4 desk:grid-cols-2">
             <article className={card}>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">VideoAsk</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Video answers</h2>
               <p className="mt-2 text-2xl font-semibold">{review.videoAsk === "complete" ? "Complete" : "Not complete"}</p>
               <p className="mt-1 text-sm text-black/70">{review.round1CompletedAt ? <When stamp={review.round1CompletedAt} /> : "No completion time"}</p>
             </article>
             <article className={card}>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-black/60">Identity</h2>
-              <p className="mt-2 text-2xl font-semibold">{words(review.identity)}</p>
+              <p className="mt-2 text-2xl font-semibold">{identityWords(review.identity)}</p>
               <p className="mt-1 text-sm text-black/70">{review.identityCheckedAt ? <When stamp={review.identityCheckedAt} /> : "Not checked"}</p>
               {review.documents.length === 0 ? <p className="mt-3 text-sm text-black/60">No document on file.</p> : review.documents.map((document) => (
                 <DocumentReveal key={`${review.id}:${document.documentId}`} applicantId={review.id} view={document} />
@@ -89,8 +88,8 @@ export function ApplicantReviewView({
               <Fact term="Can travel" value={review.canTravel} />
               <Fact term="Valid passport" value={review.hasValidPassport} />
               <Fact term="Submitted" value={review.createdAt} when />
-              <Fact term="Documents" value={review.docsStatus} />
-              <Fact term="Online offered" value={review.onlineOfferedAt} />
+              <Fact term="Documents" value={documentWords(review.docsStatus)} />
+              <Fact term="Offered online place" value={review.onlineOfferedAt} when />
             </dl>
           </section>
           <section className={card}>
@@ -122,8 +121,21 @@ function statusName(value: string, empty: string): string {
   return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-function words(value: string): string {
-  if (!value || value === "none") return "Not started";
+const IDENTITY_WORDS: Record<string, string> = {
+  none: "Not started",
+  pending: "In progress",
+  verified: "Confirmed",
+  failed: "Failed",
+  review: "Needs a manual look",
+};
+
+function identityWords(value: string): string {
+  if (!value) return "Not started";
+  return IDENTITY_WORDS[value] ?? value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function documentWords(value: string): string {
+  if (value === "submitted") return "Sent in";
   return value.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
@@ -163,16 +175,10 @@ function AnswerBlock({ applicantId, view }: { applicantId: string; view: AnswerV
 
 function Fact({ term, value, when = false }: { term: string; value: string; when?: boolean }) {
   const shown = when && value ? <When stamp={value} /> : value || "Not given";
-  const body = term === "Phone" && value ? (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <span>{value}</span>
-      <a className={buttonClass("outline", "sm")} href={`tel:${value.replace(/\s+/g, "")}`}>Call</a>
-    </span>
-  ) : shown;
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-wide text-black/50">{term}</dt>
-      <dd className="mt-1 text-sm">{body}</dd>
+      <dd className="mt-1 break-words text-sm">{shown}</dd>
     </div>
   );
 }

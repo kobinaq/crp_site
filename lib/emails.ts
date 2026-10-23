@@ -267,6 +267,22 @@ export function identityRetryEmail(name: string, link: string, language: Applica
   };
 }
 
+const STAFF_ROLE = { admin: "Admin", editor: "Editor", reviewer: "Reviewer" } as const;
+
+// Staff sign-in and invite mail. The link, its host, and the 15-minute expiry
+// are chosen by the caller. This only wraps that link in the branded shell.
+export function staffSignInEmail(link: string, role: keyof typeof STAFF_ROLE | null): Email {
+  const roleName = role ? STAFF_ROLE[role] : "";
+  const lines = [
+    roleName ? `You are invited as ${roleName}.` : "Sign in to the admin.",
+    "This link works once and expires in 15 minutes.",
+    `Button not working? Copy this link into your browser: ${escapeHtml(link)}`,
+    "Didn't request this? Ignore this email.",
+  ];
+  const subject = roleName ? "You're invited to Climate Refugee Pavilion" : "Sign in to Climate Refugee Pavilion";
+  return { subject, html: render("en", lines, { label: "Sign in", url: link }, shellFor("en", undefined)) };
+}
+
 export function decisionEmail(
   status: "rejected" | "online_offered" | "accepted" | "interview_yes",
   link: string | null,

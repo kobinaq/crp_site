@@ -5,10 +5,10 @@ import ackCopy from "@/lib/translations/acknowledgement-emails.json";
 import appCopy from "@/lib/translations/application-emails.json";
 
 export const CATALOGS = {
-  page: { label: "Page copy", locales },
-  ui: { label: "Interface", locales },
-  ackEmail: { label: "Acknowledgement emails", locales },
-  appEmail: { label: "Application emails", locales: applicationLocales },
+  page: { label: "Pages", locales },
+  ui: { label: "Forms and buttons", locales },
+  ackEmail: { label: "Thank-you emails", locales },
+  appEmail: { label: "Applicant emails", locales: applicationLocales },
 } as const;
 
 export type CatalogId = keyof typeof CATALOGS;

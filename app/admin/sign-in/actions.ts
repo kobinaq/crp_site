@@ -3,9 +3,10 @@
 import { headers } from "next/headers";
 import { appUrl } from "@/lib/config";
 import { deliverEmail } from "@/lib/email";
+import { staffSignInEmail } from "@/lib/emails";
 import { getDb } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { issueSignInLink, staffLinkHtml } from "@/lib/staff/auth";
+import { issueSignInLink } from "@/lib/staff/auth";
 import { staffSameOrigin } from "@/lib/staff/origin";
 import { parseEmail } from "@/lib/staff/users";
 
@@ -15,15 +16,15 @@ export async function requestStaffLink(_previous: { message: string; devLink?: s
   const headerList = await headers();
   if (!staffSameOrigin(headerList)) return { message: SENT };
   const email = parseEmail(String(formData.get("email") ?? ""));
-  if (!email) return { message: "Enter the email address on the admin list." };
+  if (!email) return { message: "Enter your email address." };
   const ip = clientIp(headerList);
   const allowed = (await rateLimit("staff-signin:ip", ip, 20, 3600)) && (await rateLimit("staff-signin:email", email, 5, 3600));
   if (!allowed) return { message: SENT };
   const issued = await issueSignInLink(getDb(), email);
   if (!issued) return { message: SENT };
   const link = `${appUrl()}/admin/confirm?token=${encodeURIComponent(issued.raw)}`;
-  const html = staffLinkHtml(link, null);
-  const sent = await deliverEmail({ to: email, subject: "Sign in to Climate Refugee Pavilion", html }, issued.hash);
+  const mail = staffSignInEmail(link, null);
+  const sent = await deliverEmail({ to: email, subject: mail.subject, html: mail.html }, issued.hash);
   if (!sent.ok) return { message: SENT };
   if (sent.skipped && process.env.NODE_ENV !== "production") return { message: SENT, devLink: link };
   return { message: SENT };

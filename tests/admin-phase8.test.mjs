@@ -38,7 +38,7 @@ test("a detail page can return to the same filters, search, and page", () => {
 test("cycle zero stays unlabeled, and track and language read as words", () => {
   assert.equal(cycleLabel(0), null);
   assert.equal(cycleLabel(-1), null);
-  assert.equal(cycleLabel(2), "Cycle 2");
+  assert.equal(cycleLabel(2), "Review round 2");
   assert.equal(trackLabel("in_person"), "In person");
   assert.equal(trackLabel("online"), "Online");
   assert.equal(languageLabel("en"), "English");

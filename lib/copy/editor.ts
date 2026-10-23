@@ -16,6 +16,7 @@ import {
   type TranslationState,
 } from "@/lib/copy/catalog";
 import { expireCopy } from "@/lib/copy/read";
+import { copyLabel, sectionLabel } from "@/lib/copy/labels";
 
 export type PublishFrom =
   | { kind: "draft" }
@@ -49,7 +50,9 @@ export type LocaleCell = {
 export type CopyRow = {
   catalog: CatalogId;
   key: string;
+  label: string;
   section: string;
+  sectionLabel: string;
   english: string;
   digest: string;
   cells: readonly LocaleCell[];
@@ -203,6 +206,14 @@ export type DeskFilter = {
   readonly authorId: string;
 };
 
+// Search reads like the screen: plain label and section first, the key still works for anyone who has it.
+export function matchesCopyQuery(row: CopyRow, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [row.label, row.sectionLabel, row.key, row.english, ...row.cells.flatMap((cell) => [cell.value, cell.draft ?? ""])].join("\n").toLowerCase();
+  return haystack.includes(needle);
+}
+
 export async function loadDesk(db: Db, filter: DeskFilter): Promise<{ readonly rows: readonly CopyRow[]; readonly reviewCount: number }> {
   const catalogs = filter.catalog ? [filter.catalog] : catalogIds();
   const built: CopyRow[] = [];
@@ -211,9 +222,7 @@ export async function loadDesk(db: Db, filter: DeskFilter): Promise<{ readonly r
   const needle = filter.query.trim().toLowerCase();
   const rows = built.filter((row) => {
     if (filter.needsReview && !row.cells.some((cell) => cell.state.kind === "stale")) return false;
-    if (!needle) return true;
-    const haystack = [row.key, row.english, ...row.cells.flatMap((cell) => [cell.value, cell.draft ?? ""])].join("\n").toLowerCase();
-    return haystack.includes(needle);
+    return matchesCopyQuery(row, needle);
   });
   return { rows, reviewCount };
 }
@@ -266,7 +275,16 @@ async function catalogRows(db: Db, catalog: CatalogId, authorId: string): Promis
         state,
       };
     });
-    return { catalog, key: leaf.key, section: leaf.section, english: leaf.english, digest: englishDigest(liveEnglish), cells };
+    return {
+      catalog,
+      key: leaf.key,
+      label: copyLabel(catalog, leaf.key) ?? leaf.key,
+      section: leaf.section,
+      sectionLabel: sectionLabel(leaf.section),
+      english: leaf.english,
+      digest: englishDigest(liveEnglish),
+      cells,
+    };
   });
 }
 

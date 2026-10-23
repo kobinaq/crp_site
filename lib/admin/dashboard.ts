@@ -33,19 +33,19 @@ export const PIPELINE_ORDER = [
 
 export const STATUS_LABEL: Record<Status, string> = {
   submitted: "Submitted",
-  round1_complete: "Round 1 complete",
+  round1_complete: "Video answers done",
   id_verified: "Identity verified",
-  id_failed: "Identity failed",
+  id_failed: "Identity check failed",
   under_review: "Under review",
   accepted: "Accepted",
-  interview_yes: "Interview yes",
-  interview_no: "Interview no",
+  interview_yes: "Passed interview",
+  interview_no: "Did not pass interview",
   docs_submitted: "Documents submitted",
   onboarding: "Onboarding",
-  online: "Online",
-  online_offered: "Online offered",
+  online: "Online participant",
+  online_offered: "Offered online place",
   rejected: "Rejected",
-  ineligible: "Ineligible",
+  ineligible: "Not eligible",
 };
 
 const RECENT = 20;

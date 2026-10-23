@@ -5,7 +5,7 @@ import { copyHistory, entryRef, loadDesk, type Head } from "@/lib/copy/editor";
 import { getDb } from "@/lib/db";
 import { requireStaff } from "@/lib/staff/gate";
 
-export const metadata: Metadata = { title: "Copy" };
+export const metadata: Metadata = { title: "Website text" };
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";

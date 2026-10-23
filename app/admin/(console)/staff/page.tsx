@@ -17,11 +17,11 @@ export const metadata: Metadata = { title: "Staff" };
 
 const NOTICES: Record<string, string> = {
   saved: "Saved.",
-  self: "Use another admin to change your own account.",
-  "last-admin": "The pavilion needs one enabled admin.",
-  missing: "That account is not on the list.",
-  forbidden: "Your role cannot change staff.",
-  invalid: "That change was not understood.",
+  self: "You can't change your own account. Ask another admin.",
+  "last-admin": "There must always be at least one active admin.",
+  missing: "That account could not be found.",
+  forbidden: "You don't have permission to change staff.",
+  invalid: "Not saved. Try again.",
 };
 
 function stamp(value: Date | null): string {
@@ -41,9 +41,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Staff</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-black/70">
-          Invite an editor or a reviewer. An admin cannot remove the last enabled admin, and cannot change their own account.
-        </p>
         <ResultLine message={notice ?? null} tone={params.notice === "saved" ? "ok" : "warn"} />
       </div>
       <section className={card}>

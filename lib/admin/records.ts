@@ -81,12 +81,31 @@ const TITLES: Record<RecordList, string> = {
   messages: "Messages",
 };
 
+const ACTOR_NAME: Record<string, string> = {
+  applicant: "Applicant",
+  videoask: "Video answers",
+  identity: "Identity check",
+  excel: "Spreadsheet",
+  ops: "Tech team",
+  system: "Automatic",
+  staff: "Staff",
+};
+
+export function actorName(actor: string): string {
+  return ACTOR_NAME[actor] ?? actor;
+}
+
+function sentence(text: string | null): string {
+  const value = text ?? "";
+  return value ? value[0].toUpperCase() + value.slice(1) : "";
+}
+
 const SCREEN: Record<RecordList, readonly string[]> = {
-  applicants: ["Name", "Email", "Track", "Language", "Status", "Assignee", "Cycle", "Created"],
-  nominations: ["Nominator", "Nominee", "Email", "Track", "Staff status", "Assignee", "Created"],
-  interest: ["Name", "Email", "Age", "Track", "Created"],
-  waitlist: ["Name", "Email", "Status", "Created"],
-  partners: ["Name", "Email", "Organization", "Support", "Staff status", "Assignee", "Created"],
+  applicants: ["Name", "Email", "Track", "Language", "Status", "Assigned to", "Review round", "Received"],
+  nominations: ["Nominated by", "Nominee", "Email", "Track", "Status", "Assigned to", "Received"],
+  interest: ["Name", "Email", "Age", "Track", "Received"],
+  waitlist: ["Name", "Email", "Status", "Received"],
+  partners: ["Name", "Email", "Organization", "Support", "Status", "Assigned to", "Received"],
   messages: MESSAGE_LIST_HEADERS,
 };
 
@@ -463,10 +482,10 @@ export async function loadApplicant(
     nextHref: neighbors.next,
     events: events.map((event) => ({
       at: stamp(event.createdAt),
-      actor: event.staffName || event.staffEmail || event.actor,
+      actor: event.staffName || event.staffEmail || actorName(event.actor),
       from: textOf(event.fromStatus),
       to: textOf(event.toStatus),
-      reason: event.reason,
+      reason: sentence(event.reason),
     })),
     answers,
     documents,
