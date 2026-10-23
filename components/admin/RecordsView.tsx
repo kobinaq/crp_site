@@ -7,6 +7,7 @@ import { WeekBars } from "@/components/admin/WeekBars";
 import { PIPELINE_ORDER, STATUS_LABEL } from "@/lib/admin/dashboard";
 import type { RecordPage } from "@/lib/admin/records";
 import { RECORD_LISTS } from "@/lib/admin/records";
+import { CONTACT_LIST, showsAttention, statusFilterLabel } from "@/lib/contact/model";
 import { ageGroup, appLanguage, track, waitlistStatus } from "@/lib/db";
 
 const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
@@ -15,6 +16,7 @@ const LABELS: Record<(typeof RECORD_LISTS)[number], string> = {
   interest: "Interest",
   waitlist: "Waitlist",
   partners: "Partners",
+  messages: "Messages",
 };
 
 export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage; exportable: boolean; canConfirm: boolean }) {
@@ -38,8 +40,8 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
         <input type="hidden" name="list" value={data.list} />
         <Filter label="Search" name="q" value={data.filters.q} />
         {data.list === "applicants" ? <Choice label="Status" name="status" value={data.filters.status} options={PIPELINE_ORDER.map((status) => [status, STATUS_LABEL[status]])} /> : null}
-        {data.statusOptions.length > 0 ? <Choice label="Staff status" name="status" value={data.filters.status} options={data.statusOptions} /> : null}
-        {data.statusOptions.length > 0 ? <Choice label="Attention" name="attention" value={data.filters.attention} options={[["needs", "Needs attention"]]} /> : null}
+        {data.statusOptions.length > 0 ? <Choice label={statusFilterLabel(data.list)} name="status" value={data.filters.status} options={data.statusOptions} /> : null}
+        {showsAttention(data.list) ? <Choice label="Attention" name="attention" value={data.filters.attention} options={[["needs", "Needs attention"]]} /> : null}
         {data.list === "waitlist" ? <Choice label="Status" name="status" value={data.filters.status} options={waitlistStatus.enumValues.map((status) => [status, status])} /> : null}
         {data.list === "applicants" || data.list === "nominations" || data.list === "interest" ? <Choice label="Track" name="track" value={data.filters.track} options={track.enumValues.map((item) => [item, item])} /> : null}
         {data.list === "applicants" ? <Choice label="Language" name="language" value={data.filters.language} options={appLanguage.enumValues.map((item) => [item, item])} /> : null}
@@ -87,7 +89,7 @@ export function RecordsView({ data, exportable, canConfirm }: { data: RecordPage
           {data.page > 1 ? <Link className={`text-sm font-semibold underline ${focusRing}`} href={hrefFor({ ...data.filters, page: data.page - 1 })}>Previous</Link> : null}
           {data.page < pages ? <Link className={`text-sm font-semibold underline ${focusRing}`} href={hrefFor({ ...data.filters, page: data.page + 1 })}>Next</Link> : null}
         </div>
-        {exportable ? (
+        {data.list === CONTACT_LIST ? null : exportable ? (
           <form className="mt-4" method="post" action="/admin/records/export">
             <input type="hidden" name="list" value={data.list} />
             <input type="hidden" name="q" value={data.filters.q} />

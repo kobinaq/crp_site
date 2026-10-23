@@ -60,6 +60,9 @@ export function activityLabel(kind: string, detail: Record<string, unknown>): st
   if (kind === "partner.noted") return "Added a partner note";
   if (kind === "partner.status") return `Moved a partner inquiry from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
   if (kind === "partner.assigned") return textOf(detail, "assigneeId") ? "Assigned a partner inquiry" : "Cleared a partner assignee";
+  if (kind === "contact.noted") return "Added a message note";
+  if (kind === "contact.status") return `Moved a message from ${textOf(detail, "from")} to ${textOf(detail, "to")}`;
+  if (kind === "contact.assigned") return textOf(detail, "assigneeId") ? "Assigned a message" : "Cleared a message assignee";
   if (kind === "answer.media_opened") return "Played a VideoAsk recording";
   if (kind === "identity.document_opened") return "Showed an identity document";
   return "Unknown event";
