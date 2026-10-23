@@ -118,7 +118,7 @@
   },
   "contactPage": {
     "title": "Contact us",
-    "email": "email@gmail.com",
+    "email": "name@example.com",
     "address": "Office address",
     "phone": "Phone",
     "emailLabel": "Email",
@@ -154,6 +154,8 @@
     "photoAlt": "People and dogs walking across an open field at dusk"
   },
   "pavilion": {
+    "kicker": "The",
+    "word": "Pavilion",
     "location": "COP31, Antalya & online",
     "locationPlace": "COP31, Antalya",
     "locationOnline": "& online",
@@ -174,6 +176,8 @@
     ]
   },
   "platform": {
+    "kicker": "The",
+    "word": "Platform",
     "subtitle": "Collecting insights from communities, experts and decision-makers around the world",
     "comingSoon": "Coming soon",
     "groups": {
@@ -192,6 +196,7 @@
     }
   },
   "content": {
+    "word": "Content",
     "kicker": "Our",
     "subtitle": "Stories and knowledge that make the issue of climate mobility easier to understand",
     "homeCaption": "H.O.M.E is a series of developing stories covering climate mobility across the globe",
@@ -287,7 +292,7 @@
         },
         {
           "value": "10-12",
-          "label": "at COP 31"
+          "label": "at COP31"
         }
       ],
       "online": "3 week capacity building online",

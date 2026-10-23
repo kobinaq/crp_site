@@ -34,7 +34,7 @@ export function finishingUpPage(nextUrl: string, requestedLocale?: string): Resp
   const locale = parseLocale(requestedLocale);
   const copy = {
     en: ["Finishing up…", "We’re confirming your video answers. This page will continue automatically.", "Continue"],
-    fr: ["Encore un instant…", "Nous confirmons vos réponses vidéo. Cette page continuera automatiquement.", "Continuer"],
+    fr: ["Encore un instant…", "Nous confirmons vos réponses vidéo. La suite s’affichera automatiquement.", "Continuer"],
     es: ["Un momento…", "Estamos confirmando tus respuestas en vídeo. Esta página continuará automáticamente.", "Continuar"],
     pt: ["Só um momento…", "Estamos a confirmar as suas respostas em vídeo. Esta página continuará automaticamente.", "Continuar"],
   }[locale];

@@ -145,6 +145,8 @@ const PAGE: Readonly<Record<string, string>> = {
   "heroExtension.subtitle": "Subtitle",
   "heroExtension.photoAlt": "Photo description (for screen readers)",
 
+  "pavilion.kicker": "Big heading: small word above",
+  "pavilion.word": "Big heading",
   "pavilion.location": "Location",
   "pavilion.locationPlace": "Location: place",
   "pavilion.locationOnline": "Location: online",
@@ -155,6 +157,8 @@ const PAGE: Readonly<Record<string, string>> = {
   "pavilion.photoAlt": "Photo description (for screen readers)",
   "pavilion.groups.#": "Group {n}",
 
+  "platform.kicker": "Big heading: small word above",
+  "platform.word": "Big heading",
   "platform.subtitle": "Subtitle",
   "platform.comingSoon": "Coming soon",
   "platform.groups.beacons.label": "Beacons: name",
@@ -164,7 +168,8 @@ const PAGE: Readonly<Record<string, string>> = {
   "platform.groups.ambassadors.label": "Ambassadors: name",
   "platform.groups.ambassadors.blurb": "Ambassadors: text",
 
-  "content.kicker": "Small heading",
+  "content.kicker": "Big heading: small word above",
+  "content.word": "Big heading",
   "content.subtitle": "Subtitle",
   "content.homeCaption": "H.O.M.E caption",
   "content.featuredAlt": "Featured photo description (for screen readers)",
