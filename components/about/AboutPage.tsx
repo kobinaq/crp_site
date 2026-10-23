@@ -15,6 +15,7 @@ import { TicketTab } from "../TicketTab";
 import { trail } from "@/lib/fonts";
 import { aboutImages } from "@/lib/about-assets";
 import { aboutTeam, type AboutTeamMember } from "@/lib/about-team";
+import { useText } from "@/lib/ui-text";
 import type { Pin } from "@/lib/pins";
 import { ABOUT_GLOBE_WAIT_IMAGES } from "../platform/globe-defer";
 import { PlatformGlobe } from "../platform/PlatformGlobe";
@@ -150,6 +151,7 @@ function WorkTitle({
 const TICKET_TEXT_MAX = 160 - (19.125 - 2) * 2 - 18 * 2 - 4;
 const TICKET_TYPE = 12;
 
+// Keyed by the English role; both sides are translated through ui-*.json.
 const SHORTER_ROLE: Readonly<Record<string, string>> = {
   "Founder & President": "Founder & Pres.",
   "Executive Producer": "Exec. Producer",
@@ -174,17 +176,31 @@ function sizeToFit(text: string, widthAt: (text: string, px: number) => number):
   return px;
 }
 
-function fittedRole(role: string, widthAt: (text: string, px: number) => number): { text: string; px: number } {
+/** A team member with role (and its short form) in the page language. */
+type TeamMember = AboutTeamMember & { shortRole?: string };
+
+function useTeam(): TeamMember[] {
+  const tr = useText();
+  return aboutTeam.map((member) => {
+    const shorter = SHORTER_ROLE[member.role];
+    return { ...member, role: tr(member.role), shortRole: shorter === undefined ? undefined : tr(shorter) };
+  });
+}
+
+function fittedRole(
+  role: string,
+  shorter: string | undefined,
+  widthAt: (text: string, px: number) => number,
+): { text: string; px: number } {
   const full = sizeToFit(role, widthAt);
   if (full >= 8) return { text: role, px: full };
-  const shorter = SHORTER_ROLE[role];
   if (shorter === undefined) return { text: role, px: full };
   return { text: shorter, px: sizeToFit(shorter, widthAt) };
 }
 
-function useTicketLabel(role: string) {
+function useTicketLabel(role: string, shorter?: string) {
   const cardRef = useRef<HTMLElement | null>(null);
-  const [label, setLabel] = useState(() => fittedRole(role, estimateTextWidth));
+  const [label, setLabel] = useState(() => fittedRole(role, shorter, estimateTextWidth));
 
   useLayoutEffect(() => {
     const fit = () => {
@@ -195,7 +211,7 @@ function useTicketLabel(role: string) {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       setLabel(
-        fittedRole(role, (text, px) => {
+        fittedRole(role, shorter, (text, px) => {
           const upper = text.toUpperCase();
           ctx.font = `600 ${px}px ${family}`;
           return ctx.measureText(upper).width + Math.max(0, upper.length - 1) * px * 0.04;
@@ -210,7 +226,7 @@ function useTicketLabel(role: string) {
     return () => {
       cancel = true;
     };
-  }, [role]);
+  }, [role, shorter]);
 
   return { cardRef, ...label };
 }
@@ -219,12 +235,14 @@ function TeamCard({
   photo,
   name,
   role,
+  shortRole,
   expand,
   imagePosition,
 }: {
   photo: string;
   name: string;
   role: string;
+  shortRole?: string;
   expand?: "left" | "lead" | "right";
   imagePosition?: string;
 }) {
@@ -232,7 +250,7 @@ function TeamCard({
     expand === "left" ? "group-hover/left:w-[320px]" : expand === "lead" ? "group-hover/lead:w-[320px]" : expand === "right" ? "group-hover/right:w-[320px]" : "";
   const clear =
     expand === "left" ? "group-hover/left:opacity-0" : expand === "lead" ? "group-hover/lead:opacity-0" : expand === "right" ? "group-hover/right:opacity-0" : "";
-  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(role);
+  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(role, shortRole);
 
   return (
     <article
@@ -263,7 +281,7 @@ function MobileTeamCard({
   member,
   onOpen,
 }: {
-  member: AboutTeamMember;
+  member: TeamMember;
   onOpen: () => void;
 }) {
   return (
@@ -296,13 +314,13 @@ function TeamMemberSheet({
   member,
   onClose,
 }: {
-  member: AboutTeamMember;
+  member: TeamMember;
   onClose: () => void;
 }) {
   const copy = useCopy();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(member.role);
+  const { cardRef, text: ticketText, px: ticketPx } = useTicketLabel(member.role, member.shortRole);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -529,7 +547,7 @@ function MobileHomeBanner({ topics, caption }: { topics: readonly string[]; capt
 
 const TEAM_SEATS = ["left", "lead", "right"] as const;
 
-function TeamRow({ members }: { members: readonly AboutTeamMember[] }) {
+function TeamRow({ members }: { members: readonly TeamMember[] }) {
   return (
     <div className="flex w-full items-center justify-center">
       {TEAM_SEATS.map((seat, index) => {
@@ -543,6 +561,7 @@ function TeamRow({ members }: { members: readonly AboutTeamMember[] }) {
               photo={member.image}
               name={member.name}
               role={member.role}
+              shortRole={member.shortRole}
               imagePosition={member.imagePosition}
             />
             <TeamQuote group={seat} quote={member.quote} />
@@ -575,7 +594,9 @@ function TeamQuote({ quote, group }: { quote: string; group: "left" | "lead" | "
 export function AboutPage() {
   const copy = useCopy();
   const a = copy.aboutUs;
-  const [selectedMember, setSelectedMember] = useState<AboutTeamMember | null>(null);
+  const team = useTeam();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedMember = team.find((member) => member.id === selectedId) ?? null;
   const statementLines = a.statement.split("\n");
   // Mobile Figma frames the globe on Asia; desktop keeps its original start (yaw 0).
   const isMobile = useIsMobile();
@@ -593,9 +614,9 @@ export function AboutPage() {
       image: member.image,
     };
   });
-  const teamRows: AboutTeamMember[][] = [];
-  for (let i = 0; i < aboutTeam.length; i += 3) {
-    teamRows.push(aboutTeam.slice(i, i + 3));
+  const teamRows: TeamMember[][] = [];
+  for (let i = 0; i < team.length; i += 3) {
+    teamRows.push(team.slice(i, i + 3));
   }
   const teamGridHeight = teamRows.length * 200;
 
@@ -847,7 +868,7 @@ export function AboutPage() {
                 <MobileTeamCard
                   key={member.id}
                   member={member}
-                  onOpen={() => setSelectedMember(member)}
+                  onOpen={() => setSelectedId(member.id)}
                 />
               ))}
             </div>
@@ -866,7 +887,7 @@ export function AboutPage() {
       </section>
 
       {selectedMember ? (
-        <TeamMemberSheet member={selectedMember} onClose={() => setSelectedMember(null)} />
+        <TeamMemberSheet member={selectedMember} onClose={() => setSelectedId(null)} />
       ) : null}
     </div>
   );
