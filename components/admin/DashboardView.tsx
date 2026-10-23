@@ -17,7 +17,6 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-black/60">{data.applicantTotal} applicants. Open a status to review that queue.</p>
         {denied ? <p className="mt-3 text-sm font-semibold text-magenta">That page is not available for your role.</p> : null}
       </div>
       <section className={card}>
@@ -32,12 +31,12 @@ export function DashboardView({ data, denied, weeks }: { data: Dashboard; denied
         </div>
         {data.cycles.some((row) => row.cycle > 0) ? (
           <p className="mt-4 text-sm text-black/70">
-            Review cycles. {data.cycles.filter((row) => row.cycle > 0).map((row) => `Cycle ${row.cycle}: ${row.count}`).join(", ")}
+            {data.cycles.filter((row) => row.cycle > 0).map((row) => `Review round ${row.cycle}: ${row.count}`).join(", ")}
           </p>
         ) : null}
         {data.cycles.some((row) => row.cycle === 0 && row.count > 0) ? (
           <p className="mt-2 text-sm text-black/60">
-            {data.cycles.find((row) => row.cycle === 0)?.count} applicants have not entered a review cycle.
+            {data.cycles.find((row) => row.cycle === 0)?.count} not in a review round.
           </p>
         ) : null}
         <h3 className="mt-6 text-base font-semibold">Applicants by week</h3>

@@ -138,7 +138,9 @@ test("mark spam asks for confirmation and the other verbs submit directly", () =
     assert.equal(view.host.querySelector("a[aria-label='Back to messages']")?.getAttribute("href"), "/admin/records?list=messages");
     const previous = [...view.host.querySelectorAll("button")].find((button) => button.textContent?.includes("Previous"));
     assert.equal(previous?.disabled, true);
-    assert.equal(view.host.querySelector("a[href='mailto:ada@example.com']")?.textContent, "Email");
+    assert.match(view.host.textContent ?? "", /ada@example.com/);
+    assert.equal(view.host.querySelector("a[href='mailto:ada@example.com']"), null);
+    assert.equal(view.host.querySelector("a[href^='tel:']"), null);
     assert.match(view.host.textContent, /English/);
     assert.equal(view.host.querySelector("[role='alertdialog']"), null);
     const spam = [...view.host.querySelectorAll("button")].find((button) => button.textContent === "Mark spam");

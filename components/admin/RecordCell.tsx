@@ -7,7 +7,7 @@ export function RecordCell({ list, header, value }: { list: string; header: stri
   if (header === "Track") return trackLabel(value);
   if (header === "Language") return languageLabel(value);
   if (header === "Age") return ageLabel(value);
-  if (header === "Cycle") return value === "0" ? "—" : value;
+  if (header === "Review round") return value === "0" ? "—" : value;
   if (header === "Status" && list === "waitlist") return waitlistLabel(value);
   if (header === "Created") return <When stamp={value} />;
   return value;

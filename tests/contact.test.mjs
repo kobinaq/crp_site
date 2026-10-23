@@ -474,7 +474,7 @@ test("the messages list searches the body, hides an unknown status, and does not
   assert.equal(dashboard.newMessages, fresh.rows[0].n);
 
   const { activityLabel } = stored("lib/admin/activity.ts");
-  assert.equal(activityLabel("contact.status", { from: "archived", to: "spam" }), "Moved a message from archived to spam");
+  assert.equal(activityLabel("contact.status", { from: "archived", to: "spam" }), "Moved a message from Archived to Spam");
   assert.equal(activityLabel("contact.noted", { body: "private" }), "Added a message note");
   assert.equal(activityLabel("contact.assigned", { assigneeId: admin.id }), "Assigned a message");
   assert.equal(activityLabel("contact.assigned", {}), "Cleared a message assignee");

@@ -54,9 +54,7 @@ export function CopyDesk({
     <div className="grid gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Copy</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-black/70">
-          English is the source. Search covers keys and every language. {reviewCount === 1 ? "1 key needs review" : `${reviewCount} keys need review`} in this catalog.
-        </p>
+        {reviewCount > 0 ? <p className="mt-1 text-sm text-black/60">{reviewCount === 1 ? "1 needs review" : `${reviewCount} need review`}</p> : null}
         {error && ERRORS[error] ? <p className="mt-3 text-sm font-semibold text-magenta">{ERRORS[error]}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
