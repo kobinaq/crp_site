@@ -33,7 +33,7 @@ export const PIPELINE_ORDER = [
 
 export const STATUS_LABEL: Record<Status, string> = {
   submitted: "Submitted",
-  round1_complete: "Video answers done",
+  round1_complete: "VideoAsk done",
   id_verified: "Identity verified",
   id_failed: "Identity check failed",
   under_review: "Under review",
