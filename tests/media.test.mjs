@@ -292,7 +292,15 @@ function textOf(stream) {
   return stream.getReader().read().then(({ value }) => Buffer.from(value ?? []).toString());
 }
 
-test("opening a document audits once, and a ranged read does not audit or reveal the store", async () => {
+function streamInput(fields) {
+  return { rangeHeader: null, method: "GET", signal: AbortSignal.timeout(1000), ...fields };
+}
+
+function eventCount(kind) {
+  return sql.query(`select count(*)::int as n from admin_events where kind = $1`, [kind]).then((result) => result.rows[0].n);
+}
+
+test("streaming checks the role, audits once per open, and never reveals the store", async () => {
   const id = await applicant("ada-open@example.org");
   const pathname = await storedClip(id, "q-open", 8000000);
   const document = await sql.query(
@@ -303,105 +311,102 @@ test("opening a document audits once, and a ranged read does not audit or reveal
   const admin = await staffUser("admin-open@example.org", "admin");
   const editor = await staffUser("editor-open@example.org", "editor");
   const reviewer = await staffUser("reviewer-open@example.org", "reviewer");
-  const { openHolding, streamHolding } = load("lib/media.ts");
-  const { parseApplicantId, isStaffStreamPath, readMediaEnv } = load("lib/holdings.ts");
+  const { streamHolding } = load("lib/media.ts");
+  const { parseApplicantId } = load("lib/holdings.ts");
   const database = load("lib/db/index.ts").getDb();
-  const env = readMediaEnv({});
-  const now = new Date();
   const applicantId = parseApplicantId(id);
-  const forbidden = await openHolding(database, { actorId: editor, role: "editor", applicantId, slot: "document", holdingId: documentId }, now, env, process.env.APP_SECRET);
-  assert.deepEqual(forbidden, { ok: false, error: "forbidden" });
-  assert.equal((await sql.query(`select count(*)::int as n from admin_events where kind = 'identity.document_opened'`)).rows[0].n, 0);
 
-  const opened = await openHolding(database, { actorId: admin, role: "admin", applicantId, slot: "document", holdingId: documentId }, now, env, process.env.APP_SECRET);
-  assert.equal(opened.ok, true);
-  assert.equal(isStaffStreamPath(id, opened.url), true);
+  gets.length = 0;
+  for (const [actorId, role] of [[editor, "editor"], [reviewer, "reviewer"]]) {
+    const refused = await streamHolding(database, streamInput({ actorId, role, applicantId, slot: "document", holdingId: documentId }));
+    assert.deepEqual(refused, { ok: false, status: 403 });
+  }
+  assert.equal(gets.length, 0);
+  assert.equal(await eventCount("identity.document_opened"), 0);
+
+  getImpl = async () => ({
+    statusCode: 200,
+    stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("passport-jpg")); controller.close(); } }),
+    headers: new Headers(),
+    blob: { url: "https://store.example.vercel-storage.com/hidden", pathname: "hidden", size: 12 },
+  });
+  const shown = await streamHolding(database, streamInput({ actorId: admin, role: "admin", applicantId, slot: "document", holdingId: documentId }));
+  assert.equal(shown.ok, true);
+  assert.equal(shown.bytes.status, 200);
+  assert.equal(await textOf(shown.bytes.body), "passport-jpg");
   const events = await sql.query(`select actor_id, subject_id, kind, detail from admin_events where kind = 'identity.document_opened'`);
   assert.equal(events.rowCount, 1);
+  assert.equal(events.rows[0].actor_id, admin);
   assert.equal(events.rows[0].subject_id, null);
   assert.deepEqual(events.rows[0].detail, { applicantId: id, documentId });
   assert.equal(Object.hasOwn(events.rows[0].detail, "email"), false);
 
-  const clip = await openHolding(database, { actorId: reviewer, role: "reviewer", applicantId, slot: "answer", holdingId: "q-open" }, now, env, process.env.APP_SECRET);
-  assert.equal(clip.ok, true);
-  assert.equal(isStaffStreamPath(id, clip.url), true);
-  const token = clip.url.split("/").at(-1);
   gets.length = 0;
-  getImpl = async () => ({
-    statusCode: 200,
-    stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("ab")); controller.close(); } }),
-    headers: new Headers({ "content-range": "bytes 0-1/8000000" }),
-    blob: { url: "https://store.example.vercel-storage.com/hidden", downloadUrl: "https://store.example.vercel-storage.com/dl", pathname, size: 2, contentType: "video/mp4" },
-  });
-  const beforeEvents = (await sql.query(`select count(*)::int as n from admin_events`)).rows[0].n;
-  const streamed = await streamHolding(database, {
-    actorId: reviewer,
-    role: "reviewer",
-    applicantId,
-    token,
-    rangeHeader: "bytes=0-1",
-    method: "GET",
-    signal: AbortSignal.timeout(1000),
-  }, now, env, process.env.APP_SECRET);
-  assert.equal(streamed.ok, true);
-  assert.equal(streamed.bytes.status, 206);
-  assert.equal(streamed.bytes.headers["Content-Range"], "bytes 0-1/8000000");
-  assert.equal(streamed.bytes.headers["Cache-Control"], "private, no-store");
+  getImpl = async (_path, options) => {
+    const [, start, end] = /bytes=(\d+)-(\d+)/.exec(options.headers.Range);
+    return {
+      statusCode: 206,
+      stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("ab")); controller.close(); } }),
+      headers: new Headers({ "content-range": `bytes ${start}-${end}/8000000` }),
+      blob: { url: "https://store.example.vercel-storage.com/hidden", downloadUrl: "https://store.example.vercel-storage.com/dl", pathname, size: 2, contentType: "video/mp4" },
+    };
+  };
+  const clip = (rangeHeader, method = "GET") => streamHolding(database, streamInput({
+    actorId: reviewer, role: "reviewer", applicantId, slot: "answer", holdingId: "q-open", rangeHeader, method,
+  }));
+  const probe = await clip("bytes=0-1");
+  assert.equal(probe.bytes.status, 206);
+  assert.equal(probe.bytes.headers["Content-Range"], "bytes 0-1/8000000");
+  assert.equal(probe.bytes.headers["Cache-Control"], "private, no-store");
   assert.deepEqual(gets[0], { pathname, access: "private", useCache: false, headers: { Range: "bytes=0-1" } });
-  const packed = `${JSON.stringify(streamed.bytes.headers)}\n${await textOf(streamed.bytes.body)}`;
+  const packed = `${JSON.stringify(probe.bytes.headers)}\n${await textOf(probe.bytes.body)}`;
   assert.equal(packed.includes("vercel-storage.com"), false);
   assert.equal(packed.includes(pathname), false);
-  assert.equal((await sql.query(`select count(*)::int as n from admin_events`)).rows[0].n, beforeEvents);
+  assert.equal(await eventCount("answer.media_opened"), 0, "the two-byte probe is not a play");
+
+  const play = await clip("bytes=0-");
+  assert.equal(play.bytes.status, 206);
+  assert.equal(play.bytes.headers["Content-Range"], "bytes 0-7999999/8000000");
+  assert.equal(await eventCount("answer.media_opened"), 1);
+  for (const range of ["bytes=4000000-", "bytes=65536-131071", "bytes=-500"]) {
+    const chunk = await clip(range);
+    assert.equal(chunk.bytes.status, 206);
+  }
+  assert.equal(await eventCount("answer.media_opened"), 1, "later range requests in the same play are not logged again");
 
   const calls = gets.length;
-  const head = await streamHolding(database, {
-    actorId: reviewer, role: "reviewer", applicantId, token, rangeHeader: "bytes=0-1", method: "HEAD", signal: AbortSignal.timeout(1000),
-  }, now, env, process.env.APP_SECRET);
+  const head = await clip("bytes=0-", "HEAD");
   assert.equal(head.bytes.status, 206);
   assert.equal(head.bytes.body, null);
+  const unsatisfiable = await clip("bytes=0-1,2-3");
+  assert.equal(unsatisfiable.bytes.status, 416);
+  assert.equal(unsatisfiable.bytes.headers["Content-Range"], "bytes */8000000");
   assert.equal(gets.length, calls);
-  const missing = await streamHolding(database, {
-    actorId: reviewer, role: "reviewer", applicantId, token, rangeHeader: "bytes=0-1,2-3", method: "GET", signal: AbortSignal.timeout(1000),
-  }, now, env, process.env.APP_SECRET);
-  assert.equal(missing.bytes.status, 416);
-  assert.equal(missing.bytes.headers["Content-Range"], "bytes */8000000");
-  assert.equal(gets.length, calls);
+  assert.equal(await eventCount("answer.media_opened"), 1);
 
-  const seen = gets.length;
-  const demoted = await streamHolding(database, {
-    actorId: admin, role: "editor", applicantId, token: opened.url.split("/").at(-1), rangeHeader: null, method: "GET", signal: AbortSignal.timeout(1000),
-  }, now, env, process.env.APP_SECRET);
+  const missing = await streamHolding(database, streamInput({ actorId: reviewer, role: "reviewer", applicantId, slot: "answer", holdingId: "q-none" }));
+  assert.deepEqual(missing, { ok: false, status: 404 });
+  const demoted = await streamHolding(database, streamInput({ actorId: admin, role: "editor", applicantId, slot: "document", holdingId: documentId }));
   assert.deepEqual(demoted, { ok: false, status: 403 });
-  assert.equal(gets.length, seen);
+  assert.equal(gets.length, calls);
 });
 
 test("a range the store ignores is sliced from the full object", async () => {
   const id = await applicant("ada-slice@example.org");
   await storedClip(id, "q-slice", 10);
   const reviewer = await staffUser("reviewer-slice@example.org", "reviewer");
-  const { openHolding, streamHolding } = load("lib/media.ts");
-  const { parseApplicantId, readMediaEnv } = load("lib/holdings.ts");
+  const { streamHolding } = load("lib/media.ts");
+  const { parseApplicantId } = load("lib/holdings.ts");
   const database = load("lib/db/index.ts").getDb();
-  const env = readMediaEnv({});
-  const now = new Date();
-  const opened = await openHolding(database, {
-    actorId: reviewer, role: "reviewer", applicantId: parseApplicantId(id), slot: "answer", holdingId: "q-slice",
-  }, now, env, process.env.APP_SECRET);
   getImpl = async () => ({
     statusCode: 200,
     stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("abcdefghij")); controller.close(); } }),
     headers: new Headers(),
     blob: { url: "https://store.example.vercel-storage.com/hidden", size: 10, pathname: "hidden" },
   });
-  const streamed = await streamHolding(database, {
-    actorId: reviewer,
-    role: "reviewer",
-    applicantId: parseApplicantId(id),
-    token: opened.url.split("/").at(-1),
-    rangeHeader: "bytes=2-4",
-    method: "GET",
-    signal: AbortSignal.timeout(1000),
-  }, now, env, process.env.APP_SECRET);
+  const streamed = await streamHolding(database, streamInput({
+    actorId: reviewer, role: "reviewer", applicantId: parseApplicantId(id), slot: "answer", holdingId: "q-slice", rangeHeader: "bytes=2-4",
+  }));
   assert.equal(streamed.bytes.status, 206);
   assert.equal(streamed.bytes.headers["Content-Range"], "bytes 2-4/10");
   assert.equal(await textOf(streamed.bytes.body), "cde");
@@ -411,22 +416,17 @@ test("a store failure stays a fixed unavailable response", async () => {
   const id = await applicant("ada-down@example.org");
   const pathname = await storedClip(id, "q-down", 4);
   const reviewer = await staffUser("reviewer-down@example.org", "reviewer");
-  const { openHolding, streamHolding } = load("lib/media.ts");
-  const { parseApplicantId, readMediaEnv } = load("lib/holdings.ts");
+  const { streamHolding } = load("lib/media.ts");
+  const { parseApplicantId } = load("lib/holdings.ts");
   const database = load("lib/db/index.ts").getDb();
-  const now = new Date();
-  const opened = await openHolding(database, {
-    actorId: reviewer, role: "reviewer", applicantId: parseApplicantId(id), slot: "answer", holdingId: "q-down",
-  }, now, readMediaEnv({}), process.env.APP_SECRET);
   getImpl = async () => { throw new Error(`missing ${pathname} https://store.example.vercel-storage.com/nope`); };
-  const failed = await streamHolding(database, {
-    actorId: reviewer, role: "reviewer", applicantId: parseApplicantId(id), token: opened.url.split("/").at(-1),
-    rangeHeader: null, method: "GET", signal: AbortSignal.timeout(1000),
-  }, now, readMediaEnv({}), process.env.APP_SECRET);
+  const failed = await streamHolding(database, streamInput({
+    actorId: reviewer, role: "reviewer", applicantId: parseApplicantId(id), slot: "answer", holdingId: "q-down",
+  }));
   assert.deepEqual(failed, { ok: false, status: 502 });
 });
 
-test("the player button has no src until open returns a staff path", async () => {
+test("the player has no src until pressed, then points at a token-free staff path", async () => {
   const hooks = hookHarness();
   const ui = loader({ react: hooks.react });
   const { PrivateMedia } = ui("components/admin/PrivateMedia.tsx");
@@ -435,54 +435,69 @@ test("the player button has no src until open returns a staff path", async () =>
   let tree = hooks.render(() => PrivateMedia({ applicantId, view }));
   assert.equal(nodes(tree).some((node) => node.type === "video" || node.props?.src), false);
   const button = nodes(tree).find((node) => node.props?.children === "Play video");
-  assert.equal(button.props.children, "Play video");
   assert.equal(button.props.onPlay, undefined);
-  fetchHandler = async () => new Response(JSON.stringify({ url: "https://evil.example/clip.mp4" }), { status: 201 });
+  let fetched = 0;
+  fetchHandler = async () => { fetched += 1; return new Response(null, { status: 500 }); };
   await button.props.onClick();
-  tree = hooks.render(() => PrivateMedia({ applicantId, view }));
-  assert.equal(nodes(tree).some((node) => node.type === "video"), false);
-  const path = `/admin/records/applicants/${applicantId}/stream/aaaa.bbbb`;
-  fetchHandler = async () => new Response(JSON.stringify({ url: path }), { status: 201 });
-  await nodes(tree).find((node) => node.props?.children === "Play video").props.onClick();
   tree = hooks.render(() => PrivateMedia({ applicantId, view }));
   const video = nodes(tree).find((node) => node.type === "video");
   assert.equal(video.props.src, undefined);
-  assert.equal(video.props.onPlay, undefined);
   const element = { dataset: {}, src: "", attrs: {}, setAttribute(name, value) { this.attrs[name] = value; } };
   video.props.ref(element);
   assert.equal(element.attrs.referrerpolicy, "no-referrer");
-  assert.equal(element.src, path);
+  assert.equal(element.src, `/admin/records/applicants/${applicantId}/media/answer/q-video`);
+  assert.equal(fetched, 0, "no token is fetched first");
+
   const revealHooks = hookHarness();
   const revealUi = loader({ react: revealHooks.react });
-  const reveal = revealHooks.render(() => revealUi("components/admin/PrivateMedia.tsx").DocumentReveal({
+  const reveal = () => revealHooks.render(() => revealUi("components/admin/PrivateMedia.tsx").DocumentReveal({
     applicantId,
-    view: { documentId: "doc", kind: "passport", contentType: "image/jpeg" },
+    view: { documentId: "22222222-2222-4222-8222-222222222222", kind: "passport", contentType: "image/jpeg" },
   }));
-  assert.equal(nodes(reveal).some((node) => node.type === "img" || node.type === "iframe"), false);
-  assert.equal(nodes(reveal).find((node) => node.props?.children === "Show document passport").props.children, "Show document passport");
+  let shown = reveal();
+  assert.equal(nodes(shown).some((node) => node.type === "img" || node.type === "iframe"), false);
+  await nodes(shown).find((node) => node.props?.children === "Show document passport").props.onClick();
+  shown = reveal();
+  const img = nodes(shown).find((node) => node.type === "img");
+  assert.equal(img.props.src, `/admin/records/applicants/${applicantId}/media/document/22222222-2222-4222-8222-222222222222`);
+  assert.equal(img.props.referrerPolicy, "no-referrer");
 });
 
-test("the open and stream routes check the staff session", async () => {
+test("staff media paths carry only record ids", () => {
+  const { staffMediaPath } = load("lib/holdings.ts");
+  const path = staffMediaPath("11111111-1111-4111-8111-111111111111", "answer", "q/../x?y");
+  assert.equal(path, "/admin/records/applicants/11111111-1111-4111-8111-111111111111/media/answer/q%2F..%2Fx%3Fy");
+});
+
+test("the media route needs a staff session, refuses non-admins for documents, and streams ranges", async () => {
   const id = await applicant("ada-route@example.org");
   const pathname = await storedClip(id, "q-route", 8);
+  const document = await sql.query(
+    `insert into identity_documents (applicant_id, kind, pathname, content_type, size) values ($1, 'passport', $2, 'application/pdf', 4) returning id`,
+    [id, `identity/${id}/passport-route.pdf`],
+  );
+  const documentId = document.rows[0].id;
   const reviewer = await staffUser("reviewer-route@example.org", "reviewer");
+  const admin = await staffUser("admin-route@example.org", "admin");
   const { hashToken } = load("lib/access.ts");
-  const session = "route-session-token";
-  await sql.query(`insert into user_sessions (hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [hashToken(session), reviewer]);
+  const sessions = { reviewer: "route-session-reviewer", admin: "route-session-admin" };
+  await sql.query(`insert into user_sessions (hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [hashToken(sessions.reviewer), reviewer]);
+  await sql.query(`insert into user_sessions (hash, user_id, expires_at) values ($1, $2, now() + interval '1 hour')`, [hashToken(sessions.admin), admin]);
   let cookie = null;
+  const reads = [];
   const routeLoad = loader({
     "@vercel/blob": {
       put: async () => ({ url: "https://store.example.vercel-storage.com/hidden" }),
       get: async (got, options) => {
         assert.equal(options.access, "private");
         assert.equal(options.useCache, false);
-        assert.equal(options.headers.Range, "bytes=0-1");
-        assert.equal(got, pathname);
+        reads.push({ got, range: options.headers?.Range ?? null });
+        const body = got === pathname ? "ab" : "%PDF";
         return {
           statusCode: 200,
-          stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from("ab")); controller.close(); } }),
-          headers: new Headers({ "content-range": "bytes 0-1/8" }),
-          blob: { url: "https://store.example.vercel-storage.com/hidden", pathname, size: 2 },
+          stream: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from(body)); controller.close(); } }),
+          headers: new Headers(got === pathname ? { "content-range": "bytes 0-1/8" } : {}),
+          blob: { url: "https://store.example.vercel-storage.com/hidden", pathname: got, size: body.length },
         };
       },
       del: async () => {},
@@ -492,48 +507,81 @@ test("the open and stream routes check the staff session", async () => {
       cookies: async () => ({ get: (name) => (name === "crp_staff" && cookie ? { value: cookie } : undefined) }),
     },
   });
-  const openRoute = routeLoad("app/admin/(console)/records/applicants/[id]/open/route.ts");
-  const streamRoute = routeLoad("app/admin/(console)/records/applicants/[id]/stream/[token]/route.ts");
-  const headers = { origin: "https://pavilion.example", host: "pavilion.example", "sec-fetch-site": "same-origin" };
-  const anonymous = await openRoute.POST({
-    headers: new Headers(headers),
+  const route = routeLoad("app/admin/(console)/records/applicants/[id]/media/[slot]/[holdingId]/route.ts");
+  const call = (slot, holdingId, headers = {}, method = "GET") => route[method]({
+    headers: new Headers({ "sec-fetch-site": "same-origin", ...headers }),
     signal: AbortSignal.timeout(1000),
-    json: async () => ({ slot: "answer", holdingId: "q-route" }),
-  }, { params: Promise.resolve({ id }) });
+  }, { params: Promise.resolve({ id, slot, holdingId }) });
+  const privateHeaders = (response) => {
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  };
+
+  const anonymous = await call("answer", "q-route", { range: "bytes=0-1" });
   assert.equal(anonymous.status, 401);
-  cookie = session;
-  const opened = await openRoute.POST({
-    headers: new Headers(headers),
-    signal: AbortSignal.timeout(1000),
-    json: async () => ({ slot: "answer", holdingId: "q-route" }),
-  }, { params: Promise.resolve({ id }) });
-  assert.equal(opened.status, 201);
-  assert.equal(opened.headers.get("cache-control"), "private, no-store");
-  const body = await opened.json();
-  const { isStaffStreamPath } = load("lib/holdings.ts");
-  assert.equal(isStaffStreamPath(id, body.url), true);
-  const before = (await sql.query(`select count(*)::int as n from admin_events where kind = 'answer.media_opened'`)).rows[0].n;
-  const token = body.url.split("/").at(-1);
-  const streamed = await streamRoute.GET({
-    headers: new Headers({ range: "bytes=0-1" }),
-    signal: AbortSignal.timeout(1000),
-  }, { params: Promise.resolve({ id, token }) });
+  privateHeaders(anonymous);
+  const anonymousDocument = await call("document", documentId);
+  assert.equal(anonymousDocument.status, 401);
+  cookie = "not-a-session";
+  assert.equal((await call("answer", "q-route")).status, 401);
+  assert.equal(reads.length, 0);
+
+  cookie = sessions.reviewer;
+  const crossSite = await call("answer", "q-route", { "sec-fetch-site": "cross-site", range: "bytes=0-1" });
+  assert.equal(crossSite.status, 403);
+  privateHeaders(crossSite);
+  const refusedDocument = await call("document", documentId);
+  assert.equal(refusedDocument.status, 403);
+  privateHeaders(refusedDocument);
+  assert.equal(reads.length, 0);
+  assert.equal((await call("other", "q-route")).status, 404);
+
+  const before = await eventCount("answer.media_opened");
+  const streamed = await call("answer", "q-route", { range: "bytes=0-1" });
   assert.equal(streamed.status, 206);
-  assert.equal(streamed.headers.get("cache-control"), "private, no-store");
+  privateHeaders(streamed);
+  assert.equal(streamed.headers.get("accept-ranges"), "bytes");
   assert.equal(streamed.headers.get("content-range"), "bytes 0-1/8");
   const bytes = Buffer.from(await streamed.arrayBuffer()).toString();
+  assert.equal(bytes, "ab");
   const headerText = [...streamed.headers.entries()].map(([key, value]) => `${key}:${value}`).join("\n");
   assert.equal(`${headerText}\n${bytes}`.includes("vercel-storage.com"), false);
   assert.equal(`${headerText}\n${bytes}`.includes(pathname), false);
-  const afterCount = (await sql.query(`select count(*)::int as n from admin_events where kind = 'answer.media_opened'`)).rows[0].n;
-  assert.equal(afterCount, before);
+  assert.deepEqual(reads.at(-1), { got: pathname, range: "bytes=0-1" });
+  const play = await call("answer", "q-route", { range: "bytes=0-" });
+  assert.equal(play.status, 206);
+  await play.arrayBuffer();
+  assert.equal(await eventCount("answer.media_opened"), before + 1);
+
+  cookie = sessions.admin;
+  const documentBefore = await eventCount("identity.document_opened");
+  const opened = await call("document", documentId);
+  assert.equal(opened.status, 200);
+  privateHeaders(opened);
+  assert.equal(Buffer.from(await opened.arrayBuffer()).toString(), "%PDF");
+  assert.equal(await eventCount("identity.document_opened"), documentBefore + 1);
+
   cookie = null;
-  const signedOut = await streamRoute.GET({
-    headers: new Headers({ range: "bytes=0-1" }),
-    signal: AbortSignal.timeout(1000),
-  }, { params: Promise.resolve({ id, token }) });
+  const signedOut = await call("answer", "q-route", { range: "bytes=0-1" });
   assert.equal(signedOut.status, 401);
   await routeLoad("lib/db/index.ts").closeDb();
+});
+
+test("no admin route or media url carries a token segment", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name === "route.ts") found.push(full);
+    }
+  };
+  walk("app/admin");
+  assert.equal(found.some((file) => /\[token\]|\/open\//.test(file)), false, found.join("\n"));
+  const component = fs.readFileSync("components/admin/PrivateMedia.tsx", "utf8");
+  assert.doesNotMatch(component, /token|\/open|\/stream\//i);
 });
 
 test("retention counts in a dry run, deletes at most 20, and a later run finds nothing", async () => {

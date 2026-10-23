@@ -3,14 +3,12 @@ declare const questionIdBrand: unique symbol;
 declare const documentIdBrand: unique symbol;
 declare const pathnameBrand: unique symbol;
 declare const mediaUrlBrand: unique symbol;
-declare const streamPathBrand: unique symbol;
 
 export type ApplicantId = string & { readonly [applicantIdBrand]: "ApplicantId" };
 export type QuestionId = string & { readonly [questionIdBrand]: "QuestionId" };
 export type DocumentId = string & { readonly [documentIdBrand]: "DocumentId" };
 export type PrivatePathname = string & { readonly [pathnameBrand]: "PrivatePathname" };
 export type VideoAskMediaUrl = string & { readonly [mediaUrlBrand]: "VideoAskMediaUrl" };
-export type StaffStreamPath = string & { readonly [streamPathBrand]: "StaffStreamPath" };
 
 const APPLICANT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUESTION = /^[A-Za-z0-9_-]{1,128}$/;
@@ -96,13 +94,11 @@ export type StreamHeader = {
   readonly headers: Readonly<Record<string, string>>;
 };
 
-export const MEDIA_URL_TTL_SECONDS_DEFAULT = 300;
 export const MEDIA_RETENTION_DAYS_DEFAULT = 30;
 export const RETENTION_BATCH = 20;
 export const MEDIA_BYTE_CAP = 100 * 1024 * 1024;
 
 export type MediaEnv = {
-  readonly ttlSeconds: number;
   readonly programEnd: string | null;
   readonly retentionDays: number;
   readonly dryRun: boolean;
@@ -554,10 +550,18 @@ export function streamHeaders(contentType: string, total: number, read: RangeRea
   return { status: 206, headers };
 }
 
-export function isStaffStreamPath(applicantId: string, url: string): url is StaffStreamPath {
-  if (url.includes("://") || url.includes("?") || url.includes("#") || url.includes("\\")) return false;
-  const escaped = applicantId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^/admin/records/applicants/${escaped}/stream/[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$`).test(url);
+// Staff media is read through the staff session cookie. The path holds only
+// record ids, never a token, because request paths end up in hosting logs.
+export function staffMediaPath(applicantId: string, slot: "answer" | "document", holdingId: string): string {
+  return `/admin/records/applicants/${encodeURIComponent(applicantId)}/media/${slot}/${encodeURIComponent(holdingId)}`;
+}
+
+// One audit row per play or open: a whole read, or a range from byte 0 that is
+// more than Safari's two-byte probe. Seeks and later chunks are not logged.
+export function opensHolding(read: RangeRead, total: number): boolean {
+  if (read.kind === "full") return true;
+  if (read.kind !== "partial" || read.range.start !== 0) return false;
+  return read.range.end > 1 || read.range.end === total - 1;
 }
 
 function wholeDay(raw: string | undefined): string | null {
@@ -579,18 +583,8 @@ function retentionDays(raw: string | undefined): number {
   return value;
 }
 
-function ttlSeconds(raw: string | undefined): number {
-  if (raw == null || raw.trim() === "") return MEDIA_URL_TTL_SECONDS_DEFAULT;
-  const value = Number(raw);
-  if (!Number.isInteger(value)) return MEDIA_URL_TTL_SECONDS_DEFAULT;
-  if (value < 60) return 60;
-  if (value > 900) return 900;
-  return value;
-}
-
 export function readMediaEnv(env: Readonly<Record<string, string | undefined>>): MediaEnv {
   return {
-    ttlSeconds: ttlSeconds(env.MEDIA_URL_TTL_SECONDS),
     programEnd: wholeDay(env.PROGRAM_END),
     retentionDays: retentionDays(env.MEDIA_RETENTION_DAYS),
     dryRun: env.MEDIA_RETENTION_DRY_RUN !== "false",
