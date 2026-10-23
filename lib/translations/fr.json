@@ -129,7 +129,12 @@
     "emailField": "*E-mail",
     "mobile": "*Mobile",
     "message": "Écrivez votre message ici",
-    "send": "Envoyer"
+    "send": "Envoyer",
+    "sent": "Nous avons bien reçu votre message.",
+    "invalid": "Vérifiez les champs et réessayez.",
+    "turnstile": "La vérification n'a pas abouti. Réessayez.",
+    "rateLimited": "Vous avez envoyé plusieurs messages. Réessayez plus tard.",
+    "failed": "Le message n'a pas été envoyé. Réessayez."
   },
   "hero": {
     "line1Before": "Le changement climatique déplace les populations ",

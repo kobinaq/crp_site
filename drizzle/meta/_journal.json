@@ -99,6 +99,48 @@
       "when": 1792660000000,
       "tag": "0013_identity_link_opened",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0014_admin_cms",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793100000000,
+      "tag": "0015_admin_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793200000000,
+      "tag": "0016_staff_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793300000000,
+      "tag": "0017_desk_cases",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0018_videoask_answers",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793500000000,
+      "tag": "0019_contact_messages",
+      "breakpoints": true
     }
   ]
 }

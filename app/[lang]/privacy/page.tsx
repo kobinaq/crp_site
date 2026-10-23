@@ -1,5 +1,4 @@
-import { pageMetadata } from "@/lib/seo";
-import { requestLocale } from "@/lib/request-locale";
+import { metadataFor } from "@/lib/seo";
 import { StructuredData } from "@/components/StructuredData";
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
@@ -9,7 +8,7 @@ import { PrivacyPage } from "@/components/privacy/PrivacyPage";
 import { outfit } from "@/lib/fonts";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return pageMetadata(await requestLocale(), "privacy");
+  return metadataFor("privacy");
 }
 
 export default function PrivacyRoute() {

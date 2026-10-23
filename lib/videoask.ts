@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { appSecret } from "@/lib/config";
 import { videoAskBase } from "@/lib/capture";
+import { appSecret } from "@/lib/config";
+import { parseApplicantId, parseVideoaskHoldings, type IncomingAnswer } from "@/lib/holdings";
 
 function signature(value: string) {
   return createHmac("sha256", appSecret()).update(`videoask:${value}`).digest("base64url");
@@ -50,12 +51,16 @@ export function videoaskLink(applicantId: string): string | null {
   url.hash = variables.toString();
   return url.toString();
 }
-// Inspect only provider metadata, never answer text or arbitrary nested values.
 // Events that are authentic but not ours to act on (other event types,
 // abandoned responses, or another environment's form sharing this webhook)
 // come back as { ignored } so the route can acknowledge them with 200 and
 // VideoAsk does not keep retrying. Malformed or forged references stay null.
-export type VideoaskCompletion = { applicantId: string; eventId: string; formId: string };
+export type VideoaskCompletion = {
+  applicantId: string;
+  eventId: string;
+  formId: string;
+  answers: readonly IncomingAnswer[];
+};
 export function readVideoaskCompletion(body: unknown): VideoaskCompletion | { ignored: string } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
@@ -73,5 +78,7 @@ export function readVideoaskCompletion(body: unknown): VideoaskCompletion | { ig
     : variables?.application_ref;
   const reference = parseVideoaskReference(raw);
   if (!reference) return null;
-  return { ...reference, eventId: b.event_id, formId };
+  const applicantId = parseApplicantId(reference.applicantId);
+  if (!applicantId) return null;
+  return { applicantId, eventId: b.event_id, formId, answers: parseVideoaskHoldings(body, applicantId) };
 }

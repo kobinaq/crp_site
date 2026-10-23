@@ -2,9 +2,20 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { COUNTRIES, type Country } from "@/lib/countries";
+import {
+  CONTACT_PAGE_FEEDBACK,
+  HONEYPOT_FIELD,
+  REASON_LEAF,
+  parseContactBody,
+  parseContactName,
+  parseDial,
+  parseNational,
+} from "@/lib/contact/model";
+import { submitContact } from "@/lib/actions";
 import { trail } from "@/lib/fonts";
 import { CountryDropdown } from "../apply/CountryDropdown";
-import { useCopy } from "../LanguageProvider";
+import { useCopy, useLanguage } from "../LanguageProvider";
+import { Turnstile, TURNSTILE_SITE_KEY } from "../Turnstile";
 
 function useDesk() {
   const [desk, setDesk] = useState(false);
@@ -118,6 +129,7 @@ function EmailRow({ email }: { email: string }) {
 
 export function ContactPage() {
   const copy = useCopy();
+  const { locale } = useLanguage();
   const c = copy.contactPage;
   const desk = useDesk();
   const [name, setName] = useState("");
@@ -126,31 +138,56 @@ export function ContactPage() {
   const [mobile, setMobile] = useState("");
   const [message, setMessage] = useState("");
   const [dial, setDial] = useState<Country>(US);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [widgetKey, setWidgetKey] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const knownDials = useMemo(() => COUNTRIES.map((country) => country.dial), []);
 
-  const ready = useMemo(
-    () =>
-      name.trim().length > 1 &&
-      EMAIL_RE.test(email.trim()) &&
-      mobile.trim().length > 5 &&
-      message.trim().length > 2,
-    [name, email, mobile, message],
-  );
+  const ready = useMemo(() => {
+    const phoneOk = parseDial(dial.dial, knownDials) !== null && parseNational(mobile) !== null;
+    const turnstileReady = !TURNSTILE_SITE_KEY || Boolean(turnstileToken);
+    return parseContactName(name) !== null
+      && parseContactBody(message) !== null
+      && phoneOk
+      && EMAIL_RE.test(email.trim())
+      && turnstileReady;
+  }, [dial.dial, email, knownDials, message, mobile, name, turnstileToken]);
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!ready) return;
-    const body = [
-      `Name: ${name.trim()}`,
-      organization.trim() ? `Organization: ${organization.trim()}` : null,
-      `Email: ${email.trim()}`,
-      `Mobile: ${dial.dial} ${mobile.trim()}`,
-      "",
-      message.trim(),
-    ]
-      .filter(Boolean)
-      .join("\n");
-    const href = `mailto:${c.email}?subject=${encodeURIComponent("Contact — Climate Refugee Pavilion")}&body=${encodeURIComponent(body)}`;
-    window.location.href = href;
+    if (!ready || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const trap = e.currentTarget.elements.namedItem(HONEYPOT_FIELD);
+    const honeypot = trap && "value" in trap ? String(trap.value) : "";
+    try {
+      const result = await submitContact({
+        name,
+        organization,
+        email,
+        dial: dial.dial,
+        nationalNumber: mobile,
+        message,
+        locale,
+        turnstileToken,
+        [HONEYPOT_FIELD]: honeypot,
+      });
+      if (!result.ok) {
+        setTurnstileToken(null);
+        setWidgetKey((key) => key + 1);
+        setError(c[REASON_LEAF[result.reason]]);
+        setSubmitting(false);
+        return;
+      }
+      setSent(true);
+    } catch {
+      setTurnstileToken(null);
+      setWidgetKey((key) => key + 1);
+      setError(c[CONTACT_PAGE_FEEDBACK.failed]);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -169,10 +206,21 @@ export function ContactPage() {
           </div>
         </div>
 
+        {sent ? (
+          <p role="status" className="relative z-10 text-[16px] font-semibold leading-snug text-black desk:flex-1">{c[CONTACT_PAGE_FEEDBACK.sent]}</p>
+        ) : (
         <form
           onSubmit={onSubmit}
           className="relative z-10 flex w-full flex-col gap-2 desk:h-[420px] desk:flex-1 desk:items-end desk:justify-center"
         >
+          <input
+            name={HONEYPOT_FIELD}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden
+            defaultValue=""
+            className="absolute left-[-9999px] h-px w-px overflow-hidden"
+          />
           <input
             required
             name="name"
@@ -228,14 +276,17 @@ export function ContactPage() {
             aria-label={c.message}
             className={`${PILL} ${PILL_TYPE} h-[171px] w-full resize-none rounded-[31.5px] py-6 pl-6 pr-8 desk:h-auto desk:min-h-0 desk:flex-1`}
           />
+          {error ? <p role="alert" className="w-full text-sm font-semibold text-magenta">{error}</p> : null}
+          <Turnstile key={widgetKey} onToken={setTurnstileToken} />
           <button
             type="submit"
-            disabled={!ready}
+            disabled={!ready || submitting}
             className="h-16 w-full shrink-0 rounded-full bg-black text-[16px] font-semibold uppercase tracking-[0.64px] text-white transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-32 disabled:hover:scale-100 desk:w-[284px]"
           >
             {c.send}
           </button>
         </form>
+        )}
 
         <div className="mt-4 flex w-full desk:hidden">
           <MobileTile href={`mailto:${c.email}`} icon="/icons/contact/at.svg" label={c.emailLabel} />

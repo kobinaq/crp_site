@@ -18,6 +18,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { outcomes, transitions } = await applyDecisions(getDb(), parsed.data);
+  const { outcomes, transitions } = await applyDecisions(getDb(), parsed.data, { via: "sheet" });
   return NextResponse.json({ ok: true, processed: parsed.data.length, transitions, outcomes });
 }

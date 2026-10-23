@@ -4,11 +4,14 @@ export type DeliveryResult =
   | { ok: true; id: string | null; skipped?: boolean }
   | { ok: false; error: string; retryable: boolean };
 
-// Talks to Resend once. Callers are the job worker, never a request handler: an
-// email is first stored as a job in the same transaction as the record it
-// belongs to, and this function is retried from there until it is accepted.
-// The idempotency key is the job's dedupe key, so a retry after a timeout does
-// not deliver twice within Resend's 24-hour idempotency window.
+// Talks to Resend once. The job worker is the usual caller. The staff sign-in
+// action and the staff invite action also call it, with the token hash as the
+// idempotency key, because a magic link has to leave in the request that
+// created it. Every other email is
+// stored as a job in the same transaction as the record it belongs to, and this
+// function is retried from the worker until Resend accepts it. The idempotency
+// key stops a retry after a timeout from delivering twice inside Resend's
+// 24-hour window.
 export async function deliverEmail(input: EmailInput, idempotencyKey: string): Promise<DeliveryResult> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;

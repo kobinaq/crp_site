@@ -129,7 +129,12 @@
     "emailField": "*Email",
     "mobile": "*Mobile",
     "message": "Write your message here",
-    "send": "Send"
+    "send": "Send",
+    "sent": "We've received your message.",
+    "invalid": "Check the fields and try again.",
+    "turnstile": "The check did not complete. Try again.",
+    "rateLimited": "You've sent several messages. Try again later.",
+    "failed": "The message did not send. Try again."
   },
   "hero": {
     "line1Before": "Climate change moves people ",

@@ -46,6 +46,22 @@ export function scrubUrl(value: unknown): unknown {
 
 type Event = Parameters<Extract<PostHogConfig["before_send"], (...args: never[]) => unknown>>[0];
 
+export function dropAdminEvents(event: Event | null): Event | null {
+  if (!event?.properties) return event;
+  const path = event.properties.$pathname;
+  if (typeof path === "string" && (path === "/admin" || path.startsWith("/admin/"))) return null;
+  const url = event.properties.$current_url;
+  if (typeof url === "string") {
+    try {
+      const pathname = new URL(url).pathname;
+      if (pathname === "/admin" || pathname.startsWith("/admin/")) return null;
+    } catch {
+      return event;
+    }
+  }
+  return event;
+}
+
 export function scrubEvent(event: Event | null): Event | null {
   if (!event) return event;
   for (const bag of [event.properties, event.$set, event.$set_once]) {
@@ -81,7 +97,7 @@ export function posthogOptions(apiHost: string, environment = analyticsEnvironme
     advanced_disable_flags: true,
     disable_surveys: true,
     disable_external_dependency_loading: true,
-    before_send: [scrubEvent, stampEnvironment(environment)],
+    before_send: [dropAdminEvents, scrubEvent, stampEnvironment(environment)],
   };
 }
 

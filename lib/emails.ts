@@ -1,6 +1,37 @@
 import emailCopy from "@/lib/translations/application-emails.json";
 import ackCopy from "@/lib/translations/acknowledgement-emails.json";
+import { JSON_EMAILS, type EmailSources } from "@/lib/copy/sources";
+import { appUrl } from "@/lib/config";
 import { parseLocale, type ApplicationLocale, type Locale } from "@/lib/locale";
+
+export const DECISION_PREVIEW_TOKEN = "00000000-0000-4000-8000-000000000000";
+
+type DecisionStatus = "rejected" | "online_offered" | "accepted" | "interview_yes";
+
+export function decisionLink(
+  status: DecisionStatus,
+  choice: { language: "en" | "fr" | "es"; switchToken: string | null; calendly: string | null },
+): string | null {
+  if (status === "online_offered" && choice.switchToken) {
+    return `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(choice.switchToken)}&lang=${choice.language}`;
+  }
+  if (status === "accepted") return choice.calendly;
+  return null;
+}
+
+export function previewDecisionEmail(
+  status: DecisionStatus,
+  applicant: { language: "en" | "fr" | "es" },
+  sources: EmailSources,
+  calendly: string | null,
+): Email {
+  const link = decisionLink(status, {
+    language: applicant.language,
+    switchToken: status === "online_offered" ? DECISION_PREVIEW_TOKEN : null,
+    calendly,
+  });
+  return decisionEmail(status, link, applicant.language, sources);
+}
 
 // Branded transactional email shell, matching the Figma email frames
 // (2308:7356 desktop, 2308:7383 mobile): scalloped photo header, cream body,
@@ -42,9 +73,9 @@ const RADIAL = `radial-gradient(194px 181px at 93.8% 83.4%,${ORANGE} 0%,#F77346 
 // Email-client-safe: table layout, inline styles, progressive gradient
 // fallbacks (solid bgcolor → linear → radial; VML for Outlook desktop).
 // Geometry follows Figma 2308:7356 (600px desktop) and 2308:7383 (320px mobile).
-function render(language: Locale, bodyParas: string[], cta: Cta | null): string {
+function render(language: Locale, bodyParas: string[], cta: Cta | null, shell: { signoff: string; tagline: string; rights: string }): string {
   const year = new Date().getUTCFullYear();
-  const { signoff, tagline, rights } = ackCopy[language];
+  const { signoff, tagline, rights } = shell;
 
   // Figma separates paragraphs with an empty 14px/1.2 line (16.8px).
   const paras = [...bodyParas, signoff]
@@ -116,63 +147,143 @@ function render(language: Locale, bodyParas: string[], cta: Cta | null): string 
 </body></html>`;
 }
 
-// Acknowledgements for the non-application forms: a receipt, never a link.
-const ack = (locale: string | null | undefined) => ackCopy[parseLocale(locale)];
-
-export function waitlistEmail(locale?: string | null): Email {
-  const copy = ack(locale);
-  return { subject: copy.waitlistSubject, html: render(parseLocale(locale), [copy.friend, copy.waitlist], null) };
+// Bundled strings stay trusted HTML. An override is escaped, and its newlines
+// become breaks, because the editor stores the readable form.
+function piece(bundled: string, bag: Readonly<Record<string, string>> | undefined, key: string, format: "subject" | "body"): string {
+  if (!bag || !Object.hasOwn(bag, key)) return bundled;
+  const value = bag[key] ?? "";
+  if (format === "subject") return value.replace(/[\r\n]/g, "");
+  return escapeHtml(value).replaceAll("\n", "<br />");
 }
 
-export function interestEmail(locale?: string | null, name?: string | null): Email {
-  const copy = ack(locale);
-  const hello = name ? copy.greeting.replace("{name}", escapeHtml(name)) : copy.friend;
-  return { subject: copy.interestSubject, html: render(parseLocale(locale), [hello, copy.interest], null) };
+function sourcesOf(sources: EmailSources | undefined): EmailSources {
+  return sources ?? JSON_EMAILS;
 }
 
-export function nominationEmail(nomineeName: string, locale?: string | null, nominatorName?: string | null): Email {
-  const copy = ack(locale);
-  const hello = nominatorName ? copy.greeting.replace("{name}", escapeHtml(nominatorName)) : copy.friend;
-  return { subject: copy.nominationSubject, html: render(parseLocale(locale), [hello, copy.nomination.replace("{nominee}", escapeHtml(nomineeName))], null) };
+function shellFor(locale: Locale, sources: EmailSources | undefined) {
+  const bundled = ackCopy[locale];
+  const bag = sourcesOf(sources).ack[locale];
+  return {
+    signoff: piece(bundled.signoff, bag, "signoff", "body"),
+    tagline: piece(bundled.tagline, bag, "tagline", "body"),
+    rights: piece(bundled.rights, bag, "rights", "body"),
+  };
 }
 
-export function partnerEmail(name: string, locale?: string | null): Email {
-  const copy = ack(locale);
-  return { subject: copy.partnerSubject, html: render(parseLocale(locale), [copy.greeting.replace("{name}", escapeHtml(name)), copy.partner], null) };
+function ackLine(locale: string | null | undefined, sources: EmailSources | undefined, key: keyof (typeof ackCopy)["en"], format: "subject" | "body"): string {
+  const language = parseLocale(locale);
+  return piece(ackCopy[language][key], sourcesOf(sources).ack[language], key, format);
 }
 
-export function applicationEmail(name: string, link: string | null, language: ApplicationLocale): Email {
-  const copy = emailCopy[language];
-  return { subject: copy.applicationSubject, html: render(language, [copy.greeting.replace("{name}", escapeHtml(name)), link ? copy.confirm : copy.waiting], link ? { label: copy.confirmButton, url: link } : null) };
+function appLine(language: ApplicationLocale, sources: EmailSources | undefined, key: keyof (typeof emailCopy)["en"], format: "subject" | "body"): string {
+  return piece(emailCopy[language][key], sourcesOf(sources).app[language], key, format);
 }
-export function resumeEmail(name: string, link: string, language: ApplicationLocale): Email {
-  const copy = emailCopy[language];
-  return { subject: copy.resumeSubject, html: render(language, [copy.greeting.replace("{name}", escapeHtml(name)), copy.resume], { label: copy.continue, url: link }) };
+
+export function waitlistEmail(locale: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  return {
+    subject: ackLine(locale, sources, "waitlistSubject", "subject"),
+    html: render(language, [ackLine(locale, sources, "friend", "body"), ackLine(locale, sources, "waitlist", "body")], null, shellFor(language, sources)),
+  };
 }
-export function identityEmail(name: string, link: string, language: ApplicationLocale): Email {
-  const copy = emailCopy[language];
-  return { subject: copy.identitySubject, html: render(language, [copy.greeting.replace("{name}", escapeHtml(name)), copy.identity], { label: copy.identityButton, url: link }) };
+
+export function interestEmail(locale: string | null | undefined, name: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  const greeting = ackLine(locale, sources, "greeting", "body");
+  const hello = name ? greeting.replace("{name}", escapeHtml(name)) : ackLine(locale, sources, "friend", "body");
+  return {
+    subject: ackLine(locale, sources, "interestSubject", "subject"),
+    html: render(language, [hello, ackLine(locale, sources, "interest", "body")], null, shellFor(language, sources)),
+  };
 }
-export function receivedEmail(name: string, language: ApplicationLocale): Email {
-  const copy = emailCopy[language];
-  return { subject: copy.receivedSubject, html: render(language, [copy.greeting.replace("{name}", escapeHtml(name)), copy.received], null) };
+
+export function nominationEmail(nomineeName: string, locale: string | null | undefined, nominatorName: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  const greeting = ackLine(locale, sources, "greeting", "body");
+  const hello = nominatorName ? greeting.replace("{name}", escapeHtml(nominatorName)) : ackLine(locale, sources, "friend", "body");
+  const body = ackLine(locale, sources, "nomination", "body").replace("{nominee}", escapeHtml(nomineeName));
+  return {
+    subject: ackLine(locale, sources, "nominationSubject", "subject"),
+    html: render(language, [hello, body], null, shellFor(language, sources)),
+  };
 }
-export function identityRetryEmail(name: string, link: string, language: ApplicationLocale): Email {
-  const copy = emailCopy[language];
-  return { subject: copy.retrySubject, html: render(language, [copy.greeting.replace("{name}", escapeHtml(name)), copy.retry], { label: copy.identityButton, url: link }) };
+
+export function partnerEmail(name: string, locale: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  const greeting = ackLine(locale, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: ackLine(locale, sources, "partnerSubject", "subject"),
+    html: render(language, [greeting, ackLine(locale, sources, "partner", "body")], null, shellFor(language, sources)),
+  };
 }
+
+export const CONTACT_EMAIL_TEMPLATE = "contact";
+
+export function contactEmail(name: string, locale: string | null | undefined, sources: EmailSources): Email {
+  const language = parseLocale(locale);
+  const greeting = ackLine(locale, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: ackLine(locale, sources, "contactSubject", "subject"),
+    html: render(language, [greeting, ackLine(locale, sources, "contact", "body")], null, shellFor(language, sources)),
+  };
+}
+
+export function applicationEmail(name: string, link: string | null, language: ApplicationLocale, sources: EmailSources): Email {
+  const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  const body = link ? appLine(language, sources, "confirm", "body") : appLine(language, sources, "waiting", "body");
+  const button = link ? { label: appLine(language, sources, "confirmButton", "body"), url: link } : null;
+  return { subject: appLine(language, sources, "applicationSubject", "subject"), html: render(language, [greeting, body], button, shellFor(language, sources)) };
+}
+
+export function resumeEmail(name: string, link: string, language: ApplicationLocale, sources: EmailSources): Email {
+  const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: appLine(language, sources, "resumeSubject", "subject"),
+    html: render(language, [greeting, appLine(language, sources, "resume", "body")], { label: appLine(language, sources, "continue", "body"), url: link }, shellFor(language, sources)),
+  };
+}
+
+export function identityEmail(name: string, link: string, language: ApplicationLocale, sources: EmailSources): Email {
+  const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: appLine(language, sources, "identitySubject", "subject"),
+    html: render(language, [greeting, appLine(language, sources, "identity", "body")], { label: appLine(language, sources, "identityButton", "body"), url: link }, shellFor(language, sources)),
+  };
+}
+
+export function receivedEmail(name: string, language: ApplicationLocale, sources: EmailSources = JSON_EMAILS): Email {
+  const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: appLine(language, sources, "receivedSubject", "subject"),
+    html: render(language, [greeting, appLine(language, sources, "received", "body")], null, shellFor(language, sources)),
+  };
+}
+
+export function identityRetryEmail(name: string, link: string, language: ApplicationLocale, sources: EmailSources): Email {
+  const greeting = appLine(language, sources, "greeting", "body").replace("{name}", escapeHtml(name));
+  return {
+    subject: appLine(language, sources, "retrySubject", "subject"),
+    html: render(language, [greeting, appLine(language, sources, "retry", "body")], { label: appLine(language, sources, "identityButton", "body"), url: link }, shellFor(language, sources)),
+  };
+}
+
 export function decisionEmail(
   status: "rejected" | "online_offered" | "accepted" | "interview_yes",
   link: string | null,
   language: ApplicationLocale,
+  sources: EmailSources,
 ): Email {
-  const copy = emailCopy[language];
-  if (status === "rejected") return { subject: copy.rejectedSubject, html: render(language, [copy.applicant, copy.rejected], null) };
-  if (status === "online_offered") return { subject: copy.onlineSubject, html: render(language, [copy.applicant, copy.online], link ? { label: copy.onlineButton, url: link } : null) };
-  if (status === "accepted") {
-    // No booking link (Calendly off): no button, and copy that doesn't point at one.
-    if (!link) return { subject: copy.acceptedSubject, html: render(language, [copy.congratulations, copy.interviewManual], null) };
-    return { subject: copy.interviewSubject, html: render(language, [copy.congratulations, copy.interview], { label: copy.interviewButton, url: link }) };
+  const shell = shellFor(language, sources);
+  const applicant = appLine(language, sources, "applicant", "body");
+  if (status === "rejected") return { subject: appLine(language, sources, "rejectedSubject", "subject"), html: render(language, [applicant, appLine(language, sources, "rejected", "body")], null, shell) };
+  if (status === "online_offered") {
+    const button = link ? { label: appLine(language, sources, "onlineButton", "body"), url: link } : null;
+    return { subject: appLine(language, sources, "onlineSubject", "subject"), html: render(language, [applicant, appLine(language, sources, "online", "body")], button, shell) };
   }
-  return { subject: copy.selectedSubject, html: render(language, [copy.congratulations, copy.selected], null) };
+  if (status === "accepted") {
+    const congratulations = appLine(language, sources, "congratulations", "body");
+    if (!link) return { subject: appLine(language, sources, "acceptedSubject", "subject"), html: render(language, [congratulations, appLine(language, sources, "interviewManual", "body")], null, shell) };
+    return { subject: appLine(language, sources, "interviewSubject", "subject"), html: render(language, [congratulations, appLine(language, sources, "interview", "body")], { label: appLine(language, sources, "interviewButton", "body"), url: link }, shell) };
+  }
+  return { subject: appLine(language, sources, "selectedSubject", "subject"), html: render(language, [appLine(language, sources, "congratulations", "body"), appLine(language, sources, "selected", "body")], null, shell) };
 }

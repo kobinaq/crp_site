@@ -133,7 +133,7 @@ async function pushDecisions(db: Db, workbook: ReviewWorkbook) {
       next[decisionAt] = decisionId;
       await workbook.writeRow(EXCEL_TABLES.applicants, row.index, next);
     }
-    const outcome = await applyDecision(db, parsed.data);
+    const outcome = await applyDecision(db, parsed.data, { via: "sheet" });
     outcomes.push({ applicantId: outcome.applicantId, result: outcome.result });
   }
   await db.update(excelSyncState).set({ decisionOffset: pending.length ? (offset + batch.length) % pending.length : 0 })

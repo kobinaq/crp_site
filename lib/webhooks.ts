@@ -1,15 +1,18 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { applicants, jobs, webhookEvents, type Db, type JobPayload } from "@/lib/db";
-import { decisionEmail, receivedEmail } from "@/lib/emails";
+import { loadEmailSources } from "@/lib/copy/read";
+import type { EmailSources } from "@/lib/copy/sources";
+import { decisionEmail, decisionLink, receivedEmail } from "@/lib/emails";
 import { getIdentityProvider, type IdentityDecision } from "@/lib/identity";
 import { enqueue, enqueueEmail } from "@/lib/jobs";
 import { lockApplicant, transition, updateApplicant } from "@/lib/lifecycle";
 import { applyVideoaskCompletion, scheduleIdentitySession } from "@/lib/application";
 import { reconcileIdentity } from "@/lib/application-status";
 import { issueAccessToken } from "@/lib/access";
-import { appUrl } from "@/lib/config";
 import { calendlyLink, parseCalendlyReference } from "@/lib/calendly";
+import { parseApplicantId, readStoredAnswers } from "@/lib/holdings";
+import { saveAnswers } from "@/lib/media";
 import { isAllowedVideoaskForm } from "@/lib/videoask";
 
 // Every verified webhook is written down before anything acts on it. The
@@ -48,13 +51,15 @@ export type ProcessOutcome = { outcome: string; advanced?: boolean; status?: str
 // Throws on infrastructure failure so the caller can queue a retry; a business
 // refusal (unknown applicant, stale event) is a recorded outcome, not an error.
 export async function processWebhookEvent(db: Db, eventId: string): Promise<ProcessOutcome> {
+  const sources = await loadEmailSources();
   return db.transaction(async (tx) => {
     const [event] = await tx.select().from(webhookEvents).where(eq(webhookEvents.id, eventId)).for("update");
     if (!event) return { outcome: "missing" };
     if (event.processedAt) return { outcome: event.outcome ?? "processed" };
 
-    const result = await dispatch(tx, event);
-    await tx.update(webhookEvents).set({ processedAt: new Date(), outcome: result.outcome }).where(eq(webhookEvents.id, eventId));
+    const result = await dispatch(tx, event, sources);
+    const payload = event.provider === "videoask" ? scrubbedVideoaskPayload(event.payload) : event.payload;
+    await tx.update(webhookEvents).set({ processedAt: new Date(), outcome: result.outcome, payload }).where(eq(webhookEvents.id, eventId));
     return result;
   });
 }
@@ -99,12 +104,12 @@ export async function requeueUnprocessedWebhooks(db: Db, olderThanMs = 5 * 60_00
 
 type Tx = Parameters<typeof transition>[0];
 
-async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
+async function dispatch(tx: Tx, event: WebhookEvent, sources: EmailSources): Promise<ProcessOutcome> {
   switch (event.provider) {
     case "videoask":
-      return processVideoask(tx, event.payload as VideoaskPayload);
+      return processVideoask(tx, event.payload as VideoaskPayload, sources);
     case "identity":
-      return processIdentity(tx, event.payload as IdentityPayload);
+      return processIdentity(tx, event.payload as IdentityPayload, sources);
     case "resend":
       return processResend(tx, event.payload as ResendPayload);
     case "calendly":
@@ -116,11 +121,27 @@ async function dispatch(tx: Tx, event: WebhookEvent): Promise<ProcessOutcome> {
 
 // --- VideoAsk -----------------------------------------------------------------
 
-export type VideoaskPayload = { applicantId: string; formId: string; eventId: string };
+export type VideoaskPayload = { applicantId: string; formId: string; eventId: string; answers?: unknown };
 
-async function processVideoask(tx: Tx, payload: VideoaskPayload): Promise<ProcessOutcome> {
+function scrubbedVideoaskPayload(payload: JobPayload): JobPayload {
+  return {
+    applicantId: payload.applicantId,
+    eventId: payload.eventId,
+    formId: payload.formId,
+    answerCount: Array.isArray(payload.answers) ? payload.answers.length : 0,
+  };
+}
+
+async function processVideoask(tx: Tx, payload: VideoaskPayload, sources: EmailSources): Promise<ProcessOutcome> {
   if (!isAllowedVideoaskForm(payload.formId)) return { outcome: "invalid form" };
-  return applyVideoaskCompletion(tx, payload.applicantId);
+  const completion = await applyVideoaskCompletion(tx, payload.applicantId, sources);
+  // An unverified applicant still has a row. Store the answers before the webhook body is reduced to ids.
+  if (completion.outcome !== "unknown applicant") {
+    const applicantId = parseApplicantId(payload.applicantId);
+    const incoming = readStoredAnswers(payload.answers);
+    if (applicantId && incoming.length > 0) await saveAnswers(tx, applicantId, incoming);
+  }
+  return completion;
 }
 
 // --- Identity provider --------------------------------------------------------
@@ -134,7 +155,7 @@ const IDENTITY_STATUS: Record<IdentityDecision, "verified" | "failed" | "review"
   pending: "pending",
 };
 
-async function processIdentity(tx: Tx, payload: IdentityPayload): Promise<ProcessOutcome> {
+async function processIdentity(tx: Tx, payload: IdentityPayload, sources: EmailSources): Promise<ProcessOutcome> {
   const event = getIdentityProvider().parse(payload.body, new Headers(payload.headers));
   if (!event.reference && !event.sessionId) return { outcome: "missing reference" };
 
@@ -172,7 +193,7 @@ async function processIdentity(tx: Tx, payload: IdentityPayload): Promise<Proces
   if (advanced && after.status === "under_review") {
     await enqueueEmail(tx, `email:received:${after.id}:${after.reviewCycle}`, {
       to: after.email,
-      ...receivedEmail(after.fullName, after.language),
+      ...receivedEmail(after.fullName, after.language, sources),
     }, "received", after.id);
     if (after.identitySessionId) {
       await enqueue(tx, {
@@ -270,27 +291,19 @@ export async function queueDecisionEmail(
   applicant: { id: string; email: string; language: "en" | "fr" | "es" },
   status: string,
   version: number,
+  sources: EmailSources,
 ): Promise<void> {
-  let mail = null;
-  switch (status) {
-    case "rejected":
-      mail = decisionEmail(status, null, applicant.language);
-      break;
-    case "online_offered": {
-      const token = await issueAccessToken(tx, applicant.id, "switch_online", 7 * 24 * 3600);
-      mail = decisionEmail(status, `${appUrl()}/api/apply/switch-online?token=${encodeURIComponent(token.raw)}&lang=${applicant.language}`, applicant.language);
-      break;
-    }
-    case "accepted": {
-      const [full] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
-      mail = decisionEmail(status, full ? calendlyLink(full) : null, applicant.language);
-      break;
-    }
-    case "interview_yes": {
-      mail = decisionEmail(status, null, applicant.language);
-      break;
-    }
+  if (status !== "rejected" && status !== "online_offered" && status !== "accepted" && status !== "interview_yes") return;
+  let link: string | null = null;
+  if (status === "online_offered") {
+    const token = await issueAccessToken(tx, applicant.id, "switch_online", 7 * 24 * 3600);
+    link = decisionLink(status, { language: applicant.language, switchToken: token.raw, calendly: null });
+  } else if (status === "accepted") {
+    const [full] = await tx.select().from(applicants).where(eq(applicants.id, applicant.id));
+    link = decisionLink(status, { language: applicant.language, switchToken: null, calendly: full ? calendlyLink(full) : null });
+  } else {
+    link = decisionLink(status, { language: applicant.language, switchToken: null, calendly: null });
   }
-  if (!mail) return;
+  const mail = decisionEmail(status, link, applicant.language, sources);
   await enqueueEmail(tx, `email:decision:${applicant.id}:${status}:${version}`, { to: applicant.email, ...mail }, `decision:${status}`, applicant.id);
 }

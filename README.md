@@ -19,7 +19,12 @@ form at the same webhook URL and secret, and pass the custom `application_ref`
 variable through each. Online applications move straight to review. In-person
 applications continue through Didit; approved identity images are copied into
 private Vercel Blob storage and can only be streamed through the authenticated
-operations document route.
+operations document route. An admin can also play a stored VideoAsk answer and
+open an identity document from the applicant record. The file stays off the
+page until that press. Text answers and transcripts stay on the record.
+`PROGRAM_END` is the last UTC day of the program. After that day plus
+`MEDIA_RETENTION_DAYS`, the worker deletes the private files and keeps the
+transcript. Deletion stays a dry run unless `MEDIA_RETENTION_DRY_RUN` is `false`.
 
 In every VideoAsk form, set the final-step Logic redirect to
 `https://www.climaterefugeepavilion.org/api/apply/verify?ref=@application_ref`

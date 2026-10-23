@@ -1,3 +1,5 @@
+import { sql } from "drizzle-orm";
+import type { ContactStatus } from "@/lib/contact/model";
 import {
   pgEnum,
   pgTable,
@@ -11,6 +13,8 @@ import {
   jsonb,
   bigint,
   boolean,
+  primaryKey,
+  check,
 } from "drizzle-orm/pg-core";
 
 // One source of truth for every closed set. These names match the Excel mirror
@@ -115,8 +119,12 @@ export const applicants = pgTable(
     interviewOutcome: interviewOutcome("interview_outcome"),
     interviewNotes: text("interview_notes"),
     interviewDate: timestamp("interview_date", { withTimezone: true }),
+    assignedStaffId: uuid("assigned_staff_id").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [uniqueIndex("applicants_email_key").on(t.email)],
+  (t) => [
+    uniqueIndex("applicants_email_key").on(t.email),
+    index("applicants_assigned_staff_idx").on(t.assignedStaffId),
+  ],
 );
 
 // Append-only lawful-basis record: one row per consent given, never updated.
@@ -245,11 +253,64 @@ export const identityDocuments = pgTable(
 export type IdentityDocument = typeof identityDocuments.$inferSelect;
 export type NewIdentityDocument = typeof identityDocuments.$inferInsert;
 
+export const videoaskAnswers = pgTable(
+  "videoask_answers",
+  {
+    applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+    questionId: text("question_id").notNull(),
+    answerId: text("answer_id").notNull(),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    medium: text("medium").notNull(),
+    textBody: text("text_body"),
+    transcript: text("transcript"),
+    sourceUrl: text("source_url"),
+    pathname: text("pathname"),
+    contentType: text("content_type"),
+    byteSize: integer("byte_size"),
+    copiedAt: timestamp("copied_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.applicantId, t.questionId] }),
+    uniqueIndex("videoask_answers_pathname_key").on(t.pathname).where(sql`${t.pathname} is not null`),
+    check("videoask_answers_medium", sql`${t.medium} in ('text', 'poll', 'video', 'audio')`),
+    check("videoask_answers_position", sql`${t.position} >= 0`),
+    check("videoask_answers_title", sql`char_length(${t.title}) between 1 and 500`),
+    check("videoask_answers_question", sql`${t.questionId} ~ '^[A-Za-z0-9_-]{1,128}$'`),
+    check("videoask_answers_words", sql`
+      (${t.medium} in ('text', 'poll') and ${t.textBody} is not null and ${t.transcript} is null)
+      or (${t.medium} in ('video', 'audio') and ${t.textBody} is null)
+    `),
+    check("videoask_answers_no_file_on_text", sql`
+      ${t.medium} in ('video', 'audio')
+      or (${t.sourceUrl} is null and ${t.pathname} is null and ${t.contentType} is null and ${t.byteSize} is null and ${t.copiedAt} is null)
+    `),
+    check("videoask_answers_file_phase", sql`
+      ${t.medium} in ('text', 'poll')
+      or (${t.pathname} is null and ${t.contentType} is null and ${t.byteSize} is null and ${t.copiedAt} is null)
+      or (${t.sourceUrl} is null and ${t.pathname} is not null and ${t.contentType} is not null and ${t.byteSize} is not null and ${t.byteSize} >= 0 and ${t.copiedAt} is not null)
+    `),
+    check("videoask_answers_answer_len", sql`char_length(${t.answerId}) between 1 and 200`),
+    check("videoask_answers_text_len", sql`${t.textBody} is null or char_length(${t.textBody}) <= 20000`),
+    check("videoask_answers_transcript_len", sql`${t.transcript} is null or char_length(${t.transcript}) <= 20000`),
+    check("videoask_answers_source_len", sql`${t.sourceUrl} is null or char_length(${t.sourceUrl}) between 1 and 2000`),
+    check("videoask_answers_pathname_prefix", sql`
+      ${t.pathname} is null
+      or ${t.pathname} ~ '^videoask/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[A-Za-z0-9_-]{1,128}\\.[a-z0-9]{1,8}$'
+    `),
+  ],
+);
+
+export type VideoaskAnswer = typeof videoaskAnswers.$inferSelect;
+export type NewVideoaskAnswer = typeof videoaskAnswers.$inferInsert;
+
 export const applicationEvents = pgTable("application_events", {
   id: id(), createdAt: createdAt(),
   applicantId: uuid("applicant_id").references(() => applicants.id, { onDelete: "cascade" }),
   fromStatus: text("from_status"), toStatus: text("to_status"),
-  actor: text("actor").notNull(), reason: text("reason").notNull(),
+  actor: text("actor").notNull(),
+  actorStaffId: uuid("actor_staff_id").references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
   version: integer("version"),
 }, (t) => [index("application_events_applicant_idx").on(t.applicantId, t.createdAt)]);
 
@@ -293,7 +354,12 @@ export const decisionReceipts = pgTable("decision_receipts", {
   applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
   requestHash: text("request_hash").notNull(),
   result: jsonb("result").$type<{ version: number; status: string }>().notNull(),
-});
+  origin: text("origin"),
+  staffUserId: uuid("staff_user_id").references(() => users.id, { onDelete: "set null" }),
+  reviewCycle: integer("review_cycle"),
+}, (t) => [
+  index("decision_receipts_staff_hold_idx").on(t.applicantId, t.reviewCycle, t.createdAt.desc()).where(sql`${t.origin} = 'staff'`),
+]);
 
 // A transactional clock (rather than a sequence) serializes revision allocation
 // until commit, so consumers cannot skip a lower revision committed later.
@@ -328,3 +394,192 @@ export const captureTokens = pgTable("capture_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
 }, (t) => [index("capture_tokens_expiry_idx").on(t.expiresAt)]);
+
+// Staff and, later, public members. Role is text so a new role does not need
+// ALTER TYPE. The email check keeps the allowlist comparison exact.
+export const users = pgTable("users", {
+  id: id(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  email: text("email").notNull(),
+  name: text("name"),
+  role: text("role").notNull(),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("users_email_key").on(t.email),
+  check("users_email_lowercase", sql`${t.email} = lower(${t.email})`),
+]);
+
+export const signInTokens = pgTable("sign_in_tokens", {
+  hash: text("hash").primaryKey(),
+  createdAt: createdAt(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+}, (t) => [index("sign_in_tokens_expires_idx").on(t.expiresAt)]);
+
+export const userSessions = pgTable("user_sessions", {
+  hash: text("hash").primaryKey(),
+  createdAt: createdAt(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, (t) => [
+  index("user_sessions_user_idx").on(t.userId),
+  index("user_sessions_expires_idx").on(t.expiresAt),
+]);
+
+// History and the published value are the same row. A null value means the
+// JSON bundle is live again. The highest revision for a key is the head.
+export const copyRevisions = pgTable("copy_revisions", {
+  catalog: text("catalog").notNull(),
+  locale: text("locale").notNull(),
+  key: text("key").notNull(),
+  revision: integer("revision").notNull(),
+  value: text("value"),
+  translatedFrom: text("translated_from"),
+  revertedFrom: integer("reverted_from"),
+  authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [
+  primaryKey({ columns: [t.catalog, t.locale, t.key, t.revision] }),
+  check("copy_revisions_revision_positive", sql`${t.revision} > 0`),
+  index("copy_revisions_created_idx").on(t.createdAt),
+]);
+
+// Staff account changes and record exports. Publishes stay in copy_revisions.
+export const adminEvents = pgTable("admin_events", {
+  id: id(),
+  createdAt: createdAt(),
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+  subjectId: uuid("subject_id").references(() => users.id, { onDelete: "set null" }),
+  kind: text("kind").notNull(),
+  detail: jsonb("detail").$type<Record<string, unknown>>().notNull().default({}),
+}, (t) => [
+  index("admin_events_created_idx").on(t.createdAt),
+  index("admin_events_subject_idx").on(t.subjectId, t.createdAt),
+]);
+
+export const reviewPositions = pgTable("review_positions", {
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  scores: jsonb("scores").$type<Record<string, number>>().notNull().default({}),
+  recommendation: text("recommendation"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.applicantId, t.reviewCycle, t.authorId] }),
+  index("review_positions_applicant_idx").on(t.applicantId, t.reviewCycle),
+]);
+
+export const reviewNotes = pgTable("review_notes", {
+  id: uuid("id").primaryKey(),
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("review_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+  index("review_notes_applicant_idx").on(t.applicantId, t.reviewCycle, t.createdAt),
+]);
+
+export const sheetConflicts = pgTable("sheet_conflicts", {
+  applicantId: uuid("applicant_id").notNull().references(() => applicants.id, { onDelete: "cascade" }),
+  reviewCycle: integer("review_cycle").notNull(),
+  decisionId: uuid("decision_id").notNull(),
+  sheetTarget: text("sheet_target").notNull(),
+  heldStatus: text("held_status").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.applicantId, t.reviewCycle, t.decisionId] }),
+]);
+
+export const deskCases = pgTable("desk_cases", {
+  desk: text("desk").notNull(),
+  recordId: uuid("record_id").notNull(),
+  status: text("status").notNull(),
+  assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+}, (t) => [
+  primaryKey({ columns: [t.desk, t.recordId] }),
+  index("desk_cases_assignee_idx").on(t.assigneeId),
+  check("desk_cases_desk", sql`${t.desk} in ('nomination', 'partner')`),
+  check("desk_cases_status", sql`
+    (${t.desk} = 'nomination' and ${t.status} in ('new', 'reviewing', 'contacted', 'converted', 'closed'))
+    or (${t.desk} = 'partner' and ${t.status} in ('new', 'in_conversation', 'committed', 'declined', 'closed'))
+  `),
+]);
+
+export const deskNotes = pgTable("desk_notes", {
+  id: uuid("id").primaryKey(),
+  desk: text("desk").notNull(),
+  recordId: uuid("record_id").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("desk_notes_desk", sql`${t.desk} in ('nomination', 'partner')`),
+  check("desk_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+  index("desk_notes_record_idx").on(t.desk, t.recordId, t.createdAt),
+]);
+
+export const contactMessages = pgTable(
+  "contact_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    organization: text("organization"),
+    phone: text("phone").notNull(),
+    body: text("body").notNull(),
+    locale: text("locale").notNull(),
+    status: text("status").$type<ContactStatus>().notNull().default("new"),
+    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    check("contact_messages_status", sql`${t.status} in ('new', 'read', 'archived', 'spam')`),
+    check("contact_messages_read_pair", sql`
+      (${t.status} = 'new' and ${t.readAt} is null)
+      or (${t.status} = 'read' and ${t.readAt} is not null)
+      or (${t.status} in ('archived', 'spam'))
+    `),
+    check("contact_messages_name_len", sql`char_length(${t.name}) between 2 and 200`),
+    check("contact_messages_email", sql`char_length(${t.email}) between 3 and 254 and ${t.email} = lower(${t.email})`),
+    check("contact_messages_organization_len", sql`${t.organization} is null or char_length(${t.organization}) between 1 and 200`),
+    check("contact_messages_phone", sql`${t.phone} ~ '^[+][0-9]{1,4} [0-9]{6,15}$'`),
+    check("contact_messages_body_len", sql`char_length(${t.body}) between 3 and 4000`),
+    check("contact_messages_locale", sql`${t.locale} in ('en', 'fr', 'es', 'pt')`),
+    index("contact_messages_created_idx").on(t.createdAt),
+    index("contact_messages_status_created_idx").on(t.status, t.createdAt),
+    index("contact_messages_assignee_idx").on(t.assigneeId),
+  ],
+);
+
+export const contactNotes = pgTable(
+  "contact_notes",
+  {
+    id: uuid("id").primaryKey(),
+    messageId: uuid("message_id").notNull().references(() => contactMessages.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").notNull().references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    check("contact_notes_body_len", sql`char_length(${t.body}) between 1 and 4000`),
+    index("contact_notes_message_idx").on(t.messageId, t.createdAt),
+  ],
+);
+
+export const copyDrafts = pgTable("copy_drafts", {
+  catalog: text("catalog").notNull(),
+  locale: text("locale").notNull(),
+  key: text("key").notNull(),
+  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  value: text("value").notNull(),
+  translatedFrom: text("translated_from"),
+  updatedAt: updatedAt(),
+}, (t) => [
+  primaryKey({ columns: [t.catalog, t.locale, t.key, t.authorId] }),
+]);

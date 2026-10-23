@@ -6,13 +6,14 @@ import { getDb, jobs, type Db, type Store, type JobPayload } from "@/lib/db";
 // record it belongs to (an applicant and its confirmation email commit together
 // or not at all) and is then attempted by the cron worker until it succeeds,
 // with exponential backoff, or until it is parked as `failed` for the team.
-export type JobKind = "email" | "identity_session" | "webhook" | "identity_documents";
+export type JobKind = "email" | "identity_session" | "webhook" | "identity_documents" | "videoask_media";
 export type Job = typeof jobs.$inferSelect;
 
 export type EmailJobPayload = { to: string; subject: string; html: string; template: string };
 export type IdentitySessionJobPayload = { applicantId: string };
 export type WebhookJobPayload = { eventId: string };
 export type IdentityDocumentsJobPayload = { applicantId: string; sessionId: string | null };
+export type VideoaskMediaJobPayload = { applicantId: string; questionId: string };
 
 export type JobOutcome =
   | { status: "done"; providerId?: string | null; deliveryStatus?: string | null }

@@ -35,8 +35,9 @@ page; the identity provisioning job sends the next link after the event is proce
    matching VIDEOASK_WEBHOOK_SECRET. Remove secrets from query strings.
 4. Enable `form_response` or `form_response_transcribed`. Only events whose
    `contact.status` is `completed` are eligible. The handler reads the signed
-   reference from `contact.variables`, verifies the exact form and language, and
-   uses its bound stage. Answer text and caller-supplied applicant IDs are ignored.
+   reference from `contact.variables`, verifies the form id, and stores the
+   named answer fields for staff review. A recursive walk of the payload is
+   still forbidden.
 5. Verify a real test completion for each configured form before production rollout.
    If the provider uses a different variable field, normalize that documented field
    explicitly; do not restore arbitrary recursive payload searching.
@@ -50,6 +51,8 @@ Waitlist and interest forms now queue confirmation emails. No record is created,
 resubscribed, or updated until its mailbox owner confirms. Both known and unknown
 addresses receive the same public response. Confirmation links are single-use,
 short-lived, and unaffected by GET previews. Nomination submissions remain separate.
+The contact form stores a message after Turnstile and the rate limit, then
+queues a short receipt to the sender. There is no staff notification email.
 
 ## Individual operations access
 

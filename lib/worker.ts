@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { applicants, getDb, identityDocuments, type Db } from "@/lib/db";
+import { loadEmailSources } from "@/lib/copy/read";
 import { identityEmail } from "@/lib/emails";
+import { purgeExpiredSignIns } from "@/lib/staff/auth";
 import { put } from "@vercel/blob";
 import { deliverEmail } from "@/lib/email";
 import { provisionIdentitySession } from "@/lib/application";
@@ -20,7 +22,9 @@ import {
   type WebhookJobPayload,
 } from "@/lib/jobs";
 import { processWebhookEvent, requeueUnprocessedWebhooks } from "@/lib/webhooks";
+import { identityPathname, parseApplicantId, readMediaEnv, readVideoaskMediaJob } from "@/lib/holdings";
 import { fetchDiditDocuments } from "@/lib/identity";
+import { copyVideoaskMedia, retainPrivateMedia, type RetentionReport } from "@/lib/media";
 import { recordChange } from "@/lib/sync-log";
 import { applicantSyncRowWithDocuments } from "@/lib/sync";
 
@@ -34,7 +38,8 @@ async function sendIdentityFallback(db: Db, job: Job): Promise<JobOutcome> {
   if (applicant.status !== "round1_complete" || applicant.track === "online") return { status: "done", providerId: null, deliveryStatus: `skipped: status ${applicant.status}` };
   if (!applicant.identityLink) return { status: "done", providerId: null, deliveryStatus: "skipped: no identity link" };
   if (applicant.identityLinkOpenedAt) return { status: "done", providerId: null, deliveryStatus: "skipped: link opened" };
-  const { subject, html } = identityEmail(applicant.fullName, applicant.identityLink, applicant.language);
+  const sources = await loadEmailSources();
+  const { subject, html } = identityEmail(applicant.fullName, applicant.identityLink, applicant.language, sources);
   const result = await deliverEmail({ to: applicant.email, subject, html }, job.dedupeKey);
   if (result.ok) return { status: "done", providerId: result.id, deliveryStatus: result.skipped ? "skipped" : "accepted" };
   return { status: result.retryable ? "retry" : "failed", error: result.error };
@@ -78,7 +83,10 @@ export const handlers: Record<JobKind, JobHandler> = {
       const body = Buffer.from(await response.arrayBuffer());
       const contentType = response.headers.get("content-type")?.split(";")[0] || "application/octet-stream";
       const extension = contentType.split("/")[1]?.replace(/[^a-z0-9]+/gi, "") || "bin";
-      const pathname = `identity/${applicantId}/${source.kind}-${index}.${extension}`;
+      const parsedId = parseApplicantId(applicantId);
+      const pathname = parsedId
+        ? identityPathname(parsedId, source.kind, index, contentType)
+        : `identity/${applicantId}/${source.kind}-${index}.${extension}`;
       await put(pathname, body, { access: "private", contentType, allowOverwrite: true });
       await db.insert(identityDocuments).values({
         applicantId,
@@ -105,6 +113,12 @@ export const handlers: Record<JobKind, JobHandler> = {
     const result = await processWebhookEvent(db, eventId);
     return { status: "done", deliveryStatus: result.outcome };
   },
+
+  async videoask_media(job, db) {
+    const ids = readVideoaskMediaJob(job.payload);
+    if (!ids) return { status: "failed", error: "videoask media job is missing ids" };
+    return copyVideoaskMedia(db, ids.applicantId, ids.questionId);
+  },
 };
 
 // One cron tick: retry anything due, sweep for orphaned webhook events, and
@@ -116,5 +130,16 @@ export async function tick(limit = 25) {
   await purgeExpiredTokens(db);
   await purgeCaptureTokens(db);
   await purgeExpiredRateLimits(db);
-  return { ...jobs, requeuedWebhooks: requeued };
+  try {
+    await purgeExpiredSignIns(db);
+  } catch (err) {
+    console.error("[worker] staff purge skipped", err instanceof Error ? err.message : err);
+  }
+  let mediaRetention: RetentionReport = { mode: "error", answers: 0, documents: 0 };
+  try {
+    mediaRetention = await retainPrivateMedia(db, new Date(), readMediaEnv(process.env));
+  } catch {
+    mediaRetention = { mode: "error", answers: 0, documents: 0 };
+  }
+  return { ...jobs, requeuedWebhooks: requeued, mediaRetention };
 }
