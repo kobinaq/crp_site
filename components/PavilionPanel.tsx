@@ -236,7 +236,8 @@ export function PavilionPanel() {
             <div className="absolute inset-0 z-10 flex flex-col items-center px-4 pb-[63px] pt-[96px] desk:pb-[97px] desk:pt-[96px]">
               <div className="flex flex-col items-center">
                 <DisplayWordmark
-                  word="Pavilion"
+                  kicker={copy.pavilion.kicker}
+                  word={copy.pavilion.word}
                   size="xl"
                   className="gap-[15.641px]"
                 />

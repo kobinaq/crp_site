@@ -71,7 +71,7 @@ export function ContentGrid() {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1072px] flex-col items-center">
-        <DisplayWordmark kicker={copy.content.kicker} word="Content" size="section" className="shrink-0" />
+        <DisplayWordmark kicker={copy.content.kicker} word={copy.content.word} size="section" className="shrink-0" />
 
         <p className="mt-[11px] w-[360px] max-w-full text-center text-[28px] font-normal leading-[0.9] tracking-[-1.12px] text-white desk:mt-0 desk:w-auto desk:max-w-[840px] desk:text-[48px] desk:tracking-[-1.92px]">
           {copy.content.subtitle}
